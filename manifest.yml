@@ -1,0 +1,9 @@
+---
+applications:
+  - name: PEmanager
+    memory: 512M
+    buildpacks:
+      - nodejs_buildpack
+    command: npm start
+    env:
+      NODE_ENV: production

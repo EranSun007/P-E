@@ -103,6 +103,10 @@ export const localClient = {
       async list() {
         return getData('team_members');
       },
+      async get(id) {
+        const members = getData('team_members');
+        return members.find(m => m.id === id) || null;
+      },
       async create(member) {
         const members = getData('team_members');
         const newMember = { ...member, id: generateId(), created_date: new Date().toISOString() };

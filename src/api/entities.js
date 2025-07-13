@@ -1,13 +1,13 @@
-import { base44 } from './base44Client';
+import { localClient } from './localClient';
 
 // Use localClient entities (Task, Project, Stakeholder, TeamMember)
-export const Task = base44.entities.Task;
-export const Project = base44.entities.Project;
-export const Stakeholder = base44.entities.Stakeholder;
-export const TeamMember = base44.entities.TeamMember;
+export const Task = localClient.entities.Task;
+export const Project = localClient.entities.Project;
+export const Stakeholder = localClient.entities.Stakeholder;
+export const TeamMember = localClient.entities.TeamMember;
 // Optionally add TaskAttribute, OneOnOne if needed
-export const TaskAttribute = base44.entities.TaskAttribute || {};
-export const OneOnOne = base44.entities.OneOnOne || {};
+export const TaskAttribute = localClient.entities.TaskAttribute || {};
+export const OneOnOne = localClient.entities.OneOnOne || {};
 
 // Remove Base44 auth, use local user only
 export const User = { me: async () => ({ id: 'local-user', name: 'Local User' }), logout: async () => true };
