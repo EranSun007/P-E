@@ -1,11 +1,8 @@
-// SafeArray utility component and function
-export function safeArray(possibleArray) {
-  if (!possibleArray) return [];
-  if (Array.isArray(possibleArray)) return possibleArray;
-  return [];
-}
+// Re-export array utilities from the proper utils directory
+export { safeArray, safeArrayProp, safeFilters } from '../../utils/arrayUtils.js';
 
-// Export a dummy component to make it a valid React component file
+// This file is deprecated - use import from @/utils/arrayUtils.js instead
 export default function SafeArray() {
+  console.warn('SafeArray component is deprecated. Use import { safeArray } from "@/utils/arrayUtils.js" instead');
   return null;
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { format, parseISO } from "date-fns";
-import { TeamMember, OneOnOne, Task, Project } from "@/api/entities";
+import { TeamMember, OneOnOne, Task, Project, Stakeholder } from "@/api/entities";
 import { createPageUrl } from "@/utils";
 import {
   Card,
@@ -51,6 +51,7 @@ import {
   MessageSquare,
   AlertCircle,
   SmilePlus,
+  Trash2,
 } from "lucide-react";
 
 export default function TeamMemberProfile() {
@@ -61,10 +62,17 @@ export default function TeamMemberProfile() {
   const [oneOnOnes, setOneOnOnes] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [allTeamMembers, setAllTeamMembers] = useState([]);
+  const [allStakeholders, setAllStakeholders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNewMeetingDialog, setShowNewMeetingDialog] = useState(false);
   const [showActionItemDialog, setShowActionItemDialog] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
+  const [noteForm, setNoteForm] = useState({
+    text: "",
+    referenced_entity: { type: "team_member", id: "" },
+  });
+  const [selectedMeetingForNote, setSelectedMeetingForNote] = useState(null);
 
   const [meetingForm, setMeetingForm] = useState({
     date: new Date().toISOString(),
@@ -81,6 +89,18 @@ export default function TeamMemberProfile() {
     linked_task_id: "",
     linked_project_id: "",
     status: "open"
+  });
+
+  const [noteTagType, setNoteTagType] = useState("none");
+  const [noteTagId, setNoteTagId] = useState("");
+
+  const [discussedNotes, setDiscussedNotes] = useState(() => {
+    // Load discussed notes from localStorage
+    try {
+      return JSON.parse(localStorage.getItem('discussedNotes') || '{}');
+    } catch {
+      return {};
+    }
   });
 
   useEffect(() => {
@@ -106,6 +126,10 @@ export default function TeamMemberProfile() {
       const projectData = await Project.list();
       setTasks(taskData);
       setProjects(projectData);
+
+      // Load all team members and stakeholders for note tagging
+      setAllTeamMembers(await TeamMember.list());
+      setAllStakeholders(await Stakeholder.list());
     } catch (error) {
       console.error("Error loading team member data:", error);
     } finally {
@@ -117,6 +141,7 @@ export default function TeamMemberProfile() {
     try {
       await OneOnOne.create({
         ...meetingForm,
+        notes: Array.isArray(meetingForm.notes) ? meetingForm.notes : [], // always save as array
         team_member_id: memberId
       });
       setShowNewMeetingDialog(false);
@@ -146,6 +171,28 @@ export default function TeamMemberProfile() {
     }
   };
 
+  // Update handleAddNote to set referenced_entity to null if no tag
+  const handleAddNote = async (meetingId) => {
+    if (!noteForm.text) return;
+    let referenced_entity = null;
+    if (noteTagType !== "none" && noteTagId) {
+      referenced_entity = { type: noteTagType, id: noteTagId };
+    }
+    const meeting = oneOnOnes.find(o => o.id === meetingId);
+    if (!meeting) return;
+    const newNote = {
+      text: noteForm.text,
+      referenced_entity,
+      created_by: memberId,
+      timestamp: new Date().toISOString(),
+    };
+    const updatedNotes = Array.isArray(meeting.notes) ? [...meeting.notes, newNote] : [newNote];
+    await OneOnOne.update(meetingId, { ...meeting, notes: updatedNotes });
+    setNoteForm({ text: "", referenced_entity: { type: "team_member", id: "" } });
+    setSelectedMeetingForNote(null);
+    loadData();
+  };
+
   const updateActionItemStatus = async (meetingId, actionItemIndex, newStatus) => {
     try {
       const meeting = oneOnOnes.find(o => o.id === meetingId);
@@ -164,6 +211,20 @@ export default function TeamMemberProfile() {
       loadData();
     } catch (error) {
       console.error("Error updating action item status:", error);
+    }
+  };
+
+  const persistDiscussedNotes = (updated) => {
+    setDiscussedNotes(updated);
+    localStorage.setItem('discussedNotes', JSON.stringify(updated));
+  };
+
+  const handleDeleteMeeting = async (meetingId) => {
+    try {
+      await OneOnOne.delete(meetingId);
+      loadData();
+    } catch (error) {
+      console.error("Error deleting meeting:", error);
     }
   };
 
@@ -262,29 +323,121 @@ export default function TeamMemberProfile() {
                                     "Not scheduled"}
                                 </CardDescription>
                               </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedMeeting(meeting);
-                                  setShowActionItemDialog(true);
-                                }}
-                              >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add Action Item
-                              </Button>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedMeeting(meeting);
+                                    setShowActionItemDialog(true);
+                                  }}
+                                >
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Add Action Item
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDeleteMeeting(meeting.id)}
+                                  title="Delete meeting"
+                                >
+                                  <Trash2 className="h-5 w-5 text-red-500" />
+                                </Button>
+                              </div>
                             </div>
                           </CardHeader>
                           <CardContent>
                             <div className="space-y-4">
-                              {meeting.notes && (
+                              {/* Show only notes that are untagged or tagged with someone else */}
+                              {Array.isArray(meeting.notes) && meeting.notes.filter(n => !n.referenced_entity || !n.referenced_entity.id || String(n.referenced_entity.id) !== String(memberId)).length > 0 && (
                                 <div>
                                   <h4 className="font-medium mb-2">Notes</h4>
-                                  <p className="text-gray-600 whitespace-pre-wrap">
-                                    {meeting.notes}
-                                  </p>
+                                  <ul className="list-disc pl-5">
+                                    {meeting.notes.filter(n => !n.referenced_entity || !n.referenced_entity.id || String(n.referenced_entity.id) !== String(memberId)).map((n, i) => (
+                                      <li key={i} className="mb-1">
+                                        <span>{n.text}</span>
+                                        {n.referenced_entity?.id && (
+                                          <span className="ml-2 text-xs bg-gray-200 rounded px-2 py-0.5">
+                                            {n.referenced_entity.type === "team_member" &&
+                                              allTeamMembers.find(tm => String(tm.id) === String(n.referenced_entity.id))?.name}
+                                            {n.referenced_entity.type === "stakeholder" &&
+                                              allStakeholders.find(s => String(s.id) === String(n.referenced_entity.id))?.name}
+                                            {n.referenced_entity.type === "project" &&
+                                              projects.find(p => String(p.id) === String(n.referenced_entity.id))?.name}
+                                          </span>
+                                        )}
+                                      </li>
+                                    ))}
+                                  </ul>
                                 </div>
                               )}
+                              {/* Add Note form for this meeting */}
+                              <div className="mt-2 flex gap-2 items-end">
+                                <Input
+                                  className="flex-1"
+                                  placeholder="Note text..."
+                                  value={selectedMeetingForNote === meeting.id ? noteForm.text : ""}
+                                  onChange={e => {
+                                    setSelectedMeetingForNote(meeting.id);
+                                    setNoteForm(f => ({ ...f, text: e.target.value }));
+                                  }}
+                                />
+                                <Select
+                                  value={selectedMeetingForNote === meeting.id ? noteTagType : "none"}
+                                  onValueChange={val => {
+                                    setSelectedMeetingForNote(meeting.id);
+                                    setNoteTagType(val);
+                                    setNoteTagId("");
+                                    setNoteForm(f => ({ ...f, referenced_entity: val === "none" ? null : { type: val, id: "" } }));
+                                  }}
+                                >
+                                  <SelectTrigger className="w-32">
+                                    <SelectValue placeholder="No tag" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">No tag</SelectItem>
+                                    <SelectItem value="team_member">Team Members</SelectItem>
+                                    <SelectItem value="stakeholder">Stakeholders</SelectItem>
+                                    <SelectItem value="project">Projects</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                {noteTagType !== "none" && selectedMeetingForNote === meeting.id && (
+                                  <Select
+                                    value={noteTagId}
+                                    onValueChange={val => {
+                                      setNoteTagId(val);
+                                      setNoteForm(f => ({ ...f, referenced_entity: { type: noteTagType, id: val } }));
+                                    }}
+                                  >
+                                    <SelectTrigger className="w-40">
+                                      <SelectValue placeholder="Select name" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {noteTagType === "team_member" &&
+                                        allTeamMembers.filter(tm => tm.id.toString() !== memberId?.toString()).map(tm => (
+                                          <SelectItem key={tm.id} value={tm.id}>{tm.name}</SelectItem>
+                                        ))}
+                                      {noteTagType === "stakeholder" &&
+                                        allStakeholders.map(s => (
+                                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                        ))}
+                                      {noteTagType === "project" &&
+                                        projects.map(p => (
+                                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                                <Button
+                                  onClick={() => {
+                                    setSelectedMeetingForNote(meeting.id);
+                                    handleAddNote(meeting.id);
+                                  }}
+                                  disabled={!noteForm.text || (noteTagType !== "none" && !noteTagId) || selectedMeetingForNote !== meeting.id}
+                                >
+                                  Add
+                                </Button>
+                              </div>
 
                               {meeting.topics_discussed?.length > 0 && (
                                 <div>
@@ -500,19 +653,118 @@ export default function TeamMemberProfile() {
               </Select>
             </div>
 
+            {/* Structured Notes UI */}
             <div className="space-y-2">
               <Label>Notes</Label>
-              <Textarea
-                value={meetingForm.notes}
-                onChange={(e) => setMeetingForm(prev => ({
-                  ...prev,
-                  notes: e.target.value
-                }))}
-                placeholder="Meeting notes and discussion points..."
-                rows={4}
-              />
+              {/* List of notes to be added to this meeting */}
+              {Array.isArray(meetingForm.notes) && meetingForm.notes.length > 0 && (
+                <ul className="list-disc pl-5 mb-2">
+                  {meetingForm.notes.map((n, i) => (
+                    <li key={i} className="mb-1 flex items-center gap-2">
+                      <span>{n.text}</span>
+                      {n.referenced_entity?.id && (
+                        <span className="ml-2 text-xs bg-gray-200 rounded px-2 py-0.5">
+                          {n.referenced_entity.type === "team_member" &&
+                            allTeamMembers.find(tm => tm.id === n.referenced_entity.id)?.name}
+                          {n.referenced_entity.type === "stakeholder" &&
+                            allStakeholders.find(s => s.id === n.referenced_entity.id)?.name}
+                          {n.referenced_entity.type === "project" &&
+                            projects.find(p => p.id === n.referenced_entity.id)?.name}
+                        </span>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        className="ml-2"
+                        onClick={() => setMeetingForm(prev => ({
+                          ...prev,
+                          notes: prev.notes.filter((_, idx) => idx !== i)
+                        }))}
+                      >Remove</Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {/* Add note form for new meeting */}
+              <div className="flex gap-2 items-end">
+                <Input
+                  className="flex-1"
+                  placeholder="Note text..."
+                  value={noteForm.text}
+                  onChange={e => setNoteForm(f => ({ ...f, text: e.target.value }))}
+                />
+                {/* Tag type dropdown */}
+                <Select
+                  value={noteTagType}
+                  onValueChange={val => {
+                    setNoteTagType(val);
+                    setNoteTagId("");
+                    setNoteForm(f => ({ ...f, referenced_entity: { type: val, id: "" } }));
+                  }}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="No tag" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No tag</SelectItem>
+                    <SelectItem value="team_member">Team Members</SelectItem>
+                    <SelectItem value="stakeholder">Stakeholders</SelectItem>
+                    <SelectItem value="project">Projects</SelectItem>
+                  </SelectContent>
+                </Select>
+                {/* Entity name dropdown, only if a type is selected and not 'none' */}
+                {noteTagType !== "none" && (
+                  <Select
+                    value={noteTagId}
+                    onValueChange={val => {
+                      setNoteTagId(val);
+                      setNoteForm(f => ({ ...f, referenced_entity: { type: noteTagType, id: val } }));
+                    }}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Select name" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {noteTagType === "team_member" &&
+                        allTeamMembers.filter(tm => tm.id !== memberId).map(tm => (
+                          <SelectItem key={tm.id} value={tm.id}>{tm.name}</SelectItem>
+                        ))}
+                      {noteTagType === "stakeholder" &&
+                        allStakeholders.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      {noteTagType === "project" &&
+                        projects.map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Button
+                  onClick={() => {
+                    if (!noteForm.text) return;
+                    setMeetingForm(prev => ({
+                      ...prev,
+                      notes: [
+                        ...(Array.isArray(prev.notes) ? prev.notes : []),
+                        {
+                          text: noteForm.text,
+                          referenced_entity: noteTagType === "none" ? {} : { type: noteTagType, id: noteTagId },
+                          created_by: memberId,
+                          timestamp: new Date().toISOString(),
+                        }
+                      ]
+                    }));
+                    setNoteForm({ text: "", referenced_entity: { type: "team_member", id: "" } });
+                    setNoteTagType("none");
+                    setNoteTagId("");
+                  }}
+                  disabled={!noteForm.text || (noteTagType !== "none" && !noteTagId)}
+                >
+                  Add
+                </Button>
+              </div>
             </div>
-
             <div className="space-y-2">
               <Label>Next Meeting Date</Label>
               <Popover>

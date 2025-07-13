@@ -1,16 +1,38 @@
 // src/api/localClient.js
 // Local storage-based API client for migration from Base44
 
+import { sanitizeInput, validateInput } from '../utils/validation.js';
+
 function getData(key) {
-  return JSON.parse(localStorage.getItem(key) || '[]');
+  try {
+    const data = localStorage.getItem(key);
+    if (!data) return [];
+    return JSON.parse(data);
+  } catch (error) {
+    console.error(`Error reading data from localStorage key "${key}":`, error);
+    return [];
+  }
 }
 
 function setData(key, data) {
-  localStorage.setItem(key, JSON.stringify(data));
+  try {
+    if (!validateInput.array(data)) {
+      throw new Error('Invalid data format - must be an array');
+    }
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (error) {
+    console.error(`Error saving data to localStorage key "${key}":`, error);
+    throw error;
+  }
 }
 
 function generateId() {
-  return '_' + Math.random().toString(36).substr(2, 9);
+  // Use crypto.randomUUID() for secure ID generation
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for older browsers
+  return '_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 }
 
 export const localClient = {
