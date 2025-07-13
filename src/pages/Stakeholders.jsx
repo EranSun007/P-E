@@ -15,6 +15,7 @@ export default function StakeholdersPage() {
   const [showDialog, setShowDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState(null);
+  const [editingStakeholder, setEditingStakeholder] = useState(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -51,14 +52,40 @@ export default function StakeholdersPage() {
     }
   };
 
+  const openCreateDialog = () => {
+    setFormData({
+      name: "",
+      department: "",
+      influence: "medium",
+      description: ""
+    });
+    setEditingStakeholder(null);
+    setShowDialog(true);
+  };
+
+  const openEditDialog = (stakeholder) => {
+    setFormData({
+      name: stakeholder.name || "",
+      department: stakeholder.department || "",
+      influence: stakeholder.influence || "medium",
+      description: stakeholder.description || ""
+    });
+    setEditingStakeholder(stakeholder);
+    setShowDialog(true);
+  };
+
   const handleSubmit = async () => {
     try {
-      await Stakeholder.create(formData);
+      if (editingStakeholder) {
+        await Stakeholder.update(editingStakeholder.id, formData);
+      } else {
+        await Stakeholder.create(formData);
+      }
       setShowDialog(false);
       loadStakeholders();
     } catch (err) {
-      console.error("Failed to create stakeholder:", err);
-      setError("Failed to create stakeholder");
+      console.error(`Failed to ${editingStakeholder ? 'update' : 'create'} stakeholder:`, err);
+      setError(`Failed to ${editingStakeholder ? 'update' : 'create'} stakeholder`);
     }
   };
 
@@ -88,7 +115,7 @@ export default function StakeholdersPage() {
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Stakeholders</h1>
-          <Button onClick={() => setShowDialog(true)}>
+          <Button onClick={openCreateDialog}>
             <Plus className="h-4 w-4 mr-2" />
             Add Stakeholder
           </Button>
@@ -141,6 +168,9 @@ export default function StakeholdersPage() {
                   {stakeholder.description && (
                     <p className="text-sm text-gray-600">{stakeholder.description}</p>
                   )}
+                  <Button size="sm" variant="outline" className="mt-2" onClick={() => openEditDialog(stakeholder)}>
+                    Edit
+                  </Button>
                 </CardContent>
               </Card>
             ))}
@@ -150,7 +180,7 @@ export default function StakeholdersPage() {
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add New Stakeholder</DialogTitle>
+              <DialogTitle>{editingStakeholder ? "Edit Stakeholder" : "Add New Stakeholder"}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
@@ -202,7 +232,7 @@ export default function StakeholdersPage() {
                 Cancel
               </Button>
               <Button onClick={handleSubmit}>
-                Create Stakeholder
+                {editingStakeholder ? "Update Stakeholder" : "Create Stakeholder"}
               </Button>
             </DialogFooter>
           </DialogContent>
