@@ -32,6 +32,9 @@ export default function TaskCreationForm({ onCreateTask, initialTaskData = null 
     priority: "medium",
     project: "",
     due_date: "",
+    assignee: "",
+    estimated_hours: "",
+    actual_hours: "",
     stakeholders: [],
     tags: [],
     strategic: false,
@@ -269,6 +272,9 @@ export default function TaskCreationForm({ onCreateTask, initialTaskData = null 
       priority: "medium",
       project: "",
       due_date: "",
+      assignee: "",
+      estimated_hours: "",
+      actual_hours: "",
       stakeholders: [],
       tags: [],
       strategic: false,
@@ -570,6 +576,17 @@ export default function TaskCreationForm({ onCreateTask, initialTaskData = null 
                   </div>
                   
                   <div>
+                    <label className="block text-sm font-medium mb-1">Assignee</label>
+                    <Input
+                      value={taskData.assignee || ""}
+                      onChange={(e) => updateTaskField("assignee", e.target.value)}
+                      placeholder="Who is responsible for this task?"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
                     <label className="block text-sm font-medium mb-1">Strategic</label>
                     <Button
                       type="button"
@@ -580,6 +597,30 @@ export default function TaskCreationForm({ onCreateTask, initialTaskData = null 
                       {taskData.strategic && <Check className="mr-2 h-4 w-4" />}
                       {taskData.strategic ? "Strategic Task" : "Tactical Task"}
                     </Button>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Estimated Hours</label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={taskData.estimated_hours || ""}
+                      onChange={(e) => updateTaskField("estimated_hours", e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Actual Hours</label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={taskData.actual_hours || ""}
+                      onChange={(e) => updateTaskField("actual_hours", e.target.value)}
+                      placeholder="0"
+                    />
                   </div>
                 </div>
                 

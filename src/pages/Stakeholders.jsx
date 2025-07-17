@@ -19,9 +19,15 @@ export default function StakeholdersPage() {
 
   const [formData, setFormData] = useState({
     name: "",
-    department: "",
-    influence: "medium",
-    description: ""
+    role: "",
+    email: "",
+    phone: "",
+    company: "",
+    influence_level: "medium",
+    engagement_level: "active",
+    contact_info: "",
+    notes: "",
+    tags: []
   });
 
   useEffect(() => {
@@ -34,7 +40,7 @@ export default function StakeholdersPage() {
     try {
       const response = await Stakeholder.list();
       console.log("Stakeholder response:", response); // Debug log
-      
+
       // Ensure we have a valid array
       if (!response) {
         setStakeholders([]);
@@ -55,9 +61,15 @@ export default function StakeholdersPage() {
   const openCreateDialog = () => {
     setFormData({
       name: "",
-      department: "",
-      influence: "medium",
-      description: ""
+      role: "",
+      email: "",
+      phone: "",
+      company: "",
+      influence_level: "medium",
+      engagement_level: "active",
+      contact_info: "",
+      notes: "",
+      tags: []
     });
     setEditingStakeholder(null);
     setShowDialog(true);
@@ -66,9 +78,15 @@ export default function StakeholdersPage() {
   const openEditDialog = (stakeholder) => {
     setFormData({
       name: stakeholder.name || "",
-      department: stakeholder.department || "",
-      influence: stakeholder.influence || "medium",
-      description: stakeholder.description || ""
+      role: stakeholder.role || "",
+      email: stakeholder.email || "",
+      phone: stakeholder.phone || "",
+      company: stakeholder.company || stakeholder.organization || "",
+      influence_level: stakeholder.influence_level || stakeholder.influence || "medium",
+      engagement_level: stakeholder.engagement_level || "active",
+      contact_info: stakeholder.contact_info || "",
+      notes: stakeholder.notes || stakeholder.description || "",
+      tags: Array.isArray(stakeholder.tags) ? stakeholder.tags : []
     });
     setEditingStakeholder(stakeholder);
     setShowDialog(true);
@@ -106,8 +124,9 @@ export default function StakeholdersPage() {
     if (!item) return false;
     const search = (searchQuery || "").toLowerCase();
     const name = (item.name || "").toLowerCase();
-    const dept = (item.department || "").toLowerCase();
-    return name.includes(search) || dept.includes(search);
+    const role = (item.role || "").toLowerCase();
+    const company = (item.company || item.organization || "").toLowerCase();
+    return name.includes(search) || role.includes(search) || company.includes(search);
   });
 
   return (
@@ -153,20 +172,35 @@ export default function StakeholdersPage() {
               <Card key={stakeholder.id || Math.random()}>
                 <CardHeader>
                   <CardTitle>{stakeholder.name || "Unnamed Stakeholder"}</CardTitle>
-                  <Badge className={
-                    stakeholder.influence === "high" ? "bg-red-100 text-red-800" :
-                    stakeholder.influence === "medium" ? "bg-yellow-100 text-yellow-800" :
-                    "bg-blue-100 text-blue-800"
-                  }>
-                    {stakeholder.influence || "medium"} influence
-                  </Badge>
+                  <div className="flex gap-2 flex-wrap">
+                    <Badge className={
+                      (stakeholder.influence_level || stakeholder.influence) === "high" ? "bg-red-100 text-red-800" :
+                        (stakeholder.influence_level || stakeholder.influence) === "medium" ? "bg-yellow-100 text-yellow-800" :
+                          "bg-blue-100 text-blue-800"
+                    }>
+                      {(stakeholder.influence_level || stakeholder.influence) || "medium"} influence
+                    </Badge>
+                    <Badge className={
+                      stakeholder.engagement_level === "active" ? "bg-green-100 text-green-800" :
+                        stakeholder.engagement_level === "passive" ? "bg-gray-100 text-gray-800" :
+                          "bg-orange-100 text-orange-800"
+                    }>
+                      {stakeholder.engagement_level || "active"}
+                    </Badge>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  {stakeholder.department && (
-                    <p className="text-sm text-gray-500 mb-2">{stakeholder.department}</p>
+                  {stakeholder.role && (
+                    <p className="text-sm text-gray-500 mb-1">{stakeholder.role}</p>
                   )}
-                  {stakeholder.description && (
-                    <p className="text-sm text-gray-600">{stakeholder.description}</p>
+                  {(stakeholder.company || stakeholder.organization) && (
+                    <p className="text-sm text-gray-500 mb-2">{stakeholder.company || stakeholder.organization}</p>
+                  )}
+                  {stakeholder.email && (
+                    <p className="text-sm text-blue-600 mb-1">{stakeholder.email}</p>
+                  )}
+                  {(stakeholder.notes || stakeholder.description) && (
+                    <p className="text-sm text-gray-600 mb-2">{stakeholder.notes || stakeholder.description}</p>
                   )}
                   <Button size="sm" variant="outline" className="mt-2" onClick={() => openEditDialog(stakeholder)}>
                     Edit
@@ -188,42 +222,103 @@ export default function StakeholdersPage() {
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Enter name"
+                  placeholder="Enter full name"
                 />
               </div>
-              
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <Input
+                    value={formData.role}
+                    onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
+                    placeholder="Job title or role"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Company</Label>
+                  <Input
+                    value={formData.company}
+                    onChange={(e) => setFormData(prev => ({ ...prev, company: e.target.value }))}
+                    placeholder="Company name"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    placeholder="Email address"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Phone</Label>
+                  <Input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="Phone number"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Influence Level</Label>
+                  <Select
+                    value={formData.influence_level}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, influence_level: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select influence level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Engagement Level</Label>
+                  <Select
+                    value={formData.engagement_level}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, engagement_level: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select engagement level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="passive">Passive</SelectItem>
+                      <SelectItem value="resistant">Resistant</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label>Department</Label>
+                <Label>Contact Info</Label>
                 <Input
-                  value={formData.department}
-                  onChange={(e) => setFormData(prev => ({ ...prev, department: e.target.value }))}
-                  placeholder="Enter department"
+                  value={formData.contact_info}
+                  onChange={(e) => setFormData(prev => ({ ...prev, contact_info: e.target.value }))}
+                  placeholder="Additional contact information"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Influence</Label>
-                <Select
-                  value={formData.influence}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, influence: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select influence level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Description</Label>
+                <Label>Notes</Label>
                 <Input
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Enter description"
+                  value={formData.notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Additional notes about this stakeholder"
                 />
               </div>
             </div>
