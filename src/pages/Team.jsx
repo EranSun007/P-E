@@ -32,6 +32,8 @@ export default function TeamPage() {
     name: "",
     role: "",
     email: "",
+    phone: "",
+    company: "",
     department: "",
     availability: "full_time",
     skills: [], // Initialize with empty array
@@ -91,6 +93,8 @@ export default function TeamPage() {
       name: "",
       role: "",
       email: "",
+      phone: "",
+      company: "",
       department: "",
       availability: "full_time",
       skills: [],
@@ -108,6 +112,8 @@ export default function TeamPage() {
       name: member.name || "",
       role: member.role || "",
       email: member.email || "",
+      phone: member.phone || "",
+      company: member.company || "",
       department: member.department || "",
       availability: member.availability || "full_time",
       skills: Array.isArray(member.skills) ? member.skills : [],
@@ -476,14 +482,37 @@ export default function TeamPage() {
               </div>
             </div>
             
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange("email", e.target.value)}
+                  placeholder="Email address"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange("phone", e.target.value)}
+                  placeholder="Phone number"
+                />
+              </div>
+            </div>
+            
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="company">Company</Label>
               <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange("email", e.target.value)}
-                placeholder="Email address"
+                id="company"
+                value={formData.company}
+                onChange={(e) => handleInputChange("company", e.target.value)}
+                placeholder="Company name"
               />
             </div>
             

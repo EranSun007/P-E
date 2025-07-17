@@ -48,7 +48,11 @@ export default function ProjectsPage() {
     status: "not_started",
     start_date: "",
     end_date: "",
+    deadline: "",
     owner: "",
+    budget: "",
+    cost: "",
+    priority_level: "medium",
     color: getRandomColor(),
     tags: []
   });
@@ -124,7 +128,11 @@ export default function ProjectsPage() {
       status: "not_started",
       start_date: "",
       end_date: "",
+      deadline: "",
       owner: "",
+      budget: "",
+      cost: "",
+      priority_level: "medium",
       color: getRandomColor(),
       tags: []
     });
@@ -141,7 +149,11 @@ export default function ProjectsPage() {
       status: project.status || "not_started",
       start_date: project.start_date || "",
       end_date: project.end_date || "",
+      deadline: project.deadline || "",
       owner: project.owner || "",
+      budget: project.budget || "",
+      cost: project.cost || "",
+      priority_level: project.priority_level || "medium",
       color: project.color || getRandomColor(),
       tags: Array.isArray(project.tags) ? project.tags : []
     });
@@ -742,6 +754,78 @@ export default function ProjectsPage() {
                     />
                   </PopoverContent>
                 </Popover>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Deadline (Critical Date)</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.deadline ? (
+                      format(parseISO(formData.deadline), "PPP")
+                    ) : (
+                      <span>Set deadline (optional)</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={formData.deadline ? parseISO(formData.deadline) : undefined}
+                    onSelect={(date) => handleInputChange("deadline", date ? date.toISOString() : "")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="priority_level">Priority</Label>
+                <Select
+                  value={formData.priority_level}
+                  onValueChange={(value) => handleInputChange("priority_level", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="budget">Budget</Label>
+                <Input
+                  id="budget"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.budget}
+                  onChange={(e) => handleInputChange("budget", e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="cost">Actual Cost</Label>
+                <Input
+                  id="cost"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.cost}
+                  onChange={(e) => handleInputChange("cost", e.target.value)}
+                  placeholder="0.00"
+                />
               </div>
             </div>
             
