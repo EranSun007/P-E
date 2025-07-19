@@ -229,28 +229,95 @@ export const localClient = {
           // Initialize new fields with defaults
           team_member_id: oneOnOne.team_member_id || oneOnOne.participant_id || null,
           status: oneOnOne.status || 'scheduled',
-          location: oneOnOne.location || null
+          location: oneOnOne.location || null,
+          // Add calendar integration field
+          next_meeting_calendar_event_id: oneOnOne.next_meeting_calendar_event_id || null
         };
         // Remove old participant_id field if it exists
         delete newOneOnOne.participant_id;
         oneOnOnes.unshift(newOneOnOne);
         setData('one_on_ones', oneOnOnes);
+
+        // Auto-create calendar event if next_meeting_date is provided
+        if (newOneOnOne.next_meeting_date && newOneOnOne.team_member_id) {
+          try {
+            // Import CalendarService dynamically to avoid circular dependency
+            const { CalendarService } = await import('../utils/calendarService.js');
+            const result = await CalendarService.createAndLinkOneOnOneMeeting(
+              newOneOnOne.id,
+              newOneOnOne.team_member_id,
+              newOneOnOne.next_meeting_date
+            );
+            // Update the OneOnOne record with the calendar event ID
+            newOneOnOne.next_meeting_calendar_event_id = result.calendarEvent.id;
+            oneOnOnes[0] = newOneOnOne; // Update the first item (just added)
+            setData('one_on_ones', oneOnOnes);
+          } catch (error) {
+            console.warn('Failed to create calendar event for OneOnOne:', error);
+            // Continue without calendar event - don't fail the OneOnOne creation
+          }
+        }
+
         return newOneOnOne;
       },
       async update(id, updates) {
         const oneOnOnes = getData('one_on_ones');
         const idx = oneOnOnes.findIndex(o => o.id === id);
         if (idx !== -1) {
+          const currentOneOnOne = oneOnOnes[idx];
           const updatedOneOnOne = { 
-            ...oneOnOnes[idx], 
+            ...currentOneOnOne, 
             ...updates, 
             updated_date: new Date().toISOString() 
           };
+          
           // Handle participant_id -> team_member_id migration during updates
           if (updates.participant_id && !updates.team_member_id) {
             updatedOneOnOne.team_member_id = updates.participant_id;
             delete updatedOneOnOne.participant_id;
           }
+
+          // Handle calendar event updates when next_meeting_date changes
+          if (updates.next_meeting_date && updates.next_meeting_date !== currentOneOnOne.next_meeting_date) {
+            try {
+              // Import CalendarService dynamically to avoid circular dependency
+              const { CalendarService } = await import('../utils/calendarService.js');
+              
+              if (currentOneOnOne.next_meeting_calendar_event_id) {
+                // Update existing calendar event
+                await CalendarService.updateOneOnOneMeeting(
+                  currentOneOnOne.next_meeting_calendar_event_id,
+                  updates.next_meeting_date
+                );
+              } else if (updatedOneOnOne.team_member_id) {
+                // Create new calendar event and link it
+                const result = await CalendarService.createAndLinkOneOnOneMeeting(
+                  id,
+                  updatedOneOnOne.team_member_id,
+                  updates.next_meeting_date
+                );
+                updatedOneOnOne.next_meeting_calendar_event_id = result.calendarEvent.id;
+              }
+            } catch (error) {
+              console.warn('Failed to update calendar event for OneOnOne:', error);
+              // Continue with the update - don't fail the OneOnOne update
+            }
+          }
+
+          // Handle calendar event deletion when next_meeting_date is cleared
+          if (updates.next_meeting_date === null || updates.next_meeting_date === '') {
+            if (currentOneOnOne.next_meeting_calendar_event_id) {
+              try {
+                const { CalendarService } = await import('../utils/calendarService.js');
+                await CalendarService.deleteOneOnOneMeeting(currentOneOnOne.next_meeting_calendar_event_id);
+                updatedOneOnOne.next_meeting_calendar_event_id = null;
+              } catch (error) {
+                console.warn('Failed to delete calendar event for OneOnOne:', error);
+                // Continue with the update
+              }
+            }
+          }
+
           oneOnOnes[idx] = updatedOneOnOne;
           setData('one_on_ones', oneOnOnes);
           return oneOnOnes[idx];
@@ -258,9 +325,23 @@ export const localClient = {
         throw new Error('OneOnOne not found');
       },
       async delete(id) {
-        let oneOnOnes = getData('one_on_ones');
-        oneOnOnes = oneOnOnes.filter(o => o.id !== id);
-        setData('one_on_ones', oneOnOnes);
+        // Get the OneOnOne record before deletion to clean up calendar event
+        const oneOnOnes = getData('one_on_ones');
+        const oneOnOneToDelete = oneOnOnes.find(o => o.id === id);
+        
+        if (oneOnOneToDelete && oneOnOneToDelete.next_meeting_calendar_event_id) {
+          try {
+            // Import CalendarService dynamically to avoid circular dependency
+            const { CalendarService } = await import('../utils/calendarService.js');
+            await CalendarService.deleteOneOnOneMeeting(oneOnOneToDelete.next_meeting_calendar_event_id);
+          } catch (error) {
+            console.warn('Failed to delete associated calendar event:', error);
+            // Continue with deletion even if calendar cleanup fails
+          }
+        }
+
+        const filteredOneOnOnes = oneOnOnes.filter(o => o.id !== id);
+        setData('one_on_ones', filteredOneOnOnes);
         return true;
       }
     },

@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/.a8cf82be4c596f091a1eea4f5bbf89b88b99fe36-audit.json",
+    "files": [
+        {
+            "date": 1752778956799,
+            "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-07-17.log",
+            "hash": "a67de35052cc2f214a72a68cb9f9dfd39f8b044bda9bbb290d40ee2fb96bf915"
+        }
+    ],
+    "hashType": "sha256"
+}

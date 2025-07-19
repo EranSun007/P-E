@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from "react";
 import { Task } from "@/api/entities";
 import { TeamMember } from "@/api/entities";
+import { AgendaService } from "@/utils/agendaService";
+import { AgendaBadge } from "@/components/agenda/AgendaBadge";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,6 +24,7 @@ export default function TeamPage() {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
+  const [agendaSummary, setAgendaSummary] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
@@ -56,7 +59,17 @@ export default function TeamPage() {
       const taskData = await Task.list().catch(() => []);
       setTasks(taskData || []);
       
-      // Attach task data to team member records
+      // Load agenda summaries for all team members
+      let agendaData = {};
+      try {
+        agendaData = await AgendaService.getAgendaSummaryForAllMembers();
+      } catch (agendaError) {
+        console.error("Failed to load agenda data:", agendaError);
+        // Continue without agenda data rather than failing completely
+      }
+      setAgendaSummary(agendaData);
+      
+      // Attach task data and agenda data to team member records
       const enhancedMembers = (memberData || []).map(member => {
         const relatedTasks = (taskData || []).filter(task => 
           (task.metadata?.meeting?.participants || []).includes(member.name)
@@ -71,11 +84,19 @@ export default function TeamPage() {
           }, null);
         }
         
+        // Add agenda information to member data
+        const memberAgenda = agendaData[member.id] || {
+          count: 0,
+          recentItems: [],
+          hasUnresolved: false
+        };
+        
         return {
           ...member,
           tasks: relatedTasks,
           taskCount: relatedTasks.length,
-          lastActivity: lastActivity ? lastActivity.toISOString() : null
+          lastActivity: lastActivity ? lastActivity.toISOString() : null,
+          agenda: memberAgenda
         };
       });
       
@@ -366,6 +387,16 @@ export default function TeamPage() {
                         </Badge>
                       )}
                       {member.availability && getAvailabilityBadge(member.availability)}
+                      {member.agenda && (
+                        <AgendaBadge
+                          count={member.agenda.count}
+                          unresolvedCount={member.agenda.hasUnresolved ? member.agenda.count : 0}
+                          hasUnresolved={member.agenda.hasUnresolved}
+                          onClick={() => goToMemberProfile(member.id)}
+                          memberName={member.name}
+                          size="sm"
+                        />
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">

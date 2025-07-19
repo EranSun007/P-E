@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { TeamMember, OneOnOne, Task, Project, Stakeholder } from "@/api/entities";
+import { AgendaService } from "@/utils/agendaService";
+import { CalendarService } from "@/utils/calendarService";
+import { AgendaItemCard, AgendaItemList } from "@/components/agenda/AgendaItemCard";
 import { createPageUrl } from "@/utils";
 import {
   Card,
@@ -60,6 +63,7 @@ export default function TeamMemberProfile() {
 
   const [member, setMember] = useState(null);
   const [oneOnOnes, setOneOnOnes] = useState([]);
+  const [agendaItems, setAgendaItems] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
   const [allTeamMembers, setAllTeamMembers] = useState([]);
@@ -93,6 +97,7 @@ export default function TeamMemberProfile() {
 
   const [noteTagType, setNoteTagType] = useState("none");
   const [noteTagId, setNoteTagId] = useState("");
+  const [editingNextMeeting, setEditingNextMeeting] = useState(null);
 
   const [discussedNotes, setDiscussedNotes] = useState(() => {
     // Load discussed notes from localStorage
@@ -121,6 +126,15 @@ export default function TeamMemberProfile() {
       const memberOneOnOnes = oneOnOneData.filter(o => o.team_member_id === memberId);
       setOneOnOnes(memberOneOnOnes);
 
+      // Load agenda items for this team member
+      try {
+        const memberAgendaItems = await AgendaService.getAgendaItemsForMember(memberId);
+        setAgendaItems(memberAgendaItems);
+      } catch (agendaError) {
+        console.error("Error loading agenda items:", agendaError);
+        setAgendaItems([]); // Continue without agenda data
+      }
+
       // Load tasks and projects for linking
       const taskData = await Task.list();
       const projectData = await Project.list();
@@ -139,12 +153,38 @@ export default function TeamMemberProfile() {
 
   const handleCreateMeeting = async () => {
     try {
-      await OneOnOne.create({
+      // Create the OneOnOne meeting first
+      const createdMeeting = await OneOnOne.create({
         ...meetingForm,
         notes: Array.isArray(meetingForm.notes) ? meetingForm.notes : [], // always save as array
         team_member_id: memberId
       });
+
+      // If next_meeting_date is set, create a calendar event
+      if (meetingForm.next_meeting_date && member) {
+        try {
+          const result = await CalendarService.createAndLinkOneOnOneMeeting(
+            createdMeeting.id,
+            memberId,
+            meetingForm.next_meeting_date
+          );
+          console.log('Calendar event created successfully:', result.calendarEvent);
+        } catch (calendarError) {
+          console.error('Error creating calendar event:', calendarError);
+          // Don't fail the entire operation if calendar creation fails
+          // The meeting is still created, just without the calendar event
+        }
+      }
+
       setShowNewMeetingDialog(false);
+      setMeetingForm({
+        date: new Date().toISOString(),
+        notes: "",
+        mood: "good",
+        topics_discussed: [],
+        next_meeting_date: "",
+        action_items: []
+      });
       loadData();
     } catch (error) {
       console.error("Error creating 1:1 meeting:", error);
@@ -221,10 +261,75 @@ export default function TeamMemberProfile() {
 
   const handleDeleteMeeting = async (meetingId) => {
     try {
+      // First, unlink and delete any associated calendar event
+      try {
+        await CalendarService.unlinkCalendarEventFromOneOnOne(meetingId);
+      } catch (calendarError) {
+        console.error('Error deleting associated calendar event:', calendarError);
+        // Continue with meeting deletion even if calendar cleanup fails
+      }
+
+      // Delete the OneOnOne meeting
       await OneOnOne.delete(meetingId);
       loadData();
     } catch (error) {
       console.error("Error deleting meeting:", error);
+    }
+  };
+
+  const handleMarkAgendaItemDiscussed = async (agendaItem) => {
+    try {
+      const success = await AgendaService.markAgendaItemDiscussed(
+        agendaItem.meetingId,
+        agendaItem.timestamp
+      );
+      if (success) {
+        // Reload data to reflect the changes
+        loadData();
+      }
+    } catch (error) {
+      console.error("Error marking agenda item as discussed:", error);
+    }
+  };
+
+  const handleUpdateNextMeetingDate = async (meetingId, newDate) => {
+    try {
+      const meeting = oneOnOnes.find(o => o.id === meetingId);
+      if (!meeting) return;
+
+      // Update the OneOnOne record with the new next_meeting_date
+      const updatedMeeting = {
+        ...meeting,
+        next_meeting_date: newDate
+      };
+
+      await OneOnOne.update(meetingId, updatedMeeting);
+
+      // Handle calendar event creation/update
+      if (newDate && member) {
+        try {
+          await CalendarService.updateOneOnOneCalendarEvent(
+            meetingId,
+            newDate
+          );
+          console.log('Calendar event updated successfully for meeting:', meetingId);
+        } catch (calendarError) {
+          console.error('Error updating calendar event:', calendarError);
+          // Don't fail the entire operation if calendar update fails
+        }
+      } else if (!newDate && meeting.next_meeting_calendar_event_id) {
+        // If next_meeting_date is cleared, remove the calendar event
+        try {
+          await CalendarService.unlinkCalendarEventFromOneOnOne(meetingId);
+          console.log('Calendar event removed for meeting:', meetingId);
+        } catch (calendarError) {
+          console.error('Error removing calendar event:', calendarError);
+        }
+      }
+
+      loadData();
+    } catch (error) {
+      console.error("Error updating next meeting date:", error);
     }
   };
 
@@ -265,7 +370,7 @@ export default function TeamMemberProfile() {
               Back to Team
             </Button>
           </Link>
-          
+
           <div className="flex items-center gap-4">
             <Avatar className="h-16 w-16">
               {member.avatar ? (
@@ -317,10 +422,72 @@ export default function TeamMemberProfile() {
                                     {getMoodIcon(meeting.mood)}
                                   </span>
                                 </CardTitle>
-                                <CardDescription>
-                                  Next meeting: {meeting.next_meeting_date ? 
-                                    format(parseISO(meeting.next_meeting_date), "PPP") :
-                                    "Not scheduled"}
+                                <CardDescription className="flex items-center gap-2">
+                                  {editingNextMeeting === meeting.id ? (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm">Next meeting:</span>
+                                      <Popover>
+                                        <PopoverTrigger asChild>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-8 text-xs"
+                                          >
+                                            <CalendarIcon className="mr-1 h-3 w-3" />
+                                            {meeting.next_meeting_date ?
+                                              format(parseISO(meeting.next_meeting_date), "MMM d") :
+                                              "Select date"}
+                                          </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0">
+                                          <Calendar
+                                            mode="single"
+                                            selected={meeting.next_meeting_date ? parseISO(meeting.next_meeting_date) : undefined}
+                                            onSelect={(date) => {
+                                              const newDate = date?.toISOString() || "";
+                                              handleUpdateNextMeetingDate(meeting.id, newDate);
+                                              setEditingNextMeeting(null);
+                                            }}
+                                          />
+                                        </PopoverContent>
+                                      </Popover>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 px-2"
+                                        onClick={() => setEditingNextMeeting(null)}
+                                      >
+                                        Cancel
+                                      </Button>
+                                      {meeting.next_meeting_date && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 px-2 text-red-500"
+                                          onClick={() => {
+                                            handleUpdateNextMeetingDate(meeting.id, "");
+                                            setEditingNextMeeting(null);
+                                          }}
+                                        >
+                                          Clear
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-2">
+                                      <span>Next meeting: {meeting.next_meeting_date ?
+                                        format(parseISO(meeting.next_meeting_date), "PPP") :
+                                        "Not scheduled"}</span>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 px-2 text-xs"
+                                        onClick={() => setEditingNextMeeting(meeting.id)}
+                                      >
+                                        Edit
+                                      </Button>
+                                    </div>
+                                  )}
                                 </CardDescription>
                               </div>
                               <div className="flex gap-2">
@@ -470,7 +637,7 @@ export default function TeamMemberProfile() {
                                         <TableRow key={index}>
                                           <TableCell>{item.description}</TableCell>
                                           <TableCell>
-                                            {item.due_date ? 
+                                            {item.due_date ?
                                               format(parseISO(item.due_date), "MMM d, yyyy") :
                                               "No due date"}
                                           </TableCell>
@@ -578,7 +745,7 @@ export default function TeamMemberProfile() {
                   <div>
                     <Label>Last 1:1</Label>
                     <p className="text-gray-600">
-                      {oneOnOnes[0] ? 
+                      {oneOnOnes[0] ?
                         format(parseISO(oneOnOnes[0].date), "PPP") :
                         "No meetings yet"}
                     </p>
@@ -586,12 +753,60 @@ export default function TeamMemberProfile() {
                   <div>
                     <Label>Open Action Items</Label>
                     <p className="text-gray-600">
-                      {oneOnOnes.reduce((count, meeting) => 
-                        count + (meeting.action_items?.filter(item => item.status !== "completed").length || 0), 
-                      0)}
+                      {oneOnOnes.reduce((count, meeting) =>
+                        count + (meeting.action_items?.filter(item => item.status !== "completed").length || 0),
+                        0)}
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Agenda Items</Label>
+                    <p className="text-gray-600">
+                      {agendaItems.length} total, {agendaItems.filter(item => !item.isDiscussed).length} pending
                     </p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Next Agenda Items Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Next Agenda Items
+                </CardTitle>
+                <CardDescription>
+                  Items from other meetings where you are tagged
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {agendaItems.length === 0 ? (
+                  <div className="text-center py-4">
+                    <MessageSquare className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">No agenda items yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      You'll see items here when others tag you in their meeting notes
+                    </p>
+                  </div>
+                ) : (
+                  <AgendaItemList
+                    agendaItems={agendaItems.slice(0, 5)} // Show only first 5 items
+                    teamMembers={allTeamMembers.reduce((acc, member) => {
+                      acc[member.id] = member;
+                      return acc;
+                    }, {})}
+                    onMarkDiscussed={handleMarkAgendaItemDiscussed}
+                    showActions={true}
+                    emptyMessage="No agenda items found"
+                  />
+                )}
+                {agendaItems.length > 5 && (
+                  <div className="mt-3 pt-3 border-t border-border/50">
+                    <p className="text-xs text-muted-foreground text-center">
+                      Showing 5 of {agendaItems.length} items
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -614,8 +829,8 @@ export default function TeamMemberProfile() {
                     className="w-full justify-start text-left"
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {meetingForm.date ? 
-                      format(parseISO(meetingForm.date), "PPP") : 
+                    {meetingForm.date ?
+                      format(parseISO(meetingForm.date), "PPP") :
                       "Select date"}
                   </Button>
                 </PopoverTrigger>
@@ -774,8 +989,8 @@ export default function TeamMemberProfile() {
                     className="w-full justify-start text-left"
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {meetingForm.next_meeting_date ? 
-                      format(parseISO(meetingForm.next_meeting_date), "PPP") : 
+                    {meetingForm.next_meeting_date ?
+                      format(parseISO(meetingForm.next_meeting_date), "PPP") :
                       "Schedule next meeting"}
                   </Button>
                 </PopoverTrigger>
@@ -829,8 +1044,8 @@ export default function TeamMemberProfile() {
                     className="w-full justify-start text-left"
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {actionItemForm.due_date ? 
-                      format(parseISO(actionItemForm.due_date), "PPP") : 
+                    {actionItemForm.due_date ?
+                      format(parseISO(actionItemForm.due_date), "PPP") :
                       "Set due date"}
                   </Button>
                 </PopoverTrigger>
