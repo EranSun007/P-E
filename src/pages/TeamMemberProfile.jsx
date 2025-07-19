@@ -98,6 +98,9 @@ export default function TeamMemberProfile() {
   const [noteTagType, setNoteTagType] = useState("none");
   const [noteTagId, setNoteTagId] = useState("");
   const [editingNextMeeting, setEditingNextMeeting] = useState(null);
+  const [nextMeetingInfo, setNextMeetingInfo] = useState(null);
+  const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState("");
 
   const [discussedNotes, setDiscussedNotes] = useState(() => {
     // Load discussed notes from localStorage
@@ -144,10 +147,49 @@ export default function TeamMemberProfile() {
       // Load all team members and stakeholders for note tagging
       setAllTeamMembers(await TeamMember.list());
       setAllStakeholders(await Stakeholder.list());
+
+      // Load next meeting information
+      await loadNextMeetingInfo(memberOneOnOnes);
     } catch (error) {
       console.error("Error loading team member data:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadNextMeetingInfo = async (memberOneOnOnes) => {
+    try {
+      // Find the most recent OneOnOne with a next_meeting_date
+      const meetingsWithNextDate = memberOneOnOnes
+        .filter(meeting => meeting.next_meeting_date)
+        .sort((a, b) => new Date(a.next_meeting_date) - new Date(b.next_meeting_date));
+
+      if (meetingsWithNextDate.length > 0) {
+        const nextMeeting = meetingsWithNextDate[0];
+        let calendarEvent = null;
+
+        // Try to get the associated calendar event
+        if (nextMeeting.next_meeting_calendar_event_id) {
+          try {
+            const calendarEvents = await CalendarService.getOneOnOneMeetingsForTeamMember(memberId);
+            calendarEvent = calendarEvents.find(event => event.id === nextMeeting.next_meeting_calendar_event_id);
+          } catch (calendarError) {
+            console.error('Error loading calendar event:', calendarError);
+          }
+        }
+
+        setNextMeetingInfo({
+          oneOnOne: nextMeeting,
+          calendarEvent,
+          hasCalendarEvent: !!calendarEvent,
+          meetingDate: nextMeeting.next_meeting_date
+        });
+      } else {
+        setNextMeetingInfo(null);
+      }
+    } catch (error) {
+      console.error("Error loading next meeting info:", error);
+      setNextMeetingInfo(null);
     }
   };
 
@@ -330,6 +372,28 @@ export default function TeamMemberProfile() {
       loadData();
     } catch (error) {
       console.error("Error updating next meeting date:", error);
+    }
+  };
+
+  const handleRescheduleNextMeeting = async () => {
+    if (!nextMeetingInfo || !rescheduleDate) return;
+
+    try {
+      await handleUpdateNextMeetingDate(nextMeetingInfo.oneOnOne.id, rescheduleDate);
+      setShowRescheduleDialog(false);
+      setRescheduleDate("");
+    } catch (error) {
+      console.error("Error rescheduling meeting:", error);
+    }
+  };
+
+  const handleCancelNextMeeting = async () => {
+    if (!nextMeetingInfo) return;
+
+    try {
+      await handleUpdateNextMeetingDate(nextMeetingInfo.oneOnOne.id, "");
+    } catch (error) {
+      console.error("Error canceling meeting:", error);
     }
   };
 
@@ -736,6 +800,108 @@ export default function TeamMemberProfile() {
               </CardContent>
             </Card>
 
+            {/* Next 1:1 Meeting Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarIcon className="h-5 w-5" />
+                  Next 1:1 Meeting
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {nextMeetingInfo ? (
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Scheduled Date</Label>
+                      <p className="text-gray-900 font-medium">
+                        {format(parseISO(nextMeetingInfo.meetingDate), "PPP 'at' p")}
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <Label>Status</Label>
+                      <div className="flex items-center gap-2 mt-1">
+                        {nextMeetingInfo.hasCalendarEvent ? (
+                          <Badge variant="outline" className="text-green-700 border-green-200 bg-green-50">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Calendar Event Created
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-yellow-700 border-yellow-200 bg-yellow-50">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            No Calendar Event
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    {nextMeetingInfo.calendarEvent && (
+                      <div>
+                        <Label>Calendar Event</Label>
+                        <p className="text-sm text-gray-600">
+                          {nextMeetingInfo.calendarEvent.title}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setRescheduleDate(nextMeetingInfo.meetingDate);
+                          setShowRescheduleDialog(true);
+                        }}
+                      >
+                        <Clock className="h-4 w-4 mr-1" />
+                        Reschedule
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCancelNextMeeting}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <XCircle className="h-4 w-4 mr-1" />
+                        Cancel
+                      </Button>
+                    </div>
+                    
+                    {/* Temporary cleanup button - remove after cleanup */}
+                    <div className="pt-2 border-t">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            console.log('Starting duplicate cleanup...');
+                            const results = await CalendarService.cleanupAllDuplicateEvents();
+                            console.log('Cleanup results:', results);
+                            alert(`Cleanup completed! Removed ${results.totalCleaned} duplicate events.`);
+                            loadData(); // Refresh the data
+                          } catch (error) {
+                            console.error('Cleanup failed:', error);
+                            alert('Cleanup failed. Check console for details.');
+                          }
+                        }}
+                        className="text-blue-600 hover:text-blue-700"
+                      >
+                        🧹 Clean Duplicates
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <CalendarIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">No upcoming 1:1 scheduled</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Schedule your next meeting from any 1:1 record
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle>Quick Stats</CardTitle>
@@ -750,6 +916,33 @@ export default function TeamMemberProfile() {
                         "No meetings yet"}
                     </p>
                   </div>
+
+                  <div>
+                    <Label>Meeting Frequency</Label>
+                    <p className="text-gray-600">
+                      {oneOnOnes.length > 1 ? (
+                        (() => {
+                          const sortedMeetings = oneOnOnes
+                            .filter(m => m.date)
+                            .sort((a, b) => new Date(b.date) - new Date(a.date));
+                          
+                          if (sortedMeetings.length < 2) return "Insufficient data";
+                          
+                          const daysBetween = Math.round(
+                            (new Date(sortedMeetings[0].date) - new Date(sortedMeetings[1].date)) / (1000 * 60 * 60 * 24)
+                          );
+                          
+                          if (daysBetween <= 10) return "Weekly";
+                          if (daysBetween <= 20) return "Bi-weekly";
+                          if (daysBetween <= 35) return "Monthly";
+                          return "Irregular";
+                        })()
+                      ) : (
+                        "No pattern yet"
+                      )}
+                    </p>
+                  </div>
+                  
                   <div>
                     <Label>Open Action Items</Label>
                     <p className="text-gray-600">
@@ -758,11 +951,24 @@ export default function TeamMemberProfile() {
                         0)}
                     </p>
                   </div>
+                  
                   <div>
                     <Label>Agenda Items</Label>
                     <p className="text-gray-600">
                       {agendaItems.length} total, {agendaItems.filter(item => !item.isDiscussed).length} pending
                     </p>
+                  </div>
+
+                  <div>
+                    <Label>Total 1:1s</Label>
+                    <div className="flex items-center gap-2">
+                      <p className="text-gray-600">{oneOnOnes.length}</p>
+                      {oneOnOnes.length > 0 && (
+                        <span className="text-xs text-gray-500">
+                          (since {format(parseISO(oneOnOnes[oneOnOnes.length - 1].date), "MMM yyyy")})
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1113,6 +1319,61 @@ export default function TeamMemberProfile() {
               Cancel
             </Button>
             <Button onClick={handleCreateActionItem}>Add Action Item</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reschedule Meeting Dialog */}
+      <Dialog open={showRescheduleDialog} onOpenChange={setShowRescheduleDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Reschedule Next 1:1 Meeting</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Current Date</Label>
+              <p className="text-sm text-gray-600">
+                {nextMeetingInfo && format(parseISO(nextMeetingInfo.meetingDate), "PPP 'at' p")}
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>New Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {rescheduleDate ?
+                      format(parseISO(rescheduleDate), "PPP") :
+                      "Select new date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={rescheduleDate ? parseISO(rescheduleDate) : undefined}
+                    onSelect={(date) => setRescheduleDate(date?.toISOString() || "")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowRescheduleDialog(false);
+              setRescheduleDate("");
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRescheduleNextMeeting}
+              disabled={!rescheduleDate}
+            >
+              Reschedule Meeting
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
