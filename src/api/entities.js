@@ -15,5 +15,34 @@ export const Notification = localClient.entities.Notification;
 export const Reminder = localClient.entities.Reminder;
 export const Comment = localClient.entities.Comment;
 
-// Remove Base44 auth, use local user only
-export const User = { me: async () => ({ id: 'local-user', name: 'Local User' }), logout: async () => true };
+// User entity that works with new authentication system
+export const User = {
+  me: async () => {
+    // Import AuthService to get current user from token
+    const AuthService = (await import('../services/authService.js')).default;
+    const token = AuthService.getStoredToken();
+    
+    if (!token) {
+      throw new Error('No authenticated user found');
+    }
+    
+    // Create user display name based on username
+    const displayName = token.username === 'admin' 
+      ? 'Administrator' 
+      : token.username.charAt(0).toUpperCase() + token.username.slice(1);
+    
+    return {
+      id: 'local-user',
+      name: displayName,
+      username: token.username,
+      isAuthenticated: true,
+      loginTime: new Date(token.timestamp).toISOString()
+    };
+  },
+  logout: async () => {
+    // Import AuthService to handle logout
+    const AuthService = (await import('../services/authService.js')).default;
+    AuthService.clearAuthData();
+    return true;
+  }
+};

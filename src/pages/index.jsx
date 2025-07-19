@@ -18,6 +18,8 @@ import ProjectDetails from "./ProjectDetails";
 
 import TeamMemberProfile from "./TeamMemberProfile";
 
+import ProtectedRoute from "@/components/auth/ProtectedRoute.jsx";
+
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
@@ -93,7 +95,9 @@ function PagesContent() {
 export default function Pages() {
     return (
         <Router>
-            <PagesContent />
+            <ProtectedRoute>
+                <PagesContent />
+            </ProtectedRoute>
         </Router>
     );
 }
