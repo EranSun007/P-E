@@ -18,6 +18,10 @@ import ProjectDetails from "./ProjectDetails";
 
 import TeamMemberProfile from "./TeamMemberProfile";
 
+import Peers from "./Peers";
+
+import PeerProfile from "./PeerProfile";
+
 import ProtectedRoute from "@/components/auth/ProtectedRoute.jsx";
 
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
@@ -41,6 +45,10 @@ const PAGES = {
     ProjectDetails: ProjectDetails,
     
     TeamMemberProfile: TeamMemberProfile,
+    
+    Peers: Peers,
+    
+    PeerProfile: PeerProfile,
     
 }
 
@@ -86,6 +94,10 @@ function PagesContent() {
                 <Route path="/ProjectDetails" element={<ProjectDetails />} />
                 
                 <Route path="/TeamMemberProfile" element={<TeamMemberProfile />} />
+                
+                <Route path="/Peers" element={<Peers />} />
+                
+                <Route path="/PeerProfile" element={<PeerProfile />} />
                 
             </Routes>
         </Layout>

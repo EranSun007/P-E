@@ -89,6 +89,12 @@ export default function Layout({ children, currentPageName }) {
       icon: Users,
       href: createPageUrl("Stakeholders"),
       current: currentPageName === "Stakeholders"
+    },
+    {
+      name: "Peers",
+      icon: Users,
+      href: createPageUrl("Peers"),
+      current: currentPageName === "Peers"
     }
   ];
 
