@@ -171,6 +171,26 @@ class AuthService {
       return false;
     }
   }
+  /**
+   * Changes the user's password
+   * @param {string} username - The user's username
+   * @param {string} currentPassword - The user's current password
+   * @param {string} newPassword - The new password
+   * @returns {Promise<void>}
+   * @throws {Error} If the current password is incorrect
+   */
+  static async changePassword(username, currentPassword, newPassword) {
+    if (username !== AUTH_CONFIG.username || currentPassword !== AUTH_CONFIG.password) {
+      throw new Error("Incorrect current password.");
+    }
+
+    AUTH_CONFIG.password = newPassword;
+    console.log("Password for user '" + username + "' has been changed.");
+    
+    // In a real application, you would also invalidate the current token
+    // and force the user to log in again.
+    this.clearAuthData();
+  }
 }
 
 export default AuthService;

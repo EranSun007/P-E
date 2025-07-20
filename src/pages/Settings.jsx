@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { TaskAttribute } from "@/api/entities";
 import { 
@@ -10,7 +9,8 @@ import {
   CheckSquare, 
   Layers,
   Save,
-  Trash2
+  Trash2,
+  User
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +41,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import PasswordChangeForm from "@/components/auth/PasswordChangeForm";
 
 export default function SettingsPage() {
   const [attributes, setAttributes] = useState([]);
@@ -70,8 +71,10 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
-    loadAttributes();
-  }, []);
+    if (activeTab !== 'account') {
+      loadAttributes();
+    }
+  }, [activeTab]);
 
   const loadAttributes = async () => {
     setLoading(true);
@@ -247,7 +250,8 @@ export default function SettingsPage() {
     { id: "priorities", label: "Priorities", icon: Flag },
     { id: "taskTypes", label: "Task Types", icon: Layers },
     { id: "statuses", label: "Statuses", icon: CheckSquare },
-    { id: "tags", label: "Tags", icon: Tag }
+    { id: "tags", label: "Tags", icon: Tag },
+    { id: "account", label: "Account", icon: User }
   ];
 
   const colorOptions = [
@@ -278,22 +282,24 @@ export default function SettingsPage() {
               ))}
             </TabsList>
             
-            <div className="flex gap-4">
-              <div className="relative flex-grow">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder={`Search ${activeTab}...`}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
+            {activeTab !== 'account' && (
+              <div className="flex gap-4">
+                <div className="relative flex-grow">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder={`Search ${activeTab}...`}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                
+                <Button onClick={openCreateDialog}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add New
+                </Button>
               </div>
-              
-              <Button onClick={openCreateDialog}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add New
-              </Button>
-            </div>
+            )}
           </div>
           
           {error && (
@@ -306,97 +312,101 @@ export default function SettingsPage() {
           
           {tabConfigs.map(tab => (
             <TabsContent key={tab.id} value={tab.id} className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <tab.icon className="h-5 w-5" />
-                    {tab.label}
-                  </CardTitle>
-                  <CardDescription>
-                    Manage {tab.label.toLowerCase()} for your tasks
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <div className="text-center p-8">
-                      <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div>
-                      <p className="mt-4 text-gray-600">Loading attributes...</p>
-                    </div>
-                  ) : filteredAttributes.length === 0 ? (
-                    <div className="text-center p-8 border border-dashed rounded-lg">
-                      <p className="text-gray-500">
-                        {searchQuery 
-                          ? `No ${tab.label.toLowerCase()} found matching your search`
-                          : `No ${tab.label.toLowerCase()} found. Add your first one!`
-                        }
-                      </p>
-                    </div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Color</TableHead>
-                          <TableHead>Order</TableHead>
-                          <TableHead className="w-[100px]">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredAttributes.map(attr => (
-                          <TableRow key={attr.id}>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Badge 
-                                  variant="outline"
-                                  className={getColorClass(attr.color)}
-                                >
-                                  {getTypeIcon(attr.type)}
-                                  <span className="ml-1">{attr.name}</span>
-                                </Badge>
-                                {attr.default && (
-                                  <Badge variant="outline" className="text-xs">Default</Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>{attr.description || "-"}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <div className={`w-4 h-4 rounded-full ${attr.color ? `bg-${attr.color}-500` : "bg-gray-300"}`}></div>
-                                <span className="capitalize">{attr.color || "None"}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>{attr.order}</TableCell>
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                    <span className="sr-only">Open menu</span>
-                                    <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                                    </svg>
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => openEditDialog(attr)}>
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    className="text-red-600"
-                                    onClick={() => confirmDelete(attr)}
-                                  >
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
+              {tab.id !== 'account' ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <tab.icon className="h-5 w-5" />
+                      {tab.label}
+                    </CardTitle>
+                    <CardDescription>
+                      Manage {tab.label.toLowerCase()} for your tasks
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loading ? (
+                      <div className="text-center p-8">
+                        <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div>
+                        <p className="mt-4 text-gray-600">Loading attributes...</p>
+                      </div>
+                    ) : filteredAttributes.length === 0 ? (
+                      <div className="text-center p-8 border border-dashed rounded-lg">
+                        <p className="text-gray-500">
+                          {searchQuery 
+                            ? `No ${tab.label.toLowerCase()} found matching your search`
+                            : `No ${tab.label.toLowerCase()} found. Add your first one!`
+                          }
+                        </p>
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead>Color</TableHead>
+                            <TableHead>Order</TableHead>
+                            <TableHead className="w-[100px]">Actions</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredAttributes.map(attr => (
+                            <TableRow key={attr.id}>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Badge 
+                                    variant="outline"
+                                    className={getColorClass(attr.color)}
+                                  >
+                                    {getTypeIcon(attr.type)}
+                                    <span className="ml-1">{attr.name}</span>
+                                  </Badge>
+                                  {attr.default && (
+                                    <Badge variant="outline" className="text-xs">Default</Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>{attr.description || "-"}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-4 h-4 rounded-full ${attr.color ? `bg-${attr.color}-500` : "bg-gray-300"}`}></div>
+                                  <span className="capitalize">{attr.color || "None"}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>{attr.order}</TableCell>
+                              <TableCell>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                      <span className="sr-only">Open menu</span>
+                                      <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                                      </svg>
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => openEditDialog(attr)}>
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      className="text-red-600"
+                                      onClick={() => confirmDelete(attr)}
+                                    >
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <PasswordChangeForm />
+              )}
             </TabsContent>
           ))}
         </Tabs>

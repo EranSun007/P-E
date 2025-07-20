@@ -796,6 +796,35 @@ export default function TeamMemberProfile() {
                       <p className="text-gray-600 whitespace-pre-wrap">{member.notes}</p>
                     </div>
                   )}
+                  {/* Birthday field */}
+                  <div>
+                    <Label>Birthday</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {member.birthday ?
+                            format(parseISO(member.birthday), "PPP") :
+                            "Set birthday"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={member.birthday ? parseISO(member.birthday) : undefined}
+                          onSelect={async (date) => {
+                            if (!date) return;
+                            const newBirthday = date.toISOString();
+                            await TeamMember.update(member.id, { birthday: newBirthday });
+                            setMember(m => ({ ...m, birthday: newBirthday }));
+                          }}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
               </CardContent>
             </Card>

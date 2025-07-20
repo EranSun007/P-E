@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Task, CalendarEvent, TeamMember } from "@/api/entities";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, addDays, isSameMonth, isSameDay, addMonths, subMonths, parseISO } from "date-fns";
@@ -90,6 +89,28 @@ export default function CalendarPage() {
     }
   };
 
+  const getBirthdayEvents = (month, teamMembers) => {
+    // Returns birthday events for the current month
+    const events = [];
+    teamMembers.forEach(member => {
+      if (member.birthday) {
+        const birthdayDate = parseISO(member.birthday);
+        // Show birthday for this year
+        const birthdayThisYear = new Date(month.getFullYear(), birthdayDate.getMonth(), birthdayDate.getDate());
+        if (birthdayThisYear.getMonth() === month.getMonth()) {
+          events.push({
+            id: `birthday-${member.id}`,
+            title: `${member.name}'s Birthday`,
+            start_date: birthdayThisYear.toISOString(),
+            event_type: "birthday",
+            team_member_id: member.id
+          });
+        }
+      }
+    });
+    return events;
+  };
+
   const renderHeader = () => {
     return (
       <div className="flex items-center justify-between mb-4">
@@ -139,6 +160,8 @@ export default function CalendarPage() {
     let days = [];
     let day = startDate;
 
+    const birthdayEvents = getBirthdayEvents(currentMonth, teamMembers);
+
     while (day <= endDate) {
       for (let i = 0; i < 7; i++) {
         const formattedDate = format(day, dateFormat);
@@ -147,9 +170,10 @@ export default function CalendarPage() {
           task.due_date && isSameDay(parseISO(task.due_date), day)
         );
         
-        const eventsForDay = calendarEvents.filter(event => 
-          event.start_date && isSameDay(parseISO(event.start_date), day)
-        );
+        const eventsForDay = [
+          ...calendarEvents.filter(event => event.start_date && isSameDay(parseISO(event.start_date), day)),
+          ...birthdayEvents.filter(event => event.start_date && isSameDay(parseISO(event.start_date), day))
+        ];
 
         days.push(
           <div
@@ -184,9 +208,31 @@ export default function CalendarPage() {
                 </div>
               ))}
               
-              {/* Display calendar events */}
+              {/* Display calendar events and birthdays */}
               {eventsForDay.map(event => {
                 const teamMember = teamMembers.find(tm => tm.id === event.team_member_id);
+                if (event.event_type === "birthday") {
+                  return (
+                    <TooltipProvider key={event.id}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="text-xs p-1 rounded truncate cursor-pointer bg-pink-100 text-pink-800 border-l-2 border-pink-400 hover:bg-pink-200 hover:shadow-sm">
+                            <div className="flex items-center gap-1">
+                              🎂 <span className="truncate">{event.title}</span>
+                            </div>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs">
+                          <div className="space-y-1">
+                            <p className="font-medium">{event.title}</p>
+                            <p className="text-xs text-gray-600">Wish {teamMember?.name} a happy birthday!</p>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  );
+                }
+
                 const startTime = event.start_date ? format(parseISO(event.start_date), "h:mm a") : "";
                 const endTime = event.end_date ? format(parseISO(event.end_date), "h:mm a") : "";
                 
@@ -263,7 +309,9 @@ export default function CalendarPage() {
       event.start_date && isSameDay(parseISO(event.start_date), selectedDate)
     );
 
-    const hasItems = tasksForSelectedDate.length > 0 || eventsForSelectedDate.length > 0;
+    const birthdayEvents = getBirthdayEvents(selectedDate, teamMembers).filter(event => isSameDay(parseISO(event.start_date), selectedDate));
+
+    const hasItems = tasksForSelectedDate.length > 0 || eventsForSelectedDate.length > 0 || birthdayEvents.length > 0;
 
     if (!hasItems) {
       return (
@@ -283,6 +331,28 @@ export default function CalendarPage() {
 
     return (
       <div className="space-y-3">
+        {/* Birthday Events Section */}
+        {birthdayEvents.length > 0 && (
+          <div>
+            <h3 className="text-sm font-medium text-pink-700 mb-2 flex items-center gap-1">
+              🎂 Birthdays ({birthdayEvents.length})
+            </h3>
+            <div className="space-y-2">
+              {birthdayEvents.map(event => {
+                const teamMember = teamMembers.find(tm => tm.id === event.team_member_id);
+                return (
+                  <div key={event.id} className="p-3 border rounded-md border-pink-200 bg-pink-50">
+                    <div className="flex items-center gap-2">
+                      🎂 <h4 className="font-medium">{event.title}</h4>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">Wish {teamMember?.name} a happy birthday!</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        
         {/* Calendar Events Section */}
         {eventsForSelectedDate.length > 0 && (
           <div>

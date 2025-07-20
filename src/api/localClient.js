@@ -192,6 +192,7 @@ export const localClient = {
           // Initialize new fields with defaults
           phone: member.phone || null,
           company: member.company || null,
+          birthday: member.birthday || null, // Added birthday field
           last_activity: null // Will be calculated dynamically
         };
         members.unshift(newMember);
