@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { format, parseISO } from "date-fns";
-import { TeamMember, OneOnOne, Task, Project, Stakeholder } from "@/api/entities";
+import { TeamMember, OneOnOne, Task, Project, Stakeholder, OutOfOffice } from "@/api/entities";
 import { AgendaService } from "@/utils/agendaService";
 import { CalendarService } from "@/utils/calendarService";
 import { AgendaItemCard, AgendaItemList } from "@/components/agenda/AgendaItemCard";
+import OutOfOfficeCounter from "@/components/team/OutOfOfficeCounter";
+import OutOfOfficeManager from "@/components/team/OutOfOfficeManager";
 import { createPageUrl } from "@/utils";
 import {
   Card,
@@ -68,6 +70,7 @@ export default function TeamMemberProfile() {
   const [projects, setProjects] = useState([]);
   const [allTeamMembers, setAllTeamMembers] = useState([]);
   const [allStakeholders, setAllStakeholders] = useState([]);
+  const [outOfOfficeStats, setOutOfOfficeStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showNewMeetingDialog, setShowNewMeetingDialog] = useState(false);
   const [showActionItemDialog, setShowActionItemDialog] = useState(false);
@@ -762,6 +765,12 @@ export default function TeamMemberProfile() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Out of Office Management */}
+            <OutOfOfficeManager
+              teamMemberId={memberId}
+              teamMemberName={member?.name}
+            />
           </div>
 
           {/* Sidebar */}
@@ -828,6 +837,14 @@ export default function TeamMemberProfile() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Out of Office Counter */}
+            <OutOfOfficeCounter
+              teamMemberId={memberId}
+              showBreakdown={true}
+              showYearSelector={true}
+              onStatsChange={setOutOfOfficeStats}
+            />
 
             {/* Next 1:1 Meeting Section */}
             <Card>

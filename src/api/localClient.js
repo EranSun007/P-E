@@ -254,7 +254,7 @@ export const localClient = {
             oneOnOnes[0] = newOneOnOne; // Update the first item (just added)
             setData('one_on_ones', oneOnOnes);
           } catch (error) {
-            console.warn('Failed to create calendar event for OneOnOne:', error);
+            console.warn('Failed to create calendar event for OneOnone:', error);
             // Continue without calendar event - don't fail the OneOnOne creation
           }
         }
@@ -585,6 +585,164 @@ export const localClient = {
         let comments = getData('comments');
         comments = comments.filter(c => c.id !== id);
         setData('comments', comments);
+        return true;
+      }
+    },
+    OutOfOffice: {
+      async list() {
+        return getData('out_of_office');
+      },
+      async get(id) {
+        const outOfOffice = getData('out_of_office');
+        return outOfOffice.find(o => o.id === id) || null;
+      },
+      async create(outOfOfficeData) {
+        const outOfOffice = getData('out_of_office');
+        const newOutOfOffice = {
+          ...outOfOfficeData,
+          id: generateId(),
+          created_date: new Date().toISOString(),
+          updated_date: new Date().toISOString(),
+          notes: outOfOfficeData.notes || null,
+          // Support both team_member_id and peer_id
+          team_member_id: outOfOfficeData.team_member_id || null,
+          peer_id: outOfOfficeData.peer_id || null
+        };
+        outOfOffice.unshift(newOutOfOffice);
+        setData('out_of_office', outOfOffice);
+        return newOutOfOffice;
+      },
+      async update(id, updates) {
+        const outOfOffice = getData('out_of_office');
+        const idx = outOfOffice.findIndex(o => o.id === id);
+        if (idx !== -1) {
+          outOfOffice[idx] = {
+            ...outOfOffice[idx],
+            ...updates,
+            updated_date: new Date().toISOString()
+          };
+          setData('out_of_office', outOfOffice);
+          return outOfOffice[idx];
+        }
+        throw new Error('OutOfOffice not found');
+      },
+      async delete(id) {
+        let outOfOffice = getData('out_of_office');
+        outOfOffice = outOfOffice.filter(o => o.id !== id);
+        setData('out_of_office', outOfOffice);
+        return true;
+      },
+      async getByTeamMember(teamMemberId) {
+        const outOfOffice = getData('out_of_office');
+        return outOfOffice.filter(o => o.team_member_id === teamMemberId);
+      },
+      async getByPeer(peerId) {
+        const outOfOffice = getData('out_of_office');
+        return outOfOffice.filter(o => o.peer_id === peerId);
+      },
+      async getActiveForDate(date) {
+        const outOfOffice = getData('out_of_office');
+        const targetDate = new Date(date);
+        return outOfOffice.filter(o => {
+          const startDate = new Date(o.start_date);
+          const endDate = new Date(o.end_date);
+          return targetDate >= startDate && targetDate <= endDate;
+        });
+      },
+      async getCountForYear(teamMemberId, year) {
+        const outOfOffice = getData('out_of_office');
+        const memberPeriods = outOfOffice.filter(o => o.team_member_id === teamMemberId);
+        
+        let totalDays = 0;
+        const yearStart = new Date(year, 0, 1);
+        const yearEnd = new Date(year, 11, 31);
+        
+        memberPeriods.forEach(period => {
+          const periodStart = new Date(period.start_date);
+          const periodEnd = new Date(period.end_date);
+          
+          // Calculate overlap with the target year
+          const overlapStart = new Date(Math.max(periodStart.getTime(), yearStart.getTime()));
+          const overlapEnd = new Date(Math.min(periodEnd.getTime(), yearEnd.getTime()));
+          
+          if (overlapStart <= overlapEnd) {
+            // Calculate days including both start and end dates
+            const timeDiff = overlapEnd.getTime() - overlapStart.getTime();
+            const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24)) + 1;
+            totalDays += daysDiff;
+          }
+        });
+        
+        return totalDays;
+      },
+      async getCountForYearByPeer(peerId, year) {
+        const outOfOffice = getData('out_of_office');
+        const peerPeriods = outOfOffice.filter(o => o.peer_id === peerId);
+        let totalDays = 0;
+        const yearStart = new Date(year, 0, 1);
+        const yearEnd = new Date(year, 11, 31);
+        peerPeriods.forEach(period => {
+          const periodStart = new Date(period.start_date);
+          const periodEnd = new Date(period.end_date);
+          const overlapStart = new Date(Math.max(periodStart.getTime(), yearStart.getTime()));
+          const overlapEnd = new Date(Math.min(periodEnd.getTime(), yearEnd.getTime()));
+          if (overlapStart <= overlapEnd) {
+            const timeDiff = overlapEnd.getTime() - overlapStart.getTime();
+            const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24)) + 1;
+            totalDays += daysDiff;
+          }
+        });
+        return totalDays;
+      }
+    },
+    Peer: {
+      async list() {
+        return getData('peers');
+      },
+      async get(id) {
+        const peers = getData('peers');
+        return peers.find(p => p.id === id) || null;
+      },
+      async create(peer) {
+        const peers = getData('peers');
+        const newPeer = {
+          ...peer,
+          id: generateId(),
+          created_date: new Date().toISOString(),
+          last_activity: null,
+          // Peer-specific fields
+          organization: peer.organization || '',
+          collaboration_context: peer.collaboration_context || '',
+          relationship_type: peer.relationship_type || 'other',
+          // Base fields
+          name: peer.name,
+          role: peer.role || '',
+          email: peer.email || '',
+          phone: peer.phone || '',
+          department: peer.department || '',
+          availability: peer.availability || '',
+          skills: Array.isArray(peer.skills) ? peer.skills : [],
+          notes: peer.notes || '',
+          avatar: peer.avatar || '',
+        };
+        peers.unshift(newPeer);
+        setData('peers', peers);
+        return newPeer;
+      },
+      async update(id, updates) {
+        const peers = getData('peers');
+        const idx = peers.findIndex(p => p.id === id);
+        if (idx !== -1) {
+          peers[idx] = { ...peers[idx], ...updates };
+          setData('peers', peers);
+          return peers[idx];
+        }
+        throw new Error('Peer not found');
+      },
+      async delete(id) {
+        let peers = getData('peers');
+        peers = peers.filter(p => p.id !== id);
+        setData('peers', peers);
         return true;
       }
     }

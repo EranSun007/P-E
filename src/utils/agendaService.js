@@ -255,4 +255,153 @@ export class AgendaService {
       return 0;
     }
   }
+
+  /**
+   * Get all agenda items (notes) that reference a specific peer
+   * @param {string} peerId - The ID of the peer
+   * @returns {Promise<Array>} Array of processed agenda items
+   */
+  static async getAgendaItemsForPeer(peerId) {
+    try {
+      const oneOnOnes = await OneOnOne.list();
+      const agendaItems = [];
+      for (const meeting of oneOnOnes) {
+        if (!Array.isArray(meeting.notes)) continue;
+        const relevantNotes = meeting.notes.filter(note => {
+          if (!note.referenced_entity || typeof note.referenced_entity !== 'object') return false;
+          return note.referenced_entity.type === 'peer' && String(note.referenced_entity.id) === String(peerId);
+        });
+        for (const note of relevantNotes) {
+          if (!meeting.date || !meeting.id) continue;
+          const agendaItem = {
+            id: `${meeting.id}-${note.timestamp || Date.now()}`,
+            meetingId: meeting.id,
+            meetingDate: new Date(meeting.date),
+            noteText: note.text || '[No text available]',
+            referencedPeerId: peerId,
+            createdBy: note.created_by || meeting.peer_id || 'Unknown',
+            meetingOwner: meeting.peer_id || 'Unknown',
+            isDiscussed: note.isDiscussed || false,
+            discussedAt: note.discussedAt || null,
+            timestamp: note.timestamp || meeting.created_date || new Date().toISOString()
+          };
+          agendaItems.push(agendaItem);
+        }
+      }
+      agendaItems.sort((a, b) => new Date(b.meetingDate) - new Date(a.meetingDate));
+      return agendaItems;
+    } catch (error) {
+      console.error('Error getting agenda items for peer:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get agenda summary counts for all peers
+   * @returns {Promise<Object>} Object mapping peer IDs to their agenda summaries
+   */
+  static async getAgendaSummaryForAllPeers() {
+    try {
+      const [oneOnOnes, peers] = await Promise.all([
+        OneOnOne.list(),
+        import('../api/entities.js').then(mod => mod.Peer.list())
+      ]);
+      const agendaSummary = {};
+      for (const peer of peers) {
+        agendaSummary[peer.id] = {
+          count: 0,
+          recentItems: [],
+          hasUnresolved: false
+        };
+      }
+      for (const meeting of oneOnOnes) {
+        if (!Array.isArray(meeting.notes)) continue;
+        for (const note of meeting.notes) {
+          if (!note.referenced_entity || typeof note.referenced_entity !== 'object' || note.referenced_entity.type !== 'peer' || !note.referenced_entity.id) continue;
+          if (agendaSummary[note.referenced_entity.id]) {
+            const peerId = note.referenced_entity.id;
+            const isDiscussed = note.isDiscussed || false;
+            agendaSummary[peerId].count++;
+            if (!isDiscussed) agendaSummary[peerId].hasUnresolved = true;
+            const agendaItem = {
+              id: `${meeting.id}-${note.timestamp || Date.now()}`,
+              meetingId: meeting.id,
+              meetingDate: new Date(meeting.date),
+              noteText: note.text,
+              isDiscussed: isDiscussed,
+              meetingOwner: meeting.peer_id
+            };
+            agendaSummary[peerId].recentItems.push(agendaItem);
+          }
+        }
+      }
+      for (const peerId in agendaSummary) {
+        agendaSummary[peerId].recentItems.sort((a, b) => new Date(b.meetingDate) - new Date(a.meetingDate));
+        agendaSummary[peerId].recentItems = agendaSummary[peerId].recentItems.slice(0, 3);
+      }
+      return agendaSummary;
+    } catch (error) {
+      console.error('Error getting agenda summary for all peers:', error);
+      return {};
+    }
+  }
+
+  /**
+   * Get agenda items filtered by discussion status for peer
+   * @param {string} peerId - The ID of the peer
+   * @param {boolean} includeDiscussed - Whether to include discussed items
+   * @returns {Promise<Array>} Filtered array of agenda items
+   */
+  static async getFilteredAgendaItemsForPeer(peerId, includeDiscussed = true) {
+    try {
+      const allItems = await this.getAgendaItemsForPeer(peerId);
+      if (includeDiscussed) return allItems;
+      return allItems.filter(item => !item.isDiscussed);
+    } catch (error) {
+      console.error('Error getting filtered agenda items for peer:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get agenda items grouped by meeting for peer
+   * @param {string} peerId - The ID of the peer
+   * @returns {Promise<Object>} Object with meetings as keys and agenda items as values
+   */
+  static async getAgendaItemsGroupedByMeetingForPeer(peerId) {
+    try {
+      const agendaItems = await this.getAgendaItemsForPeer(peerId);
+      const groupedItems = {};
+      for (const item of agendaItems) {
+        if (!groupedItems[item.meetingId]) {
+          groupedItems[item.meetingId] = {
+            meetingId: item.meetingId,
+            meetingDate: item.meetingDate,
+            meetingOwner: item.meetingOwner,
+            items: []
+          };
+        }
+        groupedItems[item.meetingId].items.push(item);
+      }
+      return groupedItems;
+    } catch (error) {
+      console.error('Error grouping agenda items by meeting for peer:', error);
+      return {};
+    }
+  }
+
+  /**
+   * Get count of unresolved agenda items for a peer
+   * @param {string} peerId - The ID of the peer
+   * @returns {Promise<number>} Count of unresolved items
+   */
+  static async getUnresolvedItemsCountForPeer(peerId) {
+    try {
+      const items = await this.getFilteredAgendaItemsForPeer(peerId, false);
+      return items.length;
+    } catch (error) {
+      console.error('Error getting unresolved items count for peer:', error);
+      return 0;
+    }
+  }
 }

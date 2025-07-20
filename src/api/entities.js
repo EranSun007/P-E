@@ -1,4 +1,4 @@
-import { localClient } from './localClient';
+import { localClient } from './localClient.js';
 
 // Export all existing entities
 export const Task = localClient.entities.Task;
@@ -14,6 +14,8 @@ export const CalendarEvent = localClient.entities.CalendarEvent;
 export const Notification = localClient.entities.Notification;
 export const Reminder = localClient.entities.Reminder;
 export const Comment = localClient.entities.Comment;
+export const OutOfOffice = localClient.entities.OutOfOffice;
+export const Peer = localClient.entities.Peer;
 
 // User entity that works with new authentication system
 export const User = {
