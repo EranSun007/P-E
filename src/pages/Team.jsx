@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Task } from "@/api/entities";
 import { TeamMember } from "@/api/entities";
@@ -36,7 +35,6 @@ export default function TeamPage() {
     role: "",
     email: "",
     phone: "",
-    company: "",
     department: "",
     availability: "full_time",
     skills: [], // Initialize with empty array
@@ -115,7 +113,6 @@ export default function TeamPage() {
       role: "",
       email: "",
       phone: "",
-      company: "",
       department: "",
       availability: "full_time",
       skills: [],
@@ -134,7 +131,6 @@ export default function TeamPage() {
       role: member.role || "",
       email: member.email || "",
       phone: member.phone || "",
-      company: member.company || "",
       department: member.department || "",
       availability: member.availability || "full_time",
       skills: Array.isArray(member.skills) ? member.skills : [],
@@ -535,16 +531,6 @@ export default function TeamPage() {
                   placeholder="Phone number"
                 />
               </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="company">Company</Label>
-              <Input
-                id="company"
-                value={formData.company}
-                onChange={(e) => handleInputChange("company", e.target.value)}
-                placeholder="Company name"
-              />
             </div>
             
             <div className="space-y-2">
