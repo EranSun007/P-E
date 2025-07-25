@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Project, Task } from "@/api/entities";
 import { InvokeLLM } from "@/api/integrations";
@@ -60,6 +59,11 @@ export default function ProjectsPage() {
   const [projectAnalysis, setProjectAnalysis] = useState({});
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzingProject, setAnalyzingProject] = useState(null);
+  const [ownerType, setOwnerType] = useState('');
+  const [ownerId, setOwnerId] = useState('');
+  const [stakeholders, setStakeholders] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [peers, setPeers] = useState([]);
 
   useEffect(() => {
     loadProjects();
@@ -333,6 +337,55 @@ export default function ProjectsPage() {
     ];
   };
 
+  // Fetch all owner entities when dialog opens
+  useEffect(() => {
+    if (showDialog) {
+      // Dynamically import to avoid circular dependencies if any
+      import('@/api/entities').then(({ Stakeholder, TeamMember, Peer }) => {
+        Stakeholder.list().then(setStakeholders);
+        TeamMember.list().then(setTeamMembers);
+        Peer.list().then(setPeers);
+      });
+      // If editing, set ownerType and ownerId from formData.owner
+      if (editingProject && formData.owner && typeof formData.owner === 'object') {
+        setOwnerType(formData.owner.type);
+        setOwnerId(formData.owner.id);
+      } else {
+        setOwnerType('');
+        setOwnerId('');
+      }
+    }
+    // eslint-disable-next-line
+  }, [showDialog]);
+
+  // Update formData.owner when ownerType or ownerId changes
+  useEffect(() => {
+    if (ownerType && ownerId) {
+      handleInputChange('owner', { type: ownerType, id: ownerId });
+    } else {
+      handleInputChange('owner', '');
+    }
+    // eslint-disable-next-line
+  }, [ownerType, ownerId]);
+
+  // Helper to get owner display name
+  function getOwnerName(owner) {
+    if (!owner || typeof owner !== 'object' || !owner.type || !owner.id) return '';
+    if (owner.type === 'stakeholder') {
+      const s = stakeholders.find(s => s.id === owner.id);
+      return s ? s.name : '(Unknown Stakeholder)';
+    }
+    if (owner.type === 'team_member') {
+      const m = teamMembers.find(m => m.id === owner.id);
+      return m ? m.name : '(Unknown Team Member)';
+    }
+    if (owner.type === 'peer') {
+      const p = peers.find(p => p.id === owner.id);
+      return p ? p.name : '(Unknown Peer)';
+    }
+    return '';
+  }
+
   return (
     <div className="p-6">
       <div className="max-w-7xl mx-auto">
@@ -516,7 +569,14 @@ export default function ProjectsPage() {
                         </div>
                       )}
                       
-                      {project.owner && (
+                      {project.owner && typeof project.owner === 'object' && project.owner.type && project.owner.id && (
+                        <div className="mb-4">
+                          <Badge variant="outline" className="text-gray-600">
+                            Owner: {getOwnerName(project.owner)}
+                          </Badge>
+                        </div>
+                      )}
+                      {project.owner && typeof project.owner === 'string' && project.owner && (
                         <div className="mb-4">
                           <Badge variant="outline" className="text-gray-600">
                             Owner: {project.owner}
@@ -650,7 +710,6 @@ export default function ProjectsPage() {
               {editingProject ? "Edit Project" : "Create New Project"}
             </DialogTitle>
           </DialogHeader>
-
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="name">Project Name</Label>
@@ -693,15 +752,55 @@ export default function ProjectsPage() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="owner">Project Owner</Label>
-                <Input
-                  id="owner"
-                  value={formData.owner}
-                  onChange={(e) => handleInputChange("owner", e.target.value)}
-                  placeholder="Project owner"
-                />
+                <Label htmlFor="ownerType">Project Owner Type</Label>
+                <Select value={ownerType} onValueChange={setOwnerType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select owner type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="stakeholder">Stakeholder</SelectItem>
+                    <SelectItem value="team_member">Team Member</SelectItem>
+                    <SelectItem value="peer">Peer</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+            
+            {ownerType && (
+              <div className="space-y-2">
+                <Label htmlFor="ownerId">Project Owner</Label>
+                <Select
+                  value={ownerId}
+                  onValueChange={setOwnerId}
+                  disabled={
+                    !ownerType ||
+                    (ownerType === 'stakeholder' && (!stakeholders || stakeholders.length === 0)) ||
+                    (ownerType === 'team_member' && (!teamMembers || teamMembers.length === 0)) ||
+                    (ownerType === 'peer' && (!peers || peers.length === 0))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={`Select ${ownerType.replace('_', ' ')}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ownerType === 'stakeholder' && stakeholders && stakeholders.length > 0 && stakeholders.map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                    {ownerType === 'team_member' && teamMembers && teamMembers.length > 0 && teamMembers.map(m => (
+                      <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                    ))}
+                    {ownerType === 'peer' && peers && peers.length > 0 && peers.map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {((ownerType === 'stakeholder' && (!stakeholders || stakeholders.length === 0)) ||
+                  (ownerType === 'team_member' && (!teamMembers || teamMembers.length === 0)) ||
+                  (ownerType === 'peer' && (!peers || peers.length === 0))) && (
+                  <div className="text-xs text-gray-500 mt-1">No records found for this type.</div>
+                )}
+              </div>
+            )}
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

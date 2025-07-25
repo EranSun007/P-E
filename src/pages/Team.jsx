@@ -18,6 +18,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import TagInput from "../components/ui/tag-input";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import TeamMemberDeletionDialog from "@/components/team/TeamMemberDeletionDialog";
 
 export default function TeamPage() {
   const navigate = useNavigate();
@@ -28,6 +29,8 @@ export default function TeamPage() {
   const [showDialog, setShowDialog] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState(null);
   const [error, setError] = useState(null);
 
   const [formData, setFormData] = useState({
@@ -172,14 +175,26 @@ export default function TeamPage() {
     }
   };
 
-  const handleDelete = async (memberId) => {
+  const handleDelete = (member) => {
+    setMemberToDelete(member);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = async (memberId, dataHandlingOption) => {
     try {
       await TeamMember.delete(memberId);
+      setShowDeleteDialog(false);
+      setMemberToDelete(null);
       await loadData();
     } catch (err) {
       console.error("Failed to delete team member:", err);
       setError("Failed to delete team member. Please try again.");
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteDialog(false);
+    setMemberToDelete(null);
   };
 
   const filteredMembers = searchQuery 
@@ -366,7 +381,7 @@ export default function TeamPage() {
                             Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem 
-                            onClick={() => handleDelete(member.id)}
+                            onClick={() => handleDelete(member)}
                             className="text-red-600"
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
@@ -593,6 +608,15 @@ export default function TeamPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Team Member Deletion Dialog */}
+      <TeamMemberDeletionDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        teamMember={memberToDelete}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
     </div>
   );
 }

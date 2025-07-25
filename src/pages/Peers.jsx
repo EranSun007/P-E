@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Task } from "@/api/entities";
+import { Task, TeamMember } from "@/api/entities";
 import { Peer } from "@/api/entities";
 import { AgendaService } from "@/utils/agendaService";
 import { AgendaBadge } from "@/components/agenda/AgendaBadge";
@@ -18,11 +18,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import TagInput from "../components/ui/tag-input";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import AgendaContextActions from "@/components/agenda/AgendaContextActions";
 
 export default function PeersPage() {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [peers, setPeers] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [agendaSummary, setAgendaSummary] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [showDialog, setShowDialog] = useState(false);
@@ -53,9 +55,15 @@ export default function PeersPage() {
     setLoading(true);
     setError(null);
     try {
-      const peerData = await Peer.list().catch(() => []);
-      const taskData = await Task.list().catch(() => []);
+      const [peerData, taskData, teamMemberData] = await Promise.all([
+        Peer.list().catch(() => []),
+        Task.list().catch(() => []),
+        TeamMember.list().catch(() => [])
+      ]);
+      
       setTasks(taskData || []);
+      setTeamMembers(teamMemberData || []);
+      
       let agendaData = {};
       try {
         agendaData = await AgendaService.getAgendaSummaryForAllPeers?.() || {};
@@ -443,6 +451,37 @@ export default function PeersPage() {
                         <span>{peer.taskCount} meetings</span>
                       )}
                     </div>
+
+                    {/* Context Actions for Team Members */}
+                    {teamMembers.length > 0 && (
+                      <div className="mt-4 pt-3 border-t border-gray-200">
+                        <p className="text-xs text-gray-500 font-medium mb-2">Add to team member agendas:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {teamMembers.slice(0, 2).map(teamMember => (
+                            <AgendaContextActions
+                              key={teamMember.id}
+                              teamMemberId={teamMember.id}
+                              teamMemberName={teamMember.name}
+                              sourceItem={{
+                                title: `Peer: ${peer.name}`,
+                                description: `${peer.role ? `${peer.role} - ` : ''}${peer.organization || ''}${peer.collaboration_context ? ` | Context: ${peer.collaboration_context}` : ''}${peer.notes ? ` | ${peer.notes}` : ''}`,
+                                type: 'peer',
+                                id: peer.id,
+                                relationship_type: peer.relationship_type,
+                                department: peer.department
+                              }}
+                              variant="ghost"
+                              size="xs"
+                              showAgendaAction={true}
+                              showPersonalFileAction={true}
+                            />
+                          ))}
+                          {teamMembers.length > 2 && (
+                            <span className="text-xs text-gray-400">+{teamMembers.length - 2} more</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                   {peer.email && (
                     <CardFooter className="border-t pt-4">
@@ -501,7 +540,7 @@ export default function PeersPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="organization">Organization / Company</Label>
+                <Label htmlFor="organization">Group</Label>
                 <Input
                   id="organization"
                   value={formData.organization}

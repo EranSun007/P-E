@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Stakeholder } from "@/api/entities";
+import { Stakeholder, TeamMember } from "@/api/entities";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Users, Plus, Search } from "lucide-react";
+import AgendaContextActions from "@/components/agenda/AgendaContextActions";
 
 export default function StakeholdersPage() {
   const [stakeholders, setStakeholders] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -38,17 +40,22 @@ export default function StakeholdersPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await Stakeholder.list();
-      console.log("Stakeholder response:", response); // Debug log
+      const [stakeholderResponse, teamMemberResponse] = await Promise.all([
+        Stakeholder.list(),
+        TeamMember.list()
+      ]);
 
       // Ensure we have a valid array
-      if (!response) {
+      if (!stakeholderResponse) {
         setStakeholders([]);
-        return;
+      } else {
+        const data = Array.isArray(stakeholderResponse) ? stakeholderResponse : [];
+        setStakeholders(data);
       }
 
-      const data = Array.isArray(response) ? response : [];
-      setStakeholders(data);
+      // Load team members for context actions
+      const teamMemberData = Array.isArray(teamMemberResponse) ? teamMemberResponse : [];
+      setTeamMembers(teamMemberData);
     } catch (err) {
       console.error("Failed to load stakeholders:", err);
       setError("Failed to load stakeholders");
@@ -202,9 +209,42 @@ export default function StakeholdersPage() {
                   {(stakeholder.notes || stakeholder.description) && (
                     <p className="text-sm text-gray-600 mb-2">{stakeholder.notes || stakeholder.description}</p>
                   )}
-                  <Button size="sm" variant="outline" className="mt-2" onClick={() => openEditDialog(stakeholder)}>
-                    Edit
-                  </Button>
+                  <div className="mt-3 flex flex-col gap-2">
+                    <Button size="sm" variant="outline" onClick={() => openEditDialog(stakeholder)}>
+                      Edit
+                    </Button>
+                    
+                    {/* Context Actions for Team Members */}
+                    {teamMembers.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs text-gray-500 font-medium">Add to team member agendas:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {teamMembers.slice(0, 3).map(teamMember => (
+                            <AgendaContextActions
+                              key={teamMember.id}
+                              teamMemberId={teamMember.id}
+                              teamMemberName={teamMember.name}
+                              sourceItem={{
+                                title: `Stakeholder: ${stakeholder.name}`,
+                                description: `${stakeholder.role ? `${stakeholder.role} - ` : ''}${stakeholder.company || stakeholder.organization || ''}${stakeholder.notes || stakeholder.description ? ` | ${stakeholder.notes || stakeholder.description}` : ''}`,
+                                type: 'stakeholder',
+                                id: stakeholder.id,
+                                influence_level: stakeholder.influence_level || stakeholder.influence,
+                                engagement_level: stakeholder.engagement_level
+                              }}
+                              variant="ghost"
+                              size="xs"
+                              showAgendaAction={true}
+                              showPersonalFileAction={true}
+                            />
+                          ))}
+                          {teamMembers.length > 3 && (
+                            <span className="text-xs text-gray-400">+{teamMembers.length - 3} more</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}

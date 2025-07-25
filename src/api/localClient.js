@@ -2,6 +2,8 @@
 // Local storage-based API client for migration from Base44
 
 import { sanitizeInput, validateInput } from '../utils/validation.js';
+import { logAuditEvent, AUDIT_ACTIONS, AUDIT_RESOURCES } from '../services/auditService.js';
+import AuthService from '../services/authService.js';
 
 function getData(key) {
   try {
@@ -33,6 +35,34 @@ function generateId() {
   }
   // Fallback for older browsers
   return '_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+}
+
+function getCurrentUser() {
+  try {
+    const token = AuthService.getStoredToken();
+    return token?.username || null;
+  } catch (error) {
+    console.warn('Unable to get current user:', error);
+    return null;
+  }
+}
+
+function checkAccess(operation, resourceType, resourceData = null) {
+  const currentUser = getCurrentUser();
+  
+  if (!currentUser) {
+    throw new Error('Access denied: User not authenticated');
+  }
+  
+  // For personal file items, ensure access control
+  if (resourceType === 'personal_file_items') {
+    // Only the creator can access their personal file items
+    if (resourceData && resourceData.createdBy && resourceData.createdBy !== currentUser) {
+      throw new Error('Access denied: You can only access your own personal file items');
+    }
+  }
+  
+  return currentUser;
 }
 
 export const localClient = {
@@ -193,6 +223,7 @@ export const localClient = {
           phone: member.phone || null,
           company: member.company || null,
           birthday: member.birthday || null, // Added birthday field
+          duties: member.duties || [], // Added duties field for duty assignments
           last_activity: null // Will be calculated dynamically
         };
         members.unshift(newMember);
@@ -214,6 +245,22 @@ export const localClient = {
         members = members.filter(m => m.id !== id);
         setData('team_members', members);
         return true;
+      },
+      async getDuties(id) {
+        // Get duties for a specific team member
+        const duties = getData('duties');
+        return duties.filter(d => d.team_member_id === id);
+      },
+      async getCurrentDuties(id) {
+        // Get current active duties for a team member
+        const duties = getData('duties');
+        const now = new Date();
+        return duties.filter(d => {
+          if (d.team_member_id !== id) return false;
+          const startDate = new Date(d.start_date);
+          const endDate = new Date(d.end_date);
+          return now >= startDate && now <= endDate;
+        });
       }
     },
     OneOnOne: {
@@ -439,14 +486,44 @@ export const localClient = {
       },
       async create(event) {
         const events = getData('calendar_events');
+        
+        // Validate event_type
+        const validEventTypes = ['meeting', 'one_on_one', 'duty', 'birthday', 'out_of_office'];
+        if (event.event_type && !validEventTypes.includes(event.event_type)) {
+          throw new Error(`Invalid event_type. Must be one of: ${validEventTypes.join(', ')}`);
+        }
+
+        // Validate linking fields based on event type
+        if (event.event_type === 'duty' && !event.duty_id) {
+          console.warn('Duty event created without duty_id - this may cause display issues');
+        }
+        if (event.event_type === 'out_of_office' && !event.out_of_office_id) {
+          console.warn('Out of office event created without out_of_office_id - this may cause display issues');
+        }
+
         const newEvent = {
           ...event,
           id: generateId(),
           created_date: new Date().toISOString(),
           // Initialize with defaults
           all_day: event.all_day || false,
-          recurrence_rule: event.recurrence_rule || null
+          recurrence_rule: event.recurrence_rule || null,
+          event_type: event.event_type || 'meeting', // Default to meeting type
+          // New linking fields for different event types
+          duty_id: event.duty_id || null,
+          out_of_office_id: event.out_of_office_id || null,
+          // Recurrence support for birthday events
+          recurrence: event.recurrence || null
         };
+
+        // Handle birthday event recurrence - automatically set yearly recurrence
+        if (newEvent.event_type === 'birthday' && !newEvent.recurrence) {
+          newEvent.recurrence = {
+            type: 'yearly',
+            interval: 1
+          };
+        }
+
         events.unshift(newEvent);
         setData('calendar_events', events);
         return newEvent;
@@ -466,6 +543,80 @@ export const localClient = {
         events = events.filter(e => e.id !== id);
         setData('calendar_events', events);
         return true;
+      },
+      // Helper methods for creating specific event types
+      async createDutyEvent(dutyId, teamMemberId, title, startDate, endDate, description = null) {
+        return await this.create({
+          title,
+          description: description || `Duty assignment: ${title}`,
+          start_date: startDate,
+          end_date: endDate,
+          all_day: true, // Duties are typically all-day events
+          event_type: 'duty',
+          duty_id: dutyId,
+          team_member_id: teamMemberId,
+          linked_entity_type: 'duty',
+          linked_entity_id: dutyId
+        });
+      },
+      async createBirthdayEvent(teamMemberId, teamMemberName, birthdayDate) {
+        return await this.create({
+          title: `🎂 ${teamMemberName}'s Birthday`,
+          description: `Birthday celebration for ${teamMemberName}`,
+          start_date: birthdayDate,
+          end_date: birthdayDate,
+          all_day: true,
+          event_type: 'birthday',
+          team_member_id: teamMemberId,
+          linked_entity_type: 'team_member',
+          linked_entity_id: teamMemberId,
+          recurrence: {
+            type: 'yearly',
+            interval: 1
+          }
+        });
+      },
+      async createOutOfOfficeEvent(outOfOfficeId, teamMemberId, teamMemberName, startDate, endDate, type = 'vacation') {
+        return await this.create({
+          title: `${teamMemberName} - Out of Office (${type})`,
+          description: `${teamMemberName} is out of office`,
+          start_date: startDate,
+          end_date: endDate,
+          all_day: true,
+          event_type: 'out_of_office',
+          out_of_office_id: outOfOfficeId,
+          team_member_id: teamMemberId,
+          linked_entity_type: 'out_of_office',
+          linked_entity_id: outOfOfficeId
+        });
+      },
+      // Helper methods for querying events by type
+      async getByType(eventType) {
+        const events = await this.list();
+        return events.filter(event => event.event_type === eventType);
+      },
+      async getByDutyId(dutyId) {
+        const events = await this.list();
+        return events.filter(event => event.duty_id === dutyId);
+      },
+      async getByOutOfOfficeId(outOfOfficeId) {
+        const events = await this.list();
+        return events.filter(event => event.out_of_office_id === outOfOfficeId);
+      },
+      async getBirthdayEvents() {
+        return await this.getByType('birthday');
+      },
+      async getDutyEvents() {
+        return await this.getByType('duty');
+      },
+      async getOutOfOfficeEvents() {
+        return await this.getByType('out_of_office');
+      },
+      async getMeetingEvents() {
+        const events = await this.list();
+        return events.filter(event => 
+          event.event_type === 'meeting' || event.event_type === 'one_on_one'
+        );
       }
     },
     Notification: {
@@ -744,6 +895,416 @@ export const localClient = {
         peers = peers.filter(p => p.id !== id);
         setData('peers', peers);
         return true;
+      }
+    },
+    Duty: {
+      async list() {
+        return getData('duties');
+      },
+      async get(id) {
+        const duties = getData('duties');
+        return duties.find(d => d.id === id) || null;
+      },
+      async create(duty) {
+        const duties = getData('duties');
+        
+        // Validate required fields
+        if (!duty.team_member_id) {
+          throw new Error('team_member_id is required');
+        }
+        if (!duty.type) {
+          throw new Error('duty type is required');
+        }
+        if (!duty.title) {
+          throw new Error('duty title is required');
+        }
+        if (!duty.start_date) {
+          throw new Error('start_date is required');
+        }
+        if (!duty.end_date) {
+          throw new Error('end_date is required');
+        }
+
+        // Validate duty type
+        const validTypes = ['devops', 'on_call', 'other'];
+        if (!validTypes.includes(duty.type)) {
+          throw new Error(`Invalid duty type. Must be one of: ${validTypes.join(', ')}`);
+        }
+
+        // Validate date range
+        const startDate = new Date(duty.start_date);
+        const endDate = new Date(duty.end_date);
+        if (startDate >= endDate) {
+          throw new Error('start_date must be before end_date');
+        }
+
+        // Check for conflicts with existing duties for the same team member
+        const existingDuties = duties.filter(d => d.team_member_id === duty.team_member_id);
+        const hasConflict = existingDuties.some(existingDuty => {
+          const existingStart = new Date(existingDuty.start_date);
+          const existingEnd = new Date(existingDuty.end_date);
+          
+          // Check if date ranges overlap
+          return (startDate <= existingEnd && endDate >= existingStart);
+        });
+
+        if (hasConflict) {
+          console.warn('Duty assignment conflicts with existing duty for this team member');
+          // Don't throw error, just warn - allow conflicts but log them
+        }
+
+        const newDuty = {
+          ...duty,
+          id: generateId(),
+          created_date: new Date().toISOString(),
+          updated_date: new Date().toISOString(),
+          // Ensure proper field initialization
+          team_member_id: duty.team_member_id,
+          type: duty.type,
+          title: duty.title,
+          description: duty.description || null,
+          start_date: duty.start_date,
+          end_date: duty.end_date
+        };
+
+        duties.unshift(newDuty);
+        setData('duties', duties);
+        return newDuty;
+      },
+      async update(id, updates) {
+        const duties = getData('duties');
+        const idx = duties.findIndex(d => d.id === id);
+        if (idx === -1) {
+          throw new Error('Duty not found');
+        }
+
+        const currentDuty = duties[idx];
+        
+        // Validate duty type if being updated
+        if (updates.type) {
+          const validTypes = ['devops', 'on_call', 'other'];
+          if (!validTypes.includes(updates.type)) {
+            throw new Error(`Invalid duty type. Must be one of: ${validTypes.join(', ')}`);
+          }
+        }
+
+        // Validate date range if dates are being updated
+        const startDate = new Date(updates.start_date || currentDuty.start_date);
+        const endDate = new Date(updates.end_date || currentDuty.end_date);
+        if (startDate >= endDate) {
+          throw new Error('start_date must be before end_date');
+        }
+
+        // Check for conflicts if dates or team member are being updated
+        if (updates.start_date || updates.end_date || updates.team_member_id) {
+          const teamMemberId = updates.team_member_id || currentDuty.team_member_id;
+          const existingDuties = duties.filter(d => 
+            d.team_member_id === teamMemberId && d.id !== id
+          );
+          
+          const hasConflict = existingDuties.some(existingDuty => {
+            const existingStart = new Date(existingDuty.start_date);
+            const existingEnd = new Date(existingDuty.end_date);
+            
+            // Check if date ranges overlap
+            return (startDate <= existingEnd && endDate >= existingStart);
+          });
+
+          if (hasConflict) {
+            console.warn('Updated duty assignment conflicts with existing duty for this team member');
+            // Don't throw error, just warn - allow conflicts but log them
+          }
+        }
+
+        const updatedDuty = {
+          ...currentDuty,
+          ...updates,
+          updated_date: new Date().toISOString()
+        };
+
+        duties[idx] = updatedDuty;
+        setData('duties', duties);
+        return updatedDuty;
+      },
+      async delete(id) {
+        let duties = getData('duties');
+        const dutyExists = duties.some(d => d.id === id);
+        if (!dutyExists) {
+          throw new Error('Duty not found');
+        }
+        
+        duties = duties.filter(d => d.id !== id);
+        setData('duties', duties);
+        return true;
+      },
+      async getByTeamMember(teamMemberId) {
+        const duties = getData('duties');
+        return duties.filter(d => d.team_member_id === teamMemberId);
+      },
+      async getActiveForDate(date) {
+        const duties = getData('duties');
+        const targetDate = new Date(date);
+        return duties.filter(d => {
+          const startDate = new Date(d.start_date);
+          const endDate = new Date(d.end_date);
+          return targetDate >= startDate && targetDate <= endDate;
+        });
+      },
+      async getConflicts(teamMemberId, startDate, endDate, excludeId = null) {
+        const duties = getData('duties');
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        return duties.filter(duty => {
+          if (excludeId && duty.id === excludeId) return false;
+          if (duty.team_member_id !== teamMemberId) return false;
+          
+          const dutyStart = new Date(duty.start_date);
+          const dutyEnd = new Date(duty.end_date);
+          
+          // Check if date ranges overlap
+          return (start <= dutyEnd && end >= dutyStart);
+        });
+      }
+    },
+    AgendaItem: {
+      async list() {
+        return getData('agenda_items');
+      },
+      async get(id) {
+        const items = getData('agenda_items');
+        return items.find(item => item.id === id) || null;
+      },
+      async create(agendaItem) {
+        const items = getData('agenda_items');
+        const newItem = {
+          ...agendaItem,
+          id: generateId(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          // Initialize with defaults
+          status: agendaItem.status || 'pending',
+          priority: agendaItem.priority || 2,
+          tags: agendaItem.tags || []
+        };
+        items.unshift(newItem);
+        setData('agenda_items', items);
+        return newItem;
+      },
+      async update(id, updates) {
+        const items = getData('agenda_items');
+        const idx = items.findIndex(item => item.id === id);
+        if (idx !== -1) {
+          items[idx] = {
+            ...items[idx],
+            ...updates,
+            updatedAt: new Date().toISOString()
+          };
+          setData('agenda_items', items);
+          return items[idx];
+        }
+        throw new Error('AgendaItem not found');
+      },
+      async delete(id) {
+        let items = getData('agenda_items');
+        items = items.filter(item => item.id !== id);
+        setData('agenda_items', items);
+        return true;
+      },
+      async getByTeamMember(teamMemberId) {
+        const items = getData('agenda_items');
+        return items.filter(item => item.teamMemberId === teamMemberId);
+      },
+      async getByStatus(status) {
+        const items = getData('agenda_items');
+        return items.filter(item => item.status === status);
+      },
+      async getForNextMeeting(teamMemberId) {
+        const items = getData('agenda_items');
+        return items.filter(item => 
+          item.teamMemberId === teamMemberId && 
+          item.status === 'pending'
+        );
+      }
+    },
+    PersonalFileItem: {
+      async list() {
+        const currentUser = checkAccess('READ', 'personal_file_items');
+        const items = getData('personal_file_items');
+        
+        // Filter to only show items created by current user
+        const userItems = items.filter(item => item.createdBy === currentUser);
+        
+        // Log audit event
+        logAuditEvent(AUDIT_ACTIONS.READ, AUDIT_RESOURCES.PERSONAL_FILE_ITEM, 'all', {
+          operation: 'list',
+          itemCount: userItems.length
+        });
+        
+        return userItems;
+      },
+      async get(id) {
+        const currentUser = checkAccess('READ', 'personal_file_items');
+        const items = getData('personal_file_items');
+        const item = items.find(item => item.id === id);
+        
+        if (!item) {
+          return null;
+        }
+        
+        // Check access control
+        if (item.createdBy !== currentUser) {
+          throw new Error('Access denied: You can only access your own personal file items');
+        }
+        
+        // Log audit event
+        logAuditEvent(AUDIT_ACTIONS.READ, AUDIT_RESOURCES.PERSONAL_FILE_ITEM, id, {
+          operation: 'get',
+          teamMemberId: item.teamMemberId
+        });
+        
+        return item;
+      },
+      async create(personalFileItem) {
+        const currentUser = checkAccess('CREATE', 'personal_file_items');
+        const items = getData('personal_file_items');
+        const newItem = {
+          ...personalFileItem,
+          id: generateId(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          createdBy: currentUser, // Add access control field
+          // Initialize with defaults
+          category: personalFileItem.category || 'general',
+          tags: personalFileItem.tags || [],
+          importance: personalFileItem.importance || 3
+        };
+        items.unshift(newItem);
+        setData('personal_file_items', items);
+        
+        // Log audit event
+        logAuditEvent(AUDIT_ACTIONS.CREATE, AUDIT_RESOURCES.PERSONAL_FILE_ITEM, newItem.id, {
+          operation: 'create',
+          teamMemberId: newItem.teamMemberId,
+          category: newItem.category,
+          importance: newItem.importance
+        });
+        
+        return newItem;
+      },
+      async update(id, updates) {
+        const currentUser = checkAccess('UPDATE', 'personal_file_items');
+        const items = getData('personal_file_items');
+        const idx = items.findIndex(item => item.id === id);
+        
+        if (idx === -1) {
+          throw new Error('PersonalFileItem not found');
+        }
+        
+        const existingItem = items[idx];
+        
+        // Check access control
+        if (existingItem.createdBy !== currentUser) {
+          throw new Error('Access denied: You can only update your own personal file items');
+        }
+        
+        const updatedItem = {
+          ...existingItem,
+          ...updates,
+          updatedAt: new Date().toISOString(),
+          createdBy: existingItem.createdBy // Preserve original creator
+        };
+        
+        items[idx] = updatedItem;
+        setData('personal_file_items', items);
+        
+        // Log audit event
+        logAuditEvent(AUDIT_ACTIONS.UPDATE, AUDIT_RESOURCES.PERSONAL_FILE_ITEM, id, {
+          operation: 'update',
+          teamMemberId: updatedItem.teamMemberId,
+          changes: Object.keys(updates)
+        });
+        
+        return updatedItem;
+      },
+      async delete(id) {
+        const currentUser = checkAccess('DELETE', 'personal_file_items');
+        let items = getData('personal_file_items');
+        const itemToDelete = items.find(item => item.id === id);
+        
+        if (!itemToDelete) {
+          throw new Error('PersonalFileItem not found');
+        }
+        
+        // Check access control
+        if (itemToDelete.createdBy !== currentUser) {
+          throw new Error('Access denied: You can only delete your own personal file items');
+        }
+        
+        items = items.filter(item => item.id !== id);
+        setData('personal_file_items', items);
+        
+        // Log audit event
+        logAuditEvent(AUDIT_ACTIONS.DELETE, AUDIT_RESOURCES.PERSONAL_FILE_ITEM, id, {
+          operation: 'delete',
+          teamMemberId: itemToDelete.teamMemberId,
+          category: itemToDelete.category
+        });
+        
+        return true;
+      },
+      async getByTeamMember(teamMemberId) {
+        const currentUser = checkAccess('READ', 'personal_file_items');
+        const items = getData('personal_file_items');
+        const userItems = items.filter(item => 
+          item.teamMemberId === teamMemberId && item.createdBy === currentUser
+        );
+        
+        // Log audit event
+        logAuditEvent(AUDIT_ACTIONS.READ, AUDIT_RESOURCES.PERSONAL_FILE_ITEM, 'team_member', {
+          operation: 'getByTeamMember',
+          teamMemberId,
+          itemCount: userItems.length
+        });
+        
+        return userItems;
+      },
+      async getByCategory(category) {
+        const currentUser = checkAccess('READ', 'personal_file_items');
+        const items = getData('personal_file_items');
+        const userItems = items.filter(item => 
+          item.category === category && item.createdBy === currentUser
+        );
+        
+        // Log audit event
+        logAuditEvent(AUDIT_ACTIONS.READ, AUDIT_RESOURCES.PERSONAL_FILE_ITEM, 'category', {
+          operation: 'getByCategory',
+          category,
+          itemCount: userItems.length
+        });
+        
+        return userItems;
+      },
+      async searchByTags(tags) {
+        if (!Array.isArray(tags) || tags.length === 0) {
+          return [];
+        }
+        
+        const currentUser = checkAccess('READ', 'personal_file_items');
+        const items = getData('personal_file_items');
+        const userItems = items.filter(item => 
+          item.createdBy === currentUser &&
+          item.tags && item.tags.some(tag => tags.includes(tag))
+        );
+        
+        // Log audit event
+        logAuditEvent(AUDIT_ACTIONS.READ, AUDIT_RESOURCES.PERSONAL_FILE_ITEM, 'tags', {
+          operation: 'searchByTags',
+          tags,
+          itemCount: userItems.length
+        });
+        
+        return userItems;
       }
     }
   },

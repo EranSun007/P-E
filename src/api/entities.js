@@ -16,6 +16,9 @@ export const Reminder = localClient.entities.Reminder;
 export const Comment = localClient.entities.Comment;
 export const OutOfOffice = localClient.entities.OutOfOffice;
 export const Peer = localClient.entities.Peer;
+export const Duty = localClient.entities.Duty;
+export const AgendaItem = localClient.entities.AgendaItem;
+export const PersonalFileItem = localClient.entities.PersonalFileItem;
 
 // User entity that works with new authentication system
 export const User = {

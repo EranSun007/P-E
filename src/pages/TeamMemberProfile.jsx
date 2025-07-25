@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { format, parseISO } from "date-fns";
-import { TeamMember, OneOnOne, Task, Project, Stakeholder, OutOfOffice } from "@/api/entities";
+import { TeamMember, OneOnOne, Task, Project, Stakeholder, OutOfOffice, Duty } from "@/api/entities";
 import { AgendaService } from "@/utils/agendaService";
 import { CalendarService } from "@/utils/calendarService";
-import { AgendaItemCard, AgendaItemList } from "@/components/agenda/AgendaItemCard";
+import AgendaItemCard from "@/components/agenda/AgendaItemCard";
+import AgendaItemList from "@/components/agenda/AgendaItemList";
+import AgendaSection from "@/components/agenda/AgendaSection";
+import PersonalFileSection from "@/components/agenda/PersonalFileSection";
+import AgendaContextActions from "@/components/agenda/AgendaContextActions";
 import OutOfOfficeCounter from "@/components/team/OutOfOfficeCounter";
 import OutOfOfficeManager from "@/components/team/OutOfOfficeManager";
+import DutyForm from "@/components/duty/DutyForm";
+import DutyCard from "@/components/duty/DutyCard";
 import { createPageUrl } from "@/utils";
 import {
   Card,
@@ -37,6 +43,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -53,10 +60,15 @@ import {
   CheckCircle2,
   XCircle,
   Link as LinkIcon,
+  FileText,
+  Users,
   MessageSquare,
   AlertCircle,
   SmilePlus,
   Trash2,
+  Shield,
+  History,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function TeamMemberProfile() {
@@ -71,10 +83,14 @@ export default function TeamMemberProfile() {
   const [allTeamMembers, setAllTeamMembers] = useState([]);
   const [allStakeholders, setAllStakeholders] = useState([]);
   const [outOfOfficeStats, setOutOfOfficeStats] = useState(null);
+  const [duties, setDuties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNewMeetingDialog, setShowNewMeetingDialog] = useState(false);
   const [showActionItemDialog, setShowActionItemDialog] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
+  const [showDutyForm, setShowDutyForm] = useState(false);
+  const [editingDuty, setEditingDuty] = useState(null);
+  const [dutyConflicts, setDutyConflicts] = useState([]);
   const [noteForm, setNoteForm] = useState({
     text: "",
     referenced_entity: { type: "team_member", id: "" },
@@ -150,6 +166,10 @@ export default function TeamMemberProfile() {
       // Load all team members and stakeholders for note tagging
       setAllTeamMembers(await TeamMember.list());
       setAllStakeholders(await Stakeholder.list());
+
+      // Load duties for this team member
+      const memberDuties = await Duty.getByTeamMember(memberId);
+      setDuties(memberDuties);
 
       // Load next meeting information
       await loadNextMeetingInfo(memberOneOnOnes);
@@ -400,6 +420,87 @@ export default function TeamMemberProfile() {
     }
   };
 
+  // Duty management functions
+  const handleCreateDuty = () => {
+    setEditingDuty(null);
+    setShowDutyForm(true);
+  };
+
+  const handleEditDuty = (duty) => {
+    setEditingDuty(duty);
+    setShowDutyForm(true);
+  };
+
+  const handleSaveDuty = async (dutyData) => {
+    try {
+      if (editingDuty) {
+        await Duty.update(editingDuty.id, dutyData);
+      } else {
+        await Duty.create(dutyData);
+      }
+      
+      setShowDutyForm(false);
+      setEditingDuty(null);
+      
+      // Reload duties
+      const memberDuties = await Duty.getByTeamMember(memberId);
+      setDuties(memberDuties);
+      
+      // Check for conflicts after save
+      await checkDutyConflicts();
+    } catch (error) {
+      console.error("Error saving duty:", error);
+    }
+  };
+
+  const handleDeleteDuty = async (duty) => {
+    try {
+      await Duty.delete(duty.id);
+      
+      // Reload duties
+      const memberDuties = await Duty.getByTeamMember(memberId);
+      setDuties(memberDuties);
+      
+      // Recheck conflicts
+      await checkDutyConflicts();
+    } catch (error) {
+      console.error("Error deleting duty:", error);
+    }
+  };
+
+  const checkDutyConflicts = async () => {
+    try {
+      const conflicts = [];
+      
+      for (const duty of duties) {
+        const conflictingDuties = await Duty.getConflicts(
+          duty.team_member_id,
+          duty.start_date,
+          duty.end_date,
+          duty.id
+        );
+        
+        if (conflictingDuties.length > 0) {
+          conflicts.push({
+            duty,
+            conflicts: conflictingDuties
+          });
+        }
+      }
+      
+      setDutyConflicts(conflicts);
+    } catch (error) {
+      console.error("Error checking duty conflicts:", error);
+    }
+  };
+
+  // Check for conflicts when duties change
+  useEffect(() => {
+    if (duties.length > 0) {
+      checkDutyConflicts();
+    }
+  }, [duties]);
+
   if (loading) {
     return <div className="p-6">Loading...</div>;
   }
@@ -456,29 +557,47 @@ export default function TeamMemberProfile() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content - 1:1s */}
+          {/* Main Content with Tabs */}
           <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <CardTitle>1:1 Meetings</CardTitle>
-                  <Button onClick={() => setShowNewMeetingDialog(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    New 1:1
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {oneOnOnes.length === 0 ? (
-                  <div className="text-center py-6">
-                    <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-500">No 1:1 meetings recorded yet</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {oneOnOnes
-                      .sort((a, b) => new Date(b.date) - new Date(a.date))
-                      .map(meeting => (
+            <Tabs defaultValue="meetings" className="w-full">
+              <TabsList className="grid grid-cols-3 mb-4">
+                <TabsTrigger value="meetings">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  1:1 Meetings
+                </TabsTrigger>
+                <TabsTrigger value="agenda">
+                  <Clock className="h-4 w-4 mr-2" />
+                  1:1 Agenda
+                </TabsTrigger>
+                <TabsTrigger value="personal-file">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Personal File
+                </TabsTrigger>
+              </TabsList>
+              
+              {/* 1:1 Meetings Tab */}
+              <TabsContent value="meetings" className="mt-0">
+                <Card>
+                  <CardHeader>
+                    <div className="flex justify-between items-center">
+                      <CardTitle>1:1 Meetings</CardTitle>
+                      <Button onClick={() => setShowNewMeetingDialog(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        New 1:1
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {oneOnOnes.length === 0 ? (
+                      <div className="text-center py-6">
+                        <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-500">No 1:1 meetings recorded yet</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {oneOnOnes
+                          .sort((a, b) => new Date(b.date) - new Date(a.date))
+                          .map(meeting => (
                         <Card key={meeting.id}>
                           <CardHeader>
                             <div className="flex justify-between items-start">
@@ -600,6 +719,20 @@ export default function TeamMemberProfile() {
                                               projects.find(p => String(p.id) === String(n.referenced_entity.id))?.name}
                                           </span>
                                         )}
+                                        <div className="mt-1">
+                                          <AgendaContextActions
+                                            teamMemberId={memberId}
+                                            teamMemberName={member.name}
+                                            sourceItem={{
+                                              title: `Note from 1:1 on ${format(parseISO(meeting.date), 'MMM d, yyyy')}`,
+                                              description: n.text,
+                                              type: 'note',
+                                              id: `note-${meeting.id}-${i}`
+                                            }}
+                                            variant="ghost"
+                                            size="xs"
+                                          />
+                                        </div>
                                       </li>
                                     ))}
                                   </ul>
@@ -749,6 +882,18 @@ export default function TeamMemberProfile() {
                                               >
                                                 <Clock className="h-4 w-4 text-blue-500" />
                                               </Button>
+                                              <AgendaContextActions
+                                                teamMemberId={memberId}
+                                                teamMemberName={member.name}
+                                                sourceItem={{
+                                                  title: `Action Item: ${item.description}`,
+                                                  description: `Due date: ${item.due_date ? format(parseISO(item.due_date), "MMM d, yyyy") : "None"}\nStatus: ${item.status}`,
+                                                  type: 'action_item',
+                                                  id: `action-${meeting.id}-${index}`
+                                                }}
+                                                variant="ghost"
+                                                size="sm"
+                                              />
                                             </div>
                                           </TableCell>
                                         </TableRow>
@@ -765,12 +910,219 @@ export default function TeamMemberProfile() {
                 )}
               </CardContent>
             </Card>
+              </TabsContent>
+              
+              {/* 1:1 Agenda Tab */}
+              <TabsContent value="agenda" className="mt-0">
+                <AgendaSection 
+                  teamMemberId={memberId} 
+                  teamMemberName={member?.name} 
+                />
+              </TabsContent>
+              
+              {/* Personal File Tab */}
+              <TabsContent value="personal-file" className="mt-0">
+                <PersonalFileSection 
+                  teamMemberId={memberId} 
+                  teamMemberName={member?.name} 
+                />
+              </TabsContent>
+            </Tabs>
 
             {/* Out of Office Management */}
             <OutOfOfficeManager
               teamMemberId={memberId}
               teamMemberName={member?.name}
             />
+
+            {/* Duty Management */}
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="h-5 w-5" />
+                    Duty Assignments
+                  </CardTitle>
+                  <Button onClick={handleCreateDuty}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Assign Duty
+                  </Button>
+                </div>
+                {dutyConflicts.length > 0 && (
+                  <div className="mt-2">
+                    <div className="flex items-center gap-2 text-orange-600">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span className="text-sm font-medium">
+                        {dutyConflicts.length} duty conflict{dutyConflicts.length > 1 ? 's' : ''} detected
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent>
+                {duties.length === 0 ? (
+                  <div className="text-center py-6">
+                    <Shield className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-500">No duty assignments yet</p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Assign DevOps duties, on-call responsibilities, or other duties
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Current/Active Duties */}
+                    {duties.filter(duty => {
+                      const now = new Date();
+                      const startDate = new Date(duty.start_date);
+                      const endDate = new Date(duty.end_date);
+                      return now >= startDate && now <= endDate;
+                    }).length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-sm text-gray-700 mb-3 flex items-center gap-2">
+                          <Clock className="h-4 w-4" />
+                          Active Duties
+                        </h4>
+                        <div className="space-y-3">
+                          {duties
+                            .filter(duty => {
+                              const now = new Date();
+                              const startDate = new Date(duty.start_date);
+                              const endDate = new Date(duty.end_date);
+                              return now >= startDate && now <= endDate;
+                            })
+                            .map(duty => (
+                              <DutyCard
+                                key={duty.id}
+                                duty={duty}
+                                teamMember={member}
+                                onEdit={handleEditDuty}
+                                onDelete={handleDeleteDuty}
+                                compact={true}
+                              />
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Upcoming Duties */}
+                    {duties.filter(duty => {
+                      const now = new Date();
+                      const startDate = new Date(duty.start_date);
+                      return now < startDate;
+                    }).length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-sm text-gray-700 mb-3 flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Upcoming Duties
+                        </h4>
+                        <div className="space-y-3">
+                          {duties
+                            .filter(duty => {
+                              const now = new Date();
+                              const startDate = new Date(duty.start_date);
+                              return now < startDate;
+                            })
+                            .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
+                            .map(duty => (
+                              <DutyCard
+                                key={duty.id}
+                                duty={duty}
+                                teamMember={member}
+                                onEdit={handleEditDuty}
+                                onDelete={handleDeleteDuty}
+                                compact={true}
+                              />
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Past Duties */}
+                    {duties.filter(duty => {
+                      const now = new Date();
+                      const endDate = new Date(duty.end_date);
+                      return now > endDate;
+                    }).length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-sm text-gray-700 mb-3 flex items-center gap-2">
+                          <History className="h-4 w-4" />
+                          Past Duties ({duties.filter(duty => {
+                            const now = new Date();
+                            const endDate = new Date(duty.end_date);
+                            return now > endDate;
+                          }).length})
+                        </h4>
+                        <div className="space-y-2">
+                          {duties
+                            .filter(duty => {
+                              const now = new Date();
+                              const endDate = new Date(duty.end_date);
+                              return now > endDate;
+                            })
+                            .sort((a, b) => new Date(b.end_date) - new Date(a.end_date))
+                            .slice(0, 3) // Show only last 3 past duties
+                            .map(duty => (
+                              <div key={duty.id} className="flex items-center justify-between p-2 border rounded bg-gray-50">
+                                <div className="flex items-center space-x-2">
+                                  <Shield className="h-3 w-3 text-gray-500" />
+                                  <span className="text-sm">{duty.title}</span>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {duty.type === 'devops' ? 'DevOps' : duty.type === 'on_call' ? 'On-Call' : 'Other'}
+                                  </Badge>
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                  {format(parseISO(duty.end_date), "MMM d, yyyy")}
+                                </span>
+                              </div>
+                            ))}
+                          {duties.filter(duty => {
+                            const now = new Date();
+                            const endDate = new Date(duty.end_date);
+                            return now > endDate;
+                          }).length > 3 && (
+                            <p className="text-xs text-gray-500 text-center pt-2">
+                              Showing 3 of {duties.filter(duty => {
+                                const now = new Date();
+                                const endDate = new Date(duty.end_date);
+                                return now > endDate;
+                              }).length} past duties
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Conflict Warnings */}
+                    {dutyConflicts.length > 0 && (
+                      <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="h-4 w-4 text-orange-600 mt-0.5" />
+                          <div>
+                            <h5 className="font-medium text-orange-800 text-sm">Duty Conflicts Detected</h5>
+                            <div className="mt-2 space-y-2">
+                              {dutyConflicts.map(({ duty, conflicts }) => (
+                                <div key={duty.id} className="text-sm">
+                                  <p className="text-orange-700">
+                                    <strong>{duty.title}</strong> conflicts with:
+                                  </p>
+                                  <ul className="list-disc list-inside ml-4 text-orange-600">
+                                    {conflicts.map(conflict => (
+                                      <li key={conflict.id}>
+                                        {conflict.title} ({format(parseISO(conflict.start_date), "MMM d")} - {format(parseISO(conflict.end_date), "MMM d")})
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Sidebar */}
@@ -1015,6 +1367,30 @@ export default function TeamMemberProfile() {
                         </span>
                       )}
                     </div>
+                  </div>
+
+                  <div>
+                    <Label>Current Duties</Label>
+                    <div className="flex items-center gap-2">
+                      <p className="text-gray-600">
+                        {duties.filter(duty => {
+                          const now = new Date();
+                          const startDate = new Date(duty.start_date);
+                          const endDate = new Date(duty.end_date);
+                          return now >= startDate && now <= endDate;
+                        }).length}
+                      </p>
+                      {dutyConflicts.length > 0 && (
+                        <Badge variant="destructive" className="text-xs">
+                          {dutyConflicts.length} conflict{dutyConflicts.length > 1 ? 's' : ''}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Total Duties</Label>
+                    <p className="text-gray-600">{duties.length}</p>
                   </div>
                 </div>
               </CardContent>
@@ -1421,6 +1797,21 @@ export default function TeamMemberProfile() {
               Reschedule Meeting
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Duty Form Dialog */}
+      <Dialog open={showDutyForm} onOpenChange={setShowDutyForm}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DutyForm
+            duty={editingDuty}
+            teamMembers={allTeamMembers}
+            onSave={handleSaveDuty}
+            onCancel={() => {
+              setShowDutyForm(false);
+              setEditingDuty(null);
+            }}
+          />
         </DialogContent>
       </Dialog>
     </div>
