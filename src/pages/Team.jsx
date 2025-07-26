@@ -18,6 +18,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import TagInput from "../components/ui/tag-input";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { CalendarEventGenerationService } from "@/services/calendarEventGenerationService";
 import TeamMemberDeletionDialog from "@/components/team/TeamMemberDeletionDialog";
 
 export default function TeamPage() {
@@ -162,11 +163,35 @@ export default function TeamPage() {
 
   const handleSubmit = async () => {
     try {
+      let savedMember;
+      const previousData = editingMember ? { ...editingMember } : null;
+      
       if (editingMember) {
-        await TeamMember.update(editingMember.id, formData);
+        savedMember = await TeamMember.update(editingMember.id, formData);
+        
+        // Handle birthday event updates if birthday changed
+        try {
+          await CalendarEventGenerationService.handleTeamMemberUpdate(
+            editingMember.id, 
+            savedMember, 
+            previousData
+          );
+        } catch (calendarError) {
+          console.error("Failed to update birthday events:", calendarError);
+          // Don't fail the entire operation for calendar event errors
+        }
       } else {
-        await TeamMember.create(formData);
+        savedMember = await TeamMember.create(formData);
+        
+        // Generate birthday events for new team member
+        try {
+          await CalendarEventGenerationService.handleTeamMemberCreation(savedMember);
+        } catch (calendarError) {
+          console.error("Failed to generate birthday events:", calendarError);
+          // Don't fail the entire operation for calendar event errors
+        }
       }
+      
       setShowDialog(false);
       await loadData();
     } catch (err) {
@@ -182,6 +207,14 @@ export default function TeamPage() {
 
   const handleDeleteConfirm = async (memberId, dataHandlingOption) => {
     try {
+      // Clean up calendar events before deleting team member
+      try {
+        await CalendarEventGenerationService.handleTeamMemberDeletion(memberId);
+      } catch (calendarError) {
+        console.error("Failed to clean up calendar events:", calendarError);
+        // Continue with deletion even if calendar cleanup fails
+      }
+      
       await TeamMember.delete(memberId);
       setShowDeleteDialog(false);
       setMemberToDelete(null);

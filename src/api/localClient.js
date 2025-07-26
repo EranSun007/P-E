@@ -306,6 +306,20 @@ export const localClient = {
           }
         }
 
+        // Trigger calendar synchronization to ensure consistency
+        try {
+          const { CalendarSynchronizationService } = await import('../services/calendarSynchronizationService.js');
+          // Run sync in background without blocking the creation
+          CalendarSynchronizationService.ensureOneOnOneVisibility({ 
+            teamMemberId: newOneOnOne.team_member_id,
+            createMissing: true 
+          }).catch(syncError => {
+            console.warn('Background calendar sync failed after OneOnOne creation:', syncError);
+          });
+        } catch (importError) {
+          console.warn('Failed to import CalendarSynchronizationService:', importError);
+        }
+
         return newOneOnOne;
       },
       async update(id, updates) {
@@ -350,6 +364,20 @@ export const localClient = {
               console.warn('Failed to update calendar event for OneOnOne:', error);
               // Continue with the update - don't fail the OneOnOne update
             }
+          }
+
+          // Trigger calendar synchronization after update to ensure consistency
+          try {
+            const { CalendarSynchronizationService } = await import('../services/calendarSynchronizationService.js');
+            // Run sync in background without blocking the update
+            CalendarSynchronizationService.ensureOneOnOneVisibility({ 
+              teamMemberId: updatedOneOnOne.team_member_id,
+              createMissing: true 
+            }).catch(syncError => {
+              console.warn('Background calendar sync failed after OneOnOne update:', syncError);
+            });
+          } catch (importError) {
+            console.warn('Failed to import CalendarSynchronizationService:', importError);
           }
 
           // Handle calendar event deletion when next_meeting_date is cleared

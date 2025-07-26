@@ -7,6 +7,10 @@
     "start": "serve -s dist",
     "dev": "vite",
     "build": "vite build",
+    "build:analyze": "vite build && node scripts/bundle-analysis.js",
+    "analyze": "node scripts/bundle-analysis.js",
+    "bundle:report": "npm run build:analyze",
+    "bundle:visual": "npm run build && open dist/bundle-analysis.html",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest"
@@ -81,6 +85,7 @@
     "globals": "^15.14.0",
     "jsdom": "^26.1.0",
     "postcss": "^8.5.3",
+    "rollup-plugin-visualizer": "^6.0.3",
     "tailwindcss": "^3.4.17",
     "vite": "^6.1.0",
     "vitest": "^3.2.4"

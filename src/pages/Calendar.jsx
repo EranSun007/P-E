@@ -3,7 +3,7 @@ import { Task, CalendarEvent, TeamMember, OutOfOffice, Duty } from "@/api/entiti
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, addDays, isSameMonth, isSameDay, addMonths, subMonths, parseISO, differenceInDays, isAfter, isBefore } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronLeft, ChevronRight, Plus, Calendar, User, UserX, Shield, Cake, CalendarDays, MessageSquare } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Calendar, CalendarDays, MessageSquare, Menu, X, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
 import TaskCreationForm from "../components/task/TaskCreationForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -17,6 +17,12 @@ import AgendaContextActions from "@/components/agenda/AgendaContextActions";
 import { AgendaIndicatorService } from "@/services/agendaIndicatorService";
 import { CalendarAgendaIndicator, CalendarAgendaCount } from "@/components/calendar/CalendarAgendaIndicator";
 import MeetingDetailView from "@/components/calendar/MeetingDetailView";
+import WeeklyMeetingSidebar from "@/components/calendar/WeeklyMeetingSidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { EventStylingService } from "@/utils/eventStylingService";
+import { CalendarSyncStatusService } from "@/services/calendarSyncStatusService";
+import { ErrorHandlingService } from "@/services/errorHandlingService";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function CalendarPage() {
   const [tasks, setTasks] = useState([]);
@@ -34,54 +40,297 @@ export default function CalendarPage() {
   const [agendaCounts, setAgendaCounts] = useState({});
   const [showMeetingDetail, setShowMeetingDetail] = useState(false);
   const [selectedMeetingEvent, setSelectedMeetingEvent] = useState(null);
+  
+  // Weekly sidebar state
+  const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [weeklyMeetings, setWeeklyMeetings] = useState([]);
+  const [showSidebar, setShowSidebar] = useState(true);
+  const isMobile = useIsMobile();
+  
+  // Enhanced caching state for calendar data
+  const [dataCache, setDataCache] = useState({
+    events: [],
+    tasks: [],
+    teamMembers: [],
+    outOfOffice: [],
+    duties: [],
+    lastUpdated: null,
+    loadedDateRanges: new Set()
+  });
+  const [loadingError, setLoadingError] = useState(null);
+  
+  // Sync status state
+  const [syncStatus, setSyncStatus] = useState(CalendarSyncStatusService.getSyncStatus());
+  const [showSyncStatus, setShowSyncStatus] = useState(false);
+  
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Manual sync function with comprehensive error handling
+  const handleManualSync = async () => {
+    return ErrorHandlingService.wrapOperation(async () => {
+      setShowSyncStatus(true);
+      const results = await CalendarSyncStatusService.manualSync({
+        createMissing: true,
+        updateExisting: true,
+        repairBroken: true,
+        showProgress: true
+      });
+      
+      // Reload calendar data after successful sync
+      if (results.summary.success && results.summary.totalChanges > 0) {
+        await loadCalendarData(true);
+      }
+      
+      return results;
+    }, {
+      operationName: 'Manual Calendar Sync',
+      showLoading: true,
+      showSuccess: true,
+      successMessage: 'Calendar synchronized successfully',
+      retryOptions: {
+        maxRetries: 2,
+        baseDelay: 2000,
+        onRetry: (error, attempt, delay) => {
+          console.log(`Retrying sync operation (attempt ${attempt}) in ${delay}ms...`);
+          toast({
+            title: 'Retrying Sync',
+            description: `Attempting to sync again (attempt ${attempt})...`,
+            duration: 2000
+          });
+        }
+      },
+      errorOptions: {
+        severity: ErrorHandlingService.SEVERITY.HIGH,
+        context: { source: 'manual_sync_button' }
+      }
+    }).catch(error => {
+      // Additional error handling for sync failures
+      setShowSyncStatus(true); // Keep status visible to show error
+      throw error; // Re-throw to maintain error handling chain
+    });
+  };
 
   useEffect(() => {
     loadCalendarData();
+    
+    // Initialize sync service and add status listener
+    CalendarSyncStatusService.initialize();
+    CalendarSyncStatusService.addStatusListener(setSyncStatus);
+    
+    // Cleanup on unmount
+    return () => {
+      CalendarSyncStatusService.removeStatusListener(setSyncStatus);
+    };
   }, []);
 
-  const loadCalendarData = async () => {
-    try {
+  // Load data when month changes, with intelligent caching
+  useEffect(() => {
+    const targetYear = currentMonth.getFullYear();
+    const yearKey = `${targetYear}`;
+    
+    // Check if we need to load data for this year
+    if (!dataCache.loadedDateRanges.has(yearKey) && 
+        !dataCache.loadedDateRanges.has(`${targetYear - 1}`) &&
+        !dataCache.loadedDateRanges.has(`${targetYear + 1}`)) {
+      loadCalendarData(false, currentMonth);
+    }
+    
+    // Update current week when month changes
+    setCurrentWeek(currentMonth);
+  }, [currentMonth]);
+
+  // Update weekly meetings when calendar events change
+  useEffect(() => {
+    updateWeeklyMeetings();
+  }, [calendarEvents, currentWeek, currentViewMode]);
+
+  // Handle mobile sidebar visibility
+  useEffect(() => {
+    if (isMobile) {
+      setShowSidebar(false);
+    } else {
+      setShowSidebar(true);
+    }
+  }, [isMobile]);
+
+  const loadCalendarData = async (forceRefresh = false, targetMonth = null) => {
+    const operationName = 'Load Calendar Data';
+    
+    return ErrorHandlingService.wrapOperation(async () => {
       setIsLoading(true);
-      // Load all data in parallel
-      const [taskData, eventData, teamMemberData, outOfOfficeData, dutyData] = await Promise.all([
-        Task.list(),
-        CalendarEvent.list(),
-        TeamMember.list(),
-        OutOfOffice.list(),
-        Duty.list()
-      ]);
+      setLoadingError(null);
       
+      const now = Date.now();
+      const cacheValidityMs = 5 * 60 * 1000; // 5 minutes cache validity
+      const targetDate = targetMonth || currentMonth;
+      
+      // Check if we can use cached data (unless force refresh is requested)
+      if (!forceRefresh && 
+          dataCache.lastUpdated && 
+          (now - dataCache.lastUpdated) < cacheValidityMs &&
+          dataCache.events.length > 0) {
+        
+        // Use cached data but still update state
+        setTasks(dataCache.tasks);
+        setCalendarEvents(dataCache.events);
+        setTeamMembers(dataCache.teamMembers);
+        setOutOfOfficeRecords(dataCache.outOfOffice);
+        setDuties(dataCache.duties);
+        
+        // Load agenda counts for cached events
+        const agendaCountsData = await AgendaIndicatorService.getAgendaCountsForCalendarEvents(dataCache.events);
+        setAgendaCounts(agendaCountsData);
+        
+        setIsLoading(false);
+        return;
+      }
+
+      // Load all data in parallel with enhanced error handling
+      const loadPromises = [
+        Task.list().catch(err => {
+          console.warn("Failed to load tasks:", err);
+          return dataCache.tasks || [];
+        }),
+        CalendarEvent.list().catch(err => {
+          console.warn("Failed to load calendar events:", err);
+          return dataCache.events || [];
+        }),
+        TeamMember.list().catch(err => {
+          console.warn("Failed to load team members:", err);
+          return dataCache.teamMembers || [];
+        }),
+        OutOfOffice.list().catch(err => {
+          console.warn("Failed to load out of office records:", err);
+          return dataCache.outOfOffice || [];
+        }),
+        Duty.list().catch(err => {
+          console.warn("Failed to load duties:", err);
+          return dataCache.duties || [];
+        })
+      ];
+
+      const [taskData, eventData, teamMemberData, outOfOfficeData, dutyData] = await Promise.all(loadPromises);
+      
+      // Update state with loaded data
       setTasks(taskData);
-      setCalendarEvents(eventData);
       setTeamMembers(teamMemberData);
       setOutOfOfficeRecords(outOfOfficeData);
       setDuties(dutyData);
 
-      // Generate calendar events from duties and out-of-office records if needed
-      await CalendarEventGenerationService.synchronizeAllEvents({
-        includeBirthdays: true,
-        includeDuties: true,
-        includeOutOfOffice: true,
-        year: currentMonth.getFullYear()
-      });
+      // Generate calendar events for extended date range (current year + previous year + next year)
+      const currentYear = targetDate.getFullYear();
+      const yearsToSync = [currentYear - 1, currentYear, currentYear + 1];
+      
+      try {
+        // Synchronize events for multiple years to ensure past and future events are available
+        for (const year of yearsToSync) {
+          await CalendarEventGenerationService.synchronizeAllEvents({
+            includeBirthdays: true,
+            includeDuties: true,
+            includeOutOfOffice: true,
+            year: year
+          });
+        }
+      } catch (syncError) {
+        console.warn("Failed to synchronize some calendar events:", syncError);
+        // Continue with existing events even if sync fails
+      }
+
+      // Ensure 1:1 meeting visibility by running calendar synchronization
+      try {
+        const { CalendarSynchronizationService } = await import('../services/calendarSynchronizationService.js');
+        await CalendarSynchronizationService.ensureOneOnOneVisibility({
+          createMissing: true
+        });
+      } catch (syncError) {
+        console.warn("Failed to synchronize OneOnOne meetings:", syncError);
+        // Continue with existing events even if sync fails
+      }
 
       // Reload calendar events after synchronization
-      const updatedEventData = await CalendarEvent.list();
+      let updatedEventData;
+      try {
+        updatedEventData = await CalendarEvent.list();
+      } catch (eventLoadError) {
+        console.warn("Failed to reload calendar events after sync:", eventLoadError);
+        updatedEventData = eventData; // Use original data if reload fails
+      }
+      
       setCalendarEvents(updatedEventData);
 
       // Load agenda counts for calendar events
-      const agendaCountsData = await AgendaIndicatorService.getAgendaCountsForCalendarEvents(updatedEventData);
-      setAgendaCounts(agendaCountsData);
-    } catch (err) {
+      try {
+        const agendaCountsData = await AgendaIndicatorService.getAgendaCountsForCalendarEvents(updatedEventData);
+        setAgendaCounts(agendaCountsData);
+      } catch (agendaError) {
+        console.warn("Failed to load agenda counts:", agendaError);
+        setAgendaCounts({});
+      }
+
+      // Update cache with fresh data
+      setDataCache({
+        events: updatedEventData,
+        tasks: taskData,
+        teamMembers: teamMemberData,
+        outOfOffice: outOfOfficeData,
+        duties: dutyData,
+        lastUpdated: now,
+        loadedDateRanges: new Set([
+          `${currentYear - 1}`,
+          `${currentYear}`,
+          `${currentYear + 1}`
+        ])
+      });
+
+    }, {
+      operationName,
+      showLoading: false, // We handle loading state manually
+      showSuccess: false, // Don't show success for routine data loading
+      retryOptions: {
+        maxRetries: 2,
+        baseDelay: 1000,
+        shouldRetry: (error, attempt) => {
+          // Retry network errors but not validation errors
+          return !(error.message?.includes('validation') || error.message?.includes('invalid'));
+        }
+      },
+      errorOptions: {
+        severity: ErrorHandlingService.SEVERITY.MEDIUM,
+        showToast: false, // We handle error display in the UI
+        context: { forceRefresh, targetMonth: targetMonth?.toISOString() }
+      }
+    }).catch(err => {
       console.error("Failed to load calendar data:", err);
-    } finally {
+      setLoadingError(err.message || "Failed to load calendar data");
+      
+      // Try to use cached data as fallback
+      if (dataCache.events.length > 0) {
+        setTasks(dataCache.tasks);
+        setCalendarEvents(dataCache.events);
+        setTeamMembers(dataCache.teamMembers);
+        setOutOfOfficeRecords(dataCache.outOfOffice);
+        setDuties(dataCache.duties);
+        
+        try {
+          const agendaCountsData = AgendaIndicatorService.getAgendaCountsForCalendarEvents(dataCache.events);
+          setAgendaCounts(agendaCountsData);
+        } catch (agendaError) {
+          setAgendaCounts({});
+        }
+      }
+    }).finally(() => {
       setIsLoading(false);
-    }
+    });
   };
 
   const loadTasks = async () => {
-    await loadCalendarData();
+    await loadCalendarData(true); // Force refresh when tasks are updated
+  };
+
+  // Method to refresh calendar data (useful for manual refresh)
+  const refreshCalendarData = async () => {
+    await loadCalendarData(true, currentMonth);
   };
 
   const handleCreateTask = async (taskData) => {
@@ -90,24 +339,36 @@ export default function CalendarPage() {
       return;
     }
 
-    try {
+    return ErrorHandlingService.wrapOperation(async () => {
       await Task.create({
         ...taskData,
         due_date: taskData.due_date || selectedDate.toISOString()
       });
       await loadTasks();
       setShowTaskCreation(false);
-    } catch (err) {
-      console.error("Failed to create task:", err);
-    }
+    }, {
+      operationName: 'Create Task',
+      showLoading: true,
+      showSuccess: true,
+      successMessage: 'Task created successfully',
+      retryOptions: {
+        maxRetries: 2
+      },
+      errorOptions: {
+        severity: ErrorHandlingService.SEVERITY.MEDIUM,
+        context: { taskTitle: taskData.title, dueDate: taskData.due_date }
+      }
+    });
   };
 
   const handlePreviousMonth = () => {
-    setCurrentMonth(subMonths(currentMonth, 1));
+    const newMonth = subMonths(currentMonth, 1);
+    setCurrentMonth(newMonth);
   };
 
   const handleNextMonth = () => {
-    setCurrentMonth(addMonths(currentMonth, 1));
+    const newMonth = addMonths(currentMonth, 1);
+    setCurrentMonth(newMonth);
   };
 
   const handleDateClick = (date) => {
@@ -144,49 +405,67 @@ export default function CalendarPage() {
     viewModeManager.setViewMode(newViewMode);
   };
 
-  // Helper function to get event styling based on type
-  const getEventStyling = (event) => {
-    const baseClasses = "text-xs p-1 rounded truncate cursor-pointer transition-all duration-200 border-l-2";
+  // Update weekly meetings based on current week and calendar events
+  const updateWeeklyMeetings = () => {
+    const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Monday start
+    const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 }); // Sunday end
     
-    switch (event.event_type) {
-      case 'meeting':
-        return {
-          className: `${baseClasses} bg-blue-100 text-blue-800 border-blue-400 hover:bg-blue-200 hover:shadow-sm`,
-          icon: Calendar,
-          color: '#3b82f6'
-        };
-      case 'one_on_one':
-        return {
-          className: `${baseClasses} bg-orange-100 text-orange-800 border-orange-400 hover:bg-orange-200 hover:shadow-sm`,
-          icon: User,
-          color: '#f97316'
-        };
-      case 'out_of_office':
-        return {
-          className: `${baseClasses} bg-orange-100 text-orange-800 border-orange-400 hover:bg-orange-200 hover:shadow-sm`,
-          icon: UserX,
-          color: '#f97316'
-        };
-      case 'duty':
-        return {
-          className: `${baseClasses} bg-purple-100 text-purple-800 border-purple-400 hover:bg-purple-200 hover:shadow-sm`,
-          icon: Shield,
-          color: '#8b5cf6'
-        };
-      case 'birthday':
-        return {
-          className: `${baseClasses} bg-pink-100 text-pink-800 border-pink-400 hover:bg-pink-200 hover:shadow-sm`,
-          icon: Cake,
-          color: '#ec4899'
-        };
-      default:
-        return {
-          className: `${baseClasses} bg-indigo-100 text-indigo-800 border-indigo-400 hover:bg-indigo-200 hover:shadow-sm`,
-          icon: Calendar,
-          color: '#6366f1'
-        };
+    // Filter events for the current week
+    const weeklyEvents = calendarEvents.filter(event => {
+      if (!event.start_date) return false;
+      
+      try {
+        const eventStartDate = parseISO(event.start_date);
+        const eventEndDate = event.end_date ? parseISO(event.end_date) : eventStartDate;
+        
+        // Include events that start, end, or span through the current week
+        return (eventStartDate >= weekStart && eventStartDate <= weekEnd) ||
+               (eventEndDate >= weekStart && eventEndDate <= weekEnd) ||
+               (eventStartDate <= weekStart && eventEndDate >= weekEnd);
+      } catch (dateError) {
+        console.warn("Invalid date in calendar event:", event.id, dateError);
+        return false;
+      }
+    });
+    
+    // Filter events based on current view mode
+    const filteredWeeklyEvents = viewModeManager.filterEventsForView(weeklyEvents, currentViewMode);
+    setWeeklyMeetings(filteredWeeklyEvents);
+  };
+
+  // Handle sidebar meeting click
+  const handleSidebarMeetingClick = (meeting, date) => {
+    // Navigate to the date and select it
+    setCurrentMonth(date);
+    setSelectedDate(date);
+    
+    // Handle the event click (same as calendar event click)
+    handleEventClick(meeting);
+    
+    // Close sidebar on mobile after selection
+    if (isMobile) {
+      setShowSidebar(false);
     }
   };
+
+  // Handle sidebar date navigation
+  const handleSidebarDateNavigate = (date) => {
+    // Navigate to the date and select it
+    setCurrentMonth(date);
+    setSelectedDate(date);
+    
+    // Close sidebar on mobile after navigation
+    if (isMobile) {
+      setShowSidebar(false);
+    }
+  };
+
+  // Toggle sidebar visibility
+  const toggleSidebar = () => {
+    setShowSidebar(!showSidebar);
+  };
+
+
 
   // Helper function to check if an event spans multiple days
   const isMultiDayEvent = (event) => {
@@ -217,11 +496,16 @@ export default function CalendarPage() {
     const endTime = event.end_date ? format(parseISO(event.end_date), "h:mm a") : "";
     const eventAgendaCounts = agendaCounts[event.id];
     
+    // Get styling information for enhanced tooltip
+    const styling = EventStylingService.getEventStyling(event);
+    
     const content = {
       title: event.title,
       time: null,
       details: [],
-      actions: []
+      actions: [],
+      styling: styling,
+      eventType: styling.label
     };
 
     // Add time information for non-all-day events
@@ -282,14 +566,25 @@ export default function CalendarPage() {
   };
 
   const getAllEventsForMonth = (month) => {
-    // Get all calendar events including generated ones
+    // Get all calendar events including generated ones - now supports extended date ranges
     const monthStart = startOfMonth(month);
     const monthEnd = endOfMonth(month);
     
     return calendarEvents.filter(event => {
       if (!event.start_date) return false;
-      const eventDate = parseISO(event.start_date);
-      return eventDate >= monthStart && eventDate <= monthEnd;
+      
+      try {
+        const eventStartDate = parseISO(event.start_date);
+        const eventEndDate = event.end_date ? parseISO(event.end_date) : eventStartDate;
+        
+        // Include events that start, end, or span through the month
+        return (eventStartDate >= monthStart && eventStartDate <= monthEnd) ||
+               (eventEndDate >= monthStart && eventEndDate <= monthEnd) ||
+               (eventStartDate <= monthStart && eventEndDate >= monthEnd);
+      } catch (dateError) {
+        console.warn("Invalid date in calendar event:", event.id, dateError);
+        return false;
+      }
     });
   };
 
@@ -301,9 +596,21 @@ export default function CalendarPage() {
     return (
       <div className="space-y-4 mb-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">
-            {format(currentMonth, "MMMM yyyy")}
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-semibold">
+              {format(currentMonth, "MMMM yyyy")}
+            </h2>
+            {isMobile && (
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={toggleSidebar}
+                title={showSidebar ? "Hide weekly meetings" : "Show weekly meetings"}
+              >
+                {showSidebar ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+              </Button>
+            )}
+          </div>
           <div className="flex space-x-2">
             <Button variant="outline" size="icon" onClick={handlePreviousMonth} disabled={isLoading}>
               <ChevronLeft className="h-4 w-4" />
@@ -314,8 +621,108 @@ export default function CalendarPage() {
             <Button variant="outline" size="icon" onClick={handleNextMonth} disabled={isLoading}>
               <ChevronRight className="h-4 w-4" />
             </Button>
+            <Button variant="outline" size="icon" onClick={refreshCalendarData} disabled={isLoading} title="Refresh calendar data">
+              <Calendar className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={handleManualSync} 
+              disabled={isLoading || syncStatus.isRunning} 
+              title={syncStatus.isRunning ? "Sync in progress..." : "Sync calendar events"}
+              className={cn(
+                syncStatus.lastError && "border-red-200 text-red-600",
+                syncStatus.lastSync && !syncStatus.lastError && "border-green-200 text-green-600"
+              )}
+            >
+              {syncStatus.isRunning ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : syncStatus.lastError ? (
+                <AlertCircle className="h-4 w-4" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </Button>
+            {!isMobile && (
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={toggleSidebar}
+                title={showSidebar ? "Hide weekly meetings" : "Show weekly meetings"}
+              >
+                {showSidebar ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+              </Button>
+            )}
           </div>
         </div>
+        
+        {/* Error display */}
+        {loadingError && (
+          <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="text-red-600 text-sm">
+                <strong>Error loading calendar data:</strong> {loadingError}
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={refreshCalendarData}
+                disabled={isLoading}
+              >
+                Retry
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Sync status display */}
+        {showSyncStatus && syncStatus.lastSync && (
+          <div className={cn(
+            "border rounded-md p-3 mb-4",
+            syncStatus.lastError 
+              ? "bg-red-50 border-red-200" 
+              : "bg-green-50 border-green-200"
+          )}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {syncStatus.lastError ? (
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                ) : (
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                )}
+                <div className={cn(
+                  "text-sm",
+                  syncStatus.lastError ? "text-red-600" : "text-green-600"
+                )}>
+                  {syncStatus.lastError ? (
+                    <>
+                      <strong>Sync failed:</strong> {syncStatus.lastError}
+                    </>
+                  ) : (
+                    <>
+                      <strong>Sync completed</strong>
+                      {syncStatus.syncResults?.summary?.userMessage && (
+                        <>: {syncStatus.syncResults.summary.userMessage}</>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500">
+                  {syncStatus.lastSync && new Date(syncStatus.lastSync).toLocaleTimeString()}
+                </span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowSyncStatus(false)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* View Mode Selector */}
         <div className="flex justify-center">
@@ -359,15 +766,22 @@ export default function CalendarPage() {
     let day = startDate;
 
     // Get all events for the visible date range (including days from previous/next month)
+    // Enhanced to handle all time periods without date restrictions
     const allEventsInRange = calendarEvents.filter(event => {
       if (!event.start_date) return false;
-      const eventStartDate = parseISO(event.start_date);
-      const eventEndDate = event.end_date ? parseISO(event.end_date) : eventStartDate;
       
-      // Include events that start, end, or span through the visible date range
-      return (eventStartDate >= startDate && eventStartDate <= endDate) ||
-             (eventEndDate >= startDate && eventEndDate <= endDate) ||
-             (eventStartDate <= startDate && eventEndDate >= endDate);
+      try {
+        const eventStartDate = parseISO(event.start_date);
+        const eventEndDate = event.end_date ? parseISO(event.end_date) : eventStartDate;
+        
+        // Include events that start, end, or span through the visible date range
+        return (eventStartDate >= startDate && eventStartDate <= endDate) ||
+               (eventEndDate >= startDate && eventEndDate <= endDate) ||
+               (eventStartDate <= startDate && eventEndDate >= endDate);
+      } catch (dateError) {
+        console.warn("Invalid date in calendar event:", event.id, dateError);
+        return false;
+      }
     });
 
     // Check if there are any events for the current view mode in the visible range
@@ -446,34 +860,19 @@ export default function CalendarPage() {
               
               {/* Display calendar events with enhanced styling */}
               {eventsForDay.map(event => {
-                const styling = getEventStyling(event);
-                const Icon = styling.icon;
-                const tooltipContent = getEventTooltipContent(event);
                 const multiDayPosition = getMultiDayEventPosition(event, day);
                 
                 // Skip events that don't appear on this day for multi-day events
                 if (multiDayPosition === 'none') return null;
 
-                // Modify styling for multi-day events
-                let eventClassName = styling.className;
-                let eventTitle = event.title;
+                // Get enhanced styling from EventStylingService
+                const styling = isMultiDayEvent(event) 
+                  ? EventStylingService.getMultiDayEventStyling(event, multiDayPosition, EventStylingService.VARIANTS.DEFAULT)
+                  : EventStylingService.getEventStyling(event, EventStylingService.VARIANTS.DEFAULT);
                 
-                if (isMultiDayEvent(event)) {
-                  switch (multiDayPosition) {
-                    case 'start':
-                      eventClassName += " rounded-r-none border-r-0";
-                      eventTitle = `▶ ${event.title}`;
-                      break;
-                    case 'middle':
-                      eventClassName += " rounded-none border-r-0 border-l-0";
-                      eventTitle = `─ ${event.title}`;
-                      break;
-                    case 'end':
-                      eventClassName += " rounded-l-none border-l-0";
-                      eventTitle = `◀ ${event.title}`;
-                      break;
-                  }
-                }
+                const Icon = styling.icon;
+                const tooltipContent = getEventTooltipContent(event);
+                const eventTitle = styling.titlePrefix ? `${styling.titlePrefix}${event.title}` : event.title;
                 
                 // Get agenda counts for this event
                 const eventAgendaCounts = agendaCounts[event.id];
@@ -483,11 +882,13 @@ export default function CalendarPage() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div
-                          className={eventClassName}
+                          className={styling.className}
+                          style={styling.style}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleEventClick(event);
                           }}
+                          aria-label={EventStylingService.getAccessibilityInfo(event.event_type).ariaLabel}
                         >
                           <div className="flex items-center justify-between gap-1">
                             <div className="flex items-center gap-1 min-w-0">
@@ -507,7 +908,23 @@ export default function CalendarPage() {
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs">
                         <div className="space-y-1">
-                          <p className="font-medium">{tooltipContent.title}</p>
+                          <div className="flex items-center gap-2">
+                            <Icon 
+                              className="h-4 w-4 flex-shrink-0" 
+                              style={{ color: tooltipContent.styling.colors.primary }}
+                            />
+                            <p className="font-medium">{tooltipContent.title}</p>
+                            <Badge 
+                              variant="outline" 
+                              className="text-xs"
+                              style={{ 
+                                borderColor: tooltipContent.styling.colors.primary + '50',
+                                color: tooltipContent.styling.colors.primary
+                              }}
+                            >
+                              {tooltipContent.eventType}
+                            </Badge>
+                          </div>
                           {tooltipContent.time && (
                             <p className="text-xs">{tooltipContent.time}</p>
                           )}
@@ -547,14 +964,21 @@ export default function CalendarPage() {
     );
     
     // Get events for selected date, including multi-day events that span through this date
+    // Enhanced to handle all time periods with better error handling
     const allEventsForSelectedDate = calendarEvents.filter(event => {
       if (!event.start_date) return false;
-      const eventStartDate = parseISO(event.start_date);
-      const eventEndDate = event.end_date ? parseISO(event.end_date) : eventStartDate;
       
-      return (isSameDay(eventStartDate, selectedDate) || 
-              isSameDay(eventEndDate, selectedDate) || 
-              (isAfter(selectedDate, eventStartDate) && isBefore(selectedDate, eventEndDate)));
+      try {
+        const eventStartDate = parseISO(event.start_date);
+        const eventEndDate = event.end_date ? parseISO(event.end_date) : eventStartDate;
+        
+        return (isSameDay(eventStartDate, selectedDate) || 
+                isSameDay(eventEndDate, selectedDate) || 
+                (isAfter(selectedDate, eventStartDate) && isBefore(selectedDate, eventEndDate)));
+      } catch (dateError) {
+        console.warn("Invalid date in calendar event:", event.id, dateError);
+        return false;
+      }
     });
 
     // Filter events based on current view mode
@@ -582,7 +1006,7 @@ export default function CalendarPage() {
             </h3>
             <div className="space-y-2">
               {filteredEventsForSelectedDate.map(event => {
-                const styling = getEventStyling(event);
+                const styling = EventStylingService.getEventCardStyling(event);
                 const Icon = styling.icon;
                 const tooltipContent = getEventTooltipContent(event);
                 const teamMember = teamMembers.find(tm => tm.id === event.team_member_id);
@@ -592,20 +1016,12 @@ export default function CalendarPage() {
                 return (
                   <div 
                     key={event.id}
-                    className={cn(
-                      "p-3 border rounded-md cursor-pointer transition-colors",
-                      event.event_type === "birthday" && "border-pink-200 bg-pink-50 hover:bg-pink-100",
-                      event.event_type === "one_on_one" && "border-orange-200 bg-orange-50 hover:bg-orange-100",
-                      event.event_type === "meeting" && "border-blue-200 bg-blue-50 hover:bg-blue-100",
-                      event.event_type === "out_of_office" && "border-orange-200 bg-orange-50 hover:bg-orange-100",
-                      event.event_type === "duty" && "border-purple-200 bg-purple-50 hover:bg-purple-100",
-                      (!event.event_type || event.event_type === "generic") && "border-indigo-200 bg-indigo-50 hover:bg-indigo-100"
-                    )}
+                    className={styling.className}
                     onClick={() => handleEventClick(event)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Icon className="h-4 w-4" style={{ color: styling.color }} />
+                        <Icon className="h-4 w-4" style={{ color: styling.colors.primary }} />
                         <h4 className="font-medium">{event.title}</h4>
                         {isMultiDay && (
                           <Badge variant="secondary" className="text-xs">
@@ -629,15 +1045,11 @@ export default function CalendarPage() {
                         <Badge 
                           variant="outline" 
                           style={{ 
-                            borderColor: styling.color + '50',
-                            color: styling.color
+                            borderColor: styling.colors.primary + '50',
+                            color: styling.colors.primary
                           }}
                         >
-                          {event.event_type === "one_on_one" ? "1:1" : 
-                           event.event_type === "out_of_office" ? "OOO" :
-                           event.event_type === "duty" ? "Duty" :
-                           event.event_type === "birthday" ? "Birthday" :
-                           event.event_type || "Event"}
+                          {tooltipContent.eventType}
                         </Badge>
                       </div>
                     </div>
@@ -765,8 +1177,9 @@ export default function CalendarPage() {
   return (
     <div className="p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col lg:flex-row space-y-6 lg:space-y-0 lg:space-x-6">
-          <div className="lg:flex-1">
+        <div className="flex flex-col xl:flex-row space-y-6 xl:space-y-0 xl:space-x-6">
+          {/* Main Calendar Content */}
+          <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-3xl font-bold">Calendar</h1>
               <Button onClick={() => setShowTaskCreation(true)} disabled={isLoading}>
@@ -785,15 +1198,56 @@ export default function CalendarPage() {
             )}
           </div>
 
-          <div className="lg:w-80">
+          {/* Right Sidebar */}
+          <div className="xl:w-80">
+            {/* Selected Date Details */}
             <div className="bg-white rounded-md border p-4 sticky top-4">
               <h2 className="font-semibold mb-4 pb-2 border-b">
                 {format(selectedDate, "MMMM d, yyyy")}
               </h2>
               {itemsByDate()}
             </div>
+            
+            {/* Weekly Meeting Sidebar */}
+            {showSidebar && (
+              <div className={cn(
+                "mt-6",
+                isMobile && "fixed inset-0 z-50 bg-white p-4 overflow-y-auto"
+              )}>
+                {isMobile && (
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold">Weekly Meetings</h2>
+                    <Button variant="ghost" size="icon" onClick={toggleSidebar}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                <WeeklyMeetingSidebar
+                  currentWeek={currentWeek}
+                  meetings={weeklyMeetings}
+                  onMeetingClick={handleSidebarMeetingClick}
+                  onDateNavigate={handleSidebarDateNavigate}
+                  agendaCounts={agendaCounts}
+                  isLoading={isLoading}
+                  error={loadingError}
+                  onRetry={() => loadCalendarData(true)}
+                  className={cn(
+                    isMobile && "static"
+                  )}
+                />
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Mobile Sidebar Backdrop */}
+        {isMobile && showSidebar && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40"
+            onClick={toggleSidebar}
+            aria-hidden="true"
+          />
+        )}
 
         {/* Task Creation Dialog */}
         <Dialog open={showTaskCreation} onOpenChange={setShowTaskCreation}>

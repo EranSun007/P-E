@@ -2,6 +2,13 @@
 // Service for generating calendar events from various data sources
 
 import { CalendarEvent, TeamMember, OutOfOffice, Duty } from '../api/entities.js';
+import { RecurringBirthdayService } from './recurringBirthdayService.js';
+import { 
+  ErrorHandlingService, 
+  ValidationError, 
+  DataError,
+  NetworkError 
+} from './errorHandlingService.js';
 
 /**
  * Service for generating calendar events from team member data, duties, and out-of-office periods
@@ -275,10 +282,13 @@ export class CalendarEventGenerationService {
       includeBirthdays = true,
       includeDuties = true,
       includeOutOfOffice = true,
-      year = new Date().getFullYear()
+      birthdayYears = null, // If null, will generate for current + next 2 years
+      year = null // Specific year for filtering (used by calendar loading)
     } = options;
 
-    try {
+    const operationName = 'Synchronize Calendar Events';
+    
+    return ErrorHandlingService.wrapOperation(async () => {
       const results = {
         timestamp: new Date().toISOString(),
         birthdayEvents: [],
@@ -287,21 +297,59 @@ export class CalendarEventGenerationService {
         errors: [],
         summary: {
           totalCreated: 0,
-          totalErrors: 0
+          totalErrors: 0,
+          success: true
         }
       };
 
-      // Generate birthday events
+      // Generate birthday events using RecurringBirthdayService
       if (includeBirthdays) {
         try {
-          const teamMembers = await TeamMember.list();
-          const birthdayEvents = await this.generateBirthdayEvents(teamMembers, year);
-          results.birthdayEvents = birthdayEvents;
-          results.summary.totalCreated += birthdayEvents.length;
+          const teamMembers = await ErrorHandlingService.retryOperation(
+            () => TeamMember.list(),
+            {
+              operationName: 'load team members for birthday sync',
+              maxRetries: 2
+            }
+          );
+          
+          // Set default years if not provided (current + next 2 years)
+          let targetYears = birthdayYears;
+          if (!targetYears) {
+            const currentYear = year || new Date().getFullYear();
+            targetYears = [currentYear, currentYear + 1, currentYear + 2];
+          }
+
+          const birthdayResults = await RecurringBirthdayService.ensureBirthdayEventsExist(
+            teamMembers,
+            targetYears
+          );
+          
+          results.birthdayEvents = birthdayResults.createdEvents || 0;
+          results.summary.totalCreated += birthdayResults.createdEvents || 0;
+          
+          // Add any birthday generation errors to the main results
+          if (birthdayResults.errors && birthdayResults.errors.length > 0) {
+            results.errors.push(...birthdayResults.errors.map(error => ({
+              type: 'birthday_generation',
+              teamMemberId: error.teamMemberId,
+              teamMemberName: error.teamMemberName,
+              message: error.error,
+              category: error.category
+            })));
+            results.summary.totalErrors += birthdayResults.errors.length;
+          }
         } catch (error) {
+          const errorResult = ErrorHandlingService.handleError(error, {
+            operation: 'birthday event generation',
+            showToast: false,
+            context: { birthdayYears, year }
+          });
+          
           results.errors.push({
             type: 'birthday_generation',
-            message: error.message
+            message: errorResult.userMessage,
+            category: errorResult.category
           });
           results.summary.totalErrors++;
         }
@@ -310,13 +358,28 @@ export class CalendarEventGenerationService {
       // Generate duty events
       if (includeDuties) {
         try {
-          const dutyEvents = await this.generateDutyEvents();
+          const dutyEvents = await ErrorHandlingService.retryOperation(
+            () => this.generateDutyEvents(),
+            {
+              operationName: 'generate duty events',
+              maxRetries: 2,
+              shouldRetry: (error) => !(error.message?.includes('validation'))
+            }
+          );
+          
           results.dutyEvents = dutyEvents;
           results.summary.totalCreated += dutyEvents.length;
         } catch (error) {
+          const errorResult = ErrorHandlingService.handleError(error, {
+            operation: 'duty event generation',
+            showToast: false,
+            context: { year }
+          });
+          
           results.errors.push({
             type: 'duty_generation',
-            message: error.message
+            message: errorResult.userMessage,
+            category: errorResult.category
           });
           results.summary.totalErrors++;
         }
@@ -325,28 +388,55 @@ export class CalendarEventGenerationService {
       // Generate out-of-office events
       if (includeOutOfOffice) {
         try {
-          const oooEvents = await this.generateOutOfOfficeEvents();
+          const oooEvents = await ErrorHandlingService.retryOperation(
+            () => this.generateOutOfOfficeEvents(),
+            {
+              operationName: 'generate out-of-office events',
+              maxRetries: 2,
+              shouldRetry: (error) => !(error.message?.includes('validation'))
+            }
+          );
+          
           results.outOfOfficeEvents = oooEvents;
           results.summary.totalCreated += oooEvents.length;
         } catch (error) {
+          const errorResult = ErrorHandlingService.handleError(error, {
+            operation: 'out-of-office event generation',
+            showToast: false,
+            context: { year }
+          });
+          
           results.errors.push({
             type: 'out_of_office_generation',
-            message: error.message
+            message: errorResult.userMessage,
+            category: errorResult.category
           });
           results.summary.totalErrors++;
         }
       }
 
+      // Determine overall success
+      results.summary.success = results.summary.totalErrors === 0;
+
       console.log('Calendar event synchronization completed:', {
         totalCreated: results.summary.totalCreated,
-        totalErrors: results.summary.totalErrors
+        totalErrors: results.summary.totalErrors,
+        success: results.summary.success
       });
 
       return results;
-    } catch (error) {
-      console.error('Error during calendar event synchronization:', error);
-      throw new Error(`Failed to synchronize calendar events: ${error.message}`);
-    }
+    }, {
+      operationName,
+      showLoading: false, // Background operation, don't show loading
+      showSuccess: false, // Don't show success for background operations
+      retryOptions: {
+        maxRetries: 1 // Don't retry the entire sync operation
+      },
+      errorOptions: {
+        severity: ErrorHandlingService.SEVERITY.MEDIUM,
+        context: { includeBirthdays, includeDuties, includeOutOfOffice, year }
+      }
+    });
   }
 
   /**
@@ -382,10 +472,15 @@ export class CalendarEventGenerationService {
           break;
 
         case 'team_member':
-          // Handle birthday updates
+          // Handle birthday updates using RecurringBirthdayService
           if (sourceData.birthday) {
-            const birthdayEvents = await this.generateBirthdayEvents([sourceData]);
-            calendarEvent = birthdayEvents.length > 0 ? birthdayEvents[0] : null;
+            await RecurringBirthdayService.updateBirthdayEventsForTeamMember(
+              sourceId,
+              sourceData.birthday
+            );
+            // Get the updated events to return the first one
+            const updatedEvents = await RecurringBirthdayService.getBirthdayEventsForTeamMember(sourceId);
+            calendarEvent = updatedEvents.length > 0 ? updatedEvents[0] : null;
           }
           break;
 
@@ -397,6 +492,108 @@ export class CalendarEventGenerationService {
     } catch (error) {
       console.error(`Error updating calendar event from ${sourceType} source:`, error);
       throw new Error(`Failed to update calendar event from ${sourceType}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Handle team member creation by generating birthday events
+   * @param {Object} teamMember - Newly created team member object
+   * @returns {Promise<Array>} Array of created birthday events
+   */
+  static async handleTeamMemberCreation(teamMember) {
+    try {
+      if (!teamMember) {
+        throw new Error('Team member object is required');
+      }
+
+      if (!teamMember.birthday) {
+        console.log(`Team member ${teamMember.name} has no birthday date, skipping birthday event generation`);
+        return [];
+      }
+
+      // Generate birthday events for current year and next 2 years
+      const currentYear = new Date().getFullYear();
+      const birthdayEvents = await RecurringBirthdayService.generateBirthdayEventsForYears(
+        teamMember,
+        currentYear,
+        currentYear + 2
+      );
+
+      console.log(`Generated ${birthdayEvents.length} birthday events for new team member ${teamMember.name}`);
+      return birthdayEvents;
+    } catch (error) {
+      console.error('Error handling team member creation:', error);
+      throw new Error(`Failed to handle team member creation: ${error.message}`);
+    }
+  }
+
+  /**
+   * Handle team member updates, particularly birthday changes
+   * @param {string} teamMemberId - ID of the updated team member
+   * @param {Object} updatedData - Updated team member data
+   * @param {Object} previousData - Previous team member data (optional)
+   * @returns {Promise<Array>} Array of updated birthday events
+   */
+  static async handleTeamMemberUpdate(teamMemberId, updatedData, previousData = null) {
+    try {
+      if (!teamMemberId) {
+        throw new Error('Team member ID is required');
+      }
+
+      if (!updatedData) {
+        throw new Error('Updated team member data is required');
+      }
+
+      // Check if birthday was changed
+      const birthdayChanged = previousData && 
+        previousData.birthday !== updatedData.birthday;
+
+      if (birthdayChanged || (!previousData && updatedData.birthday)) {
+        if (updatedData.birthday) {
+          // Update birthday events with new date
+          await RecurringBirthdayService.updateBirthdayEventsForTeamMember(
+            teamMemberId,
+            updatedData.birthday
+          );
+          
+          const updatedEvents = await RecurringBirthdayService.getBirthdayEventsForTeamMember(teamMemberId);
+          console.log(`Updated ${updatedEvents.length} birthday events for team member ${updatedData.name}`);
+          return updatedEvents;
+        } else {
+          // Birthday was removed, delete all birthday events
+          await RecurringBirthdayService.deleteBirthdayEventsForTeamMember(teamMemberId);
+          console.log(`Deleted birthday events for team member ${updatedData.name} (birthday removed)`);
+          return [];
+        }
+      }
+
+      // No birthday changes
+      return [];
+    } catch (error) {
+      console.error('Error handling team member update:', error);
+      throw new Error(`Failed to handle team member update: ${error.message}`);
+    }
+  }
+
+  /**
+   * Handle team member deletion by cleaning up all associated events
+   * @param {string} teamMemberId - ID of the deleted team member
+   * @returns {Promise<boolean>} Success status
+   */
+  static async handleTeamMemberDeletion(teamMemberId) {
+    try {
+      if (!teamMemberId) {
+        throw new Error('Team member ID is required');
+      }
+
+      // Use the existing deleteCalendarEventsForSource method
+      await this.deleteCalendarEventsForSource('team_member', teamMemberId);
+      
+      console.log(`Cleaned up all calendar events for deleted team member ${teamMemberId}`);
+      return true;
+    } catch (error) {
+      console.error('Error handling team member deletion:', error);
+      throw new Error(`Failed to handle team member deletion: ${error.message}`);
     }
   }
 
@@ -420,9 +617,14 @@ export class CalendarEventGenerationService {
           break;
 
         case 'team_member':
-          // Delete all events for this team member
+          // Delete all events for this team member, including birthday events
+          await RecurringBirthdayService.deleteBirthdayEventsForTeamMember(sourceId);
+          
+          // Also delete other events (duties, out-of-office) for this team member
           const allEvents = await CalendarEvent.list();
-          eventsToDelete = allEvents.filter(event => event.team_member_id === sourceId);
+          eventsToDelete = allEvents.filter(event => 
+            event.team_member_id === sourceId && event.event_type !== 'birthday'
+          );
           break;
 
         default:

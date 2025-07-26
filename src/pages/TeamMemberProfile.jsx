@@ -4,6 +4,7 @@ import { format, parseISO } from "date-fns";
 import { TeamMember, OneOnOne, Task, Project, Stakeholder, OutOfOffice, Duty } from "@/api/entities";
 import { AgendaService } from "@/utils/agendaService";
 import { CalendarService } from "@/utils/calendarService";
+import { CalendarEventGenerationService } from "@/services/calendarEventGenerationService";
 import AgendaItemCard from "@/components/agenda/AgendaItemCard";
 import AgendaItemList from "@/components/agenda/AgendaItemList";
 import AgendaSection from "@/components/agenda/AgendaSection";
@@ -1179,8 +1180,26 @@ export default function TeamMemberProfile() {
                           onSelect={async (date) => {
                             if (!date) return;
                             const newBirthday = date.toISOString();
-                            await TeamMember.update(member.id, { birthday: newBirthday });
-                            setMember(m => ({ ...m, birthday: newBirthday }));
+                            const previousData = { ...member };
+                            
+                            try {
+                              const updatedMember = await TeamMember.update(member.id, { birthday: newBirthday });
+                              setMember(m => ({ ...m, birthday: newBirthday }));
+                              
+                              // Update birthday events
+                              try {
+                                await CalendarEventGenerationService.handleTeamMemberUpdate(
+                                  member.id,
+                                  updatedMember,
+                                  previousData
+                                );
+                              } catch (calendarError) {
+                                console.error("Failed to update birthday events:", calendarError);
+                                // Don't fail the UI update for calendar errors
+                              }
+                            } catch (error) {
+                              console.error("Failed to update birthday:", error);
+                            }
                           }}
                         />
                       </PopoverContent>

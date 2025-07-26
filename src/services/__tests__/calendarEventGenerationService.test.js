@@ -521,9 +521,9 @@ describe('CalendarEventGenerationService', () => {
 
       const result = await CalendarEventGenerationService.synchronizeAllEvents();
 
-      expect(result.summary.totalCreated).toBe(3);
+      expect(result.summary.totalCreated).toBe(5); // 3 birthday events (3 years) + 1 duty + 1 out-of-office
       expect(result.summary.totalErrors).toBe(0);
-      expect(result.birthdayEvents).toHaveLength(1);
+      expect(result.birthdayEvents).toBe(3); // Birthday events count for 3 years
       expect(result.dutyEvents).toHaveLength(1);
       expect(result.outOfOfficeEvents).toHaveLength(1);
     });
