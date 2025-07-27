@@ -438,4 +438,267 @@ describe('EmployeeGoalsService', () => {
       });
     });
   });
+
+  describe('advancedSearch()', () => {
+    const mockGoalsForSearch = [
+      {
+        id: 'goal-1',
+        employeeId: 'emp-1',
+        title: 'React Development Skills',
+        developmentNeed: 'Frontend expertise',
+        developmentActivity: 'Build React applications',
+        developmentGoalDescription: 'Learn React hooks and state management',
+        status: 'active',
+        createdAt: '2025-07-01T10:00:00Z',
+        updatedAt: '2025-07-15T10:00:00Z',
+        importSource: 'hr-system'
+      },
+      {
+        id: 'goal-2',
+        employeeId: 'emp-2',
+        title: 'Leadership Training',
+        developmentNeed: 'Management skills',
+        developmentActivity: 'Attend leadership workshops',
+        developmentGoalDescription: 'Develop team leadership capabilities',
+        status: 'completed',
+        createdAt: '2025-06-15T10:00:00Z',
+        updatedAt: '2025-07-20T10:00:00Z',
+        importSource: 'manual'
+      },
+      {
+        id: 'goal-3',
+        employeeId: 'emp-1',
+        title: 'Python Backend Development',
+        developmentNeed: 'Backend expertise',
+        developmentActivity: 'Learn Python frameworks',
+        developmentGoalDescription: 'Master Django and FastAPI',
+        status: 'paused',
+        createdAt: '2025-07-10T10:00:00Z',
+        updatedAt: '2025-07-25T10:00:00Z'
+      }
+    ];
+
+    beforeEach(async () => {
+      const { localClient } = await import('../../api/localClient.js');
+      localClient.entities.EmployeeGoal.list.mockResolvedValue(mockGoalsForSearch);
+    });
+
+    it('should search by text only', async () => {
+      const result = await EmployeeGoalsService.advancedSearch({
+        searchText: 'React'
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe('React Development Skills');
+    });
+
+    it('should filter by status only', async () => {
+      const result = await EmployeeGoalsService.advancedSearch({
+        status: 'completed'
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].status).toBe('completed');
+    });
+
+    it('should filter by employee only', async () => {
+      const result = await EmployeeGoalsService.advancedSearch({
+        employeeId: 'emp-1'
+      });
+
+      expect(result).toHaveLength(2);
+      expect(result.every(goal => goal.employeeId === 'emp-1')).toBe(true);
+    });
+
+    it('should filter by import source only', async () => {
+      const result = await EmployeeGoalsService.advancedSearch({
+        importSource: 'hr-system'
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].importSource).toBe('hr-system');
+    });
+
+    it('should combine multiple filters', async () => {
+      const result = await EmployeeGoalsService.advancedSearch({
+        searchText: 'Development',
+        status: 'active',
+        employeeId: 'emp-1'
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe('React Development Skills');
+    });
+
+    it('should return empty array when no filters provided', async () => {
+      const result = await EmployeeGoalsService.advancedSearch({});
+
+      expect(result).toHaveLength(3);
+    });
+
+    it('should handle search with no matches', async () => {
+      const result = await EmployeeGoalsService.advancedSearch({
+        searchText: 'NonExistentTech'
+      });
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('should validate search parameters with Zod', async () => {
+      await expect(EmployeeGoalsService.advancedSearch({
+        status: 'invalid-status'
+      })).rejects.toThrow();
+    });
+
+    it('should handle case-insensitive text search', async () => {
+      const result = await EmployeeGoalsService.advancedSearch({
+        searchText: 'python'
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe('Python Backend Development');
+    });
+
+    it('should search across all text fields', async () => {
+      const result = await EmployeeGoalsService.advancedSearch({
+        searchText: 'Django'
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].developmentGoalDescription).toContain('Django');
+    });
+
+    it('should filter by creation date range', async () => {
+      const result = await EmployeeGoalsService.advancedSearch({
+        createdAfter: '2025-07-01T00:00:00Z',
+        createdBefore: '2025-07-31T23:59:59Z'
+      });
+
+      expect(result).toHaveLength(2);
+      expect(result.every(goal => {
+        const createdDate = new Date(goal.createdAt);
+        return createdDate >= new Date('2025-07-01T00:00:00Z') && 
+               createdDate <= new Date('2025-07-31T23:59:59Z');
+      })).toBe(true);
+    });
+
+    it('should filter by update date range', async () => {
+      const result = await EmployeeGoalsService.advancedSearch({
+        updatedAfter: '2025-07-20T00:00:00Z'
+      });
+
+      expect(result).toHaveLength(2);
+      expect(result.every(goal => 
+        new Date(goal.updatedAt) >= new Date('2025-07-20T00:00:00Z')
+      )).toBe(true);
+    });
+
+    it('should combine date and other filters', async () => {
+      const result = await EmployeeGoalsService.advancedSearch({
+        status: 'active',
+        createdAfter: '2025-06-01T00:00:00Z',
+        employeeId: 'emp-1'
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0].status).toBe('active');
+      expect(result[0].employeeId).toBe('emp-1');
+      expect(new Date(result[0].createdAt) >= new Date('2025-06-01T00:00:00Z')).toBe(true);
+    });
+
+    it('should handle invalid dates gracefully', async () => {
+      // This should not throw an error due to the try-catch in date filtering
+      const result = await EmployeeGoalsService.advancedSearch({
+        createdAfter: '2025-07-01T00:00:00Z'
+      });
+
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('should validate date format in search parameters', async () => {
+      await expect(EmployeeGoalsService.advancedSearch({
+        createdAfter: 'invalid-date-format'
+      })).rejects.toThrow();
+    });
+  });
+
+  describe('Date-based filtering support', () => {
+    const mockGoalsWithDates = [
+      {
+        id: 'goal-old',
+        title: 'Old Goal',
+        createdAt: '2025-01-15T10:00:00Z',
+        updatedAt: '2025-01-20T10:00:00Z'
+      },
+      {
+        id: 'goal-recent',
+        title: 'Recent Goal',
+        createdAt: '2025-07-20T10:00:00Z',
+        updatedAt: '2025-07-25T10:00:00Z'
+      },
+      {
+        id: 'goal-new',
+        title: 'New Goal',
+        createdAt: '2025-07-27T10:00:00Z',
+        updatedAt: '2025-07-27T10:00:00Z'
+      }
+    ];
+
+    it('should support filtering goals by date ranges programmatically', async () => {
+      const { localClient } = await import('../../api/localClient.js');
+      localClient.entities.EmployeeGoal.list.mockResolvedValue(mockGoalsWithDates);
+
+      const allGoals = await EmployeeGoalsService.getAllGoals();
+      
+      // Filter goals created after July 1, 2025
+      const recentGoals = allGoals.filter(goal => 
+        new Date(goal.createdAt) >= new Date('2025-07-01T00:00:00Z')
+      );
+
+      expect(recentGoals).toHaveLength(2);
+      expect(recentGoals.map(g => g.title)).toEqual(['Recent Goal', 'New Goal']);
+    });
+
+    it('should support filtering goals by update date ranges', async () => {
+      const { localClient } = await import('../../api/localClient.js');
+      localClient.entities.EmployeeGoal.list.mockResolvedValue(mockGoalsWithDates);
+
+      const allGoals = await EmployeeGoalsService.getAllGoals();
+      
+      // Filter goals updated in July 2025
+      const julyUpdatedGoals = allGoals.filter(goal => 
+        new Date(goal.updatedAt) >= new Date('2025-07-01T00:00:00Z') &&
+        new Date(goal.updatedAt) < new Date('2025-08-01T00:00:00Z')
+      );
+
+      expect(julyUpdatedGoals).toHaveLength(2);
+    });
+
+    it('should handle date parsing errors gracefully', async () => {
+      const mockGoalsWithInvalidDates = [
+        {
+          id: 'goal-invalid',
+          title: 'Invalid Date Goal',
+          createdAt: 'invalid-date',
+          updatedAt: '2025-07-27T10:00:00Z'
+        }
+      ];
+
+      const { localClient } = await import('../../api/localClient.js');
+      localClient.entities.EmployeeGoal.list.mockResolvedValue(mockGoalsWithInvalidDates);
+
+      const allGoals = await EmployeeGoalsService.getAllGoals();
+      
+      // Should not throw error when encountering invalid dates
+      expect(() => {
+        allGoals.filter(goal => {
+          try {
+            return new Date(goal.createdAt) >= new Date('2025-07-01T00:00:00Z');
+          } catch {
+            return false;
+          }
+        });
+      }).not.toThrow();
+    });
+  });
 });

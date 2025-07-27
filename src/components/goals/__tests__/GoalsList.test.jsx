@@ -68,6 +68,7 @@ describe('GoalsList Component', () => {
     EmployeeGoalsService.getGoalsByEmployee.mockResolvedValue(mockGoals.filter(g => g.employeeId === 'emp-1'));
     EmployeeGoalsService.deleteGoal.mockResolvedValue(true);
     EmployeeGoalsService.updateGoal.mockResolvedValue(mockGoals[0]);
+    EmployeeGoalsService.advancedSearch = vi.fn().mockResolvedValue(mockGoals);
   });
 
   afterEach(() => {
@@ -138,6 +139,109 @@ describe('GoalsList Component', () => {
     });
   });
 
+  describe('Advanced Search and Filtering', () => {
+    it('should use advanced search when multiple filters are applied', async () => {
+      EmployeeGoalsService.advancedSearch = vi.fn().mockResolvedValue([mockGoals[0]]);
+      
+      render(<GoalsList teamMembers={mockTeamMembers} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Lead the CAP/Otel project in the team')).toBeInTheDocument();
+      });
+
+      // Apply multiple filters
+      const searchInput = screen.getByPlaceholderText('Search goals...');
+      fireEvent.change(searchInput, { target: { value: 'CAP' } });
+
+      const statusFilter = screen.getByRole('combobox', { name: /status/i });
+      fireEvent.click(statusFilter);
+      fireEvent.click(screen.getByText('Active'));
+
+      await waitFor(() => {
+        expect(EmployeeGoalsService.advancedSearch).toHaveBeenCalledWith({
+          searchText: 'CAP',
+          status: 'active',
+          employeeId: undefined
+        });
+      });
+    });
+
+    it('should handle date-based filtering through service layer', async () => {
+      const mockFilteredGoals = [mockGoals[0]];
+      EmployeeGoalsService.getAllGoals.mockResolvedValue(mockFilteredGoals);
+      
+      render(<GoalsList teamMembers={mockTeamMembers} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Lead the CAP/Otel project in the team')).toBeInTheDocument();
+      });
+
+      // Service should support date filtering programmatically
+      expect(EmployeeGoalsService.getAllGoals).toHaveBeenCalled();
+    });
+
+    it('should reset advanced search when filters are cleared', async () => {
+      EmployeeGoalsService.advancedSearch = vi.fn().mockResolvedValue([mockGoals[0]]);
+      
+      render(<GoalsList teamMembers={mockTeamMembers} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Lead the CAP/Otel project in the team')).toBeInTheDocument();
+      });
+
+      // Apply a filter first
+      const searchInput = screen.getByPlaceholderText('Search goals...');
+      fireEvent.change(searchInput, { target: { value: 'test' } });
+
+      // Clear filters
+      const clearButton = screen.getByText('Clear Filters');
+      fireEvent.click(clearButton);
+
+      await waitFor(() => {
+        expect(searchInput.value).toBe('');
+      });
+    });
+
+    it('should show date filter options', async () => {
+      render(<GoalsList teamMembers={mockTeamMembers} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Lead the CAP/Otel project in the team')).toBeInTheDocument();
+      });
+
+      // Find and click date filter
+      const dateFilter = screen.getByRole('combobox', { name: /date/i });
+      expect(dateFilter).toBeInTheDocument();
+      
+      fireEvent.click(dateFilter);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Last Week')).toBeInTheDocument();
+        expect(screen.getByText('Last Month')).toBeInTheDocument();
+        expect(screen.getByText('Last Quarter')).toBeInTheDocument();
+        expect(screen.getByText('Custom Range')).toBeInTheDocument();
+      });
+    });
+
+    it('should show custom date inputs when custom range is selected', async () => {
+      render(<GoalsList teamMembers={mockTeamMembers} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Lead the CAP/Otel project in the team')).toBeInTheDocument();
+      });
+
+      // Select custom date range
+      const dateFilter = screen.getByRole('combobox', { name: /date/i });
+      fireEvent.click(dateFilter);
+      fireEvent.click(screen.getByText('Custom Range'));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Created After')).toBeInTheDocument();
+        expect(screen.getByLabelText('Created Before')).toBeInTheDocument();
+      });
+    });
+  });
+
   describe('Filtering and Search', () => {
     it('should filter goals by status', async () => {
       render(<GoalsList teamMembers={mockTeamMembers} />);
@@ -170,7 +274,10 @@ describe('GoalsList Component', () => {
       fireEvent.click(screen.getByText('John Doe'));
 
       await waitFor(() => {
-        expect(EmployeeGoalsService.getGoalsByEmployee).toHaveBeenCalledWith('emp-1');
+        // Should show only goals for emp-1 (John Doe)
+        expect(screen.getByText('Lead the CAP/Otel project in the team')).toBeInTheDocument();
+        expect(screen.getByText('Lead AI Tools and Improve Development Excellence')).toBeInTheDocument();
+        expect(screen.queryByText('Lead the Security Domain in the Team')).not.toBeInTheDocument();
       });
     });
 

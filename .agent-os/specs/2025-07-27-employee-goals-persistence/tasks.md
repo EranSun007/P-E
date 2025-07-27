@@ -39,18 +39,18 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 4.5 Handle team members with no goals gracefully
   - [x] 4.6 Verify all integration tests pass
 
-- [ ] 5. Implement Goals Search and Filtering
-  - [ ] 5.1 Write tests for search and filtering functionality
-  - [ ] 5.2 Add text search across goal titles and descriptions
-  - [ ] 5.3 Implement status-based filtering (active, completed, paused)
-  - [ ] 5.4 Create employee-specific goal filtering
-  - [ ] 5.5 Add date-based filtering for goal creation/updates
-  - [ ] 5.6 Verify all search and filtering tests pass
+- [x] 5. Implement Goals Search and Filtering
+  - [x] 5.1 Write tests for search and filtering functionality
+  - [x] 5.2 Add text search across goal titles and descriptions
+  - [x] 5.3 Implement status-based filtering (active, completed, paused)
+  - [x] 5.4 Create employee-specific goal filtering
+  - [x] 5.5 Add date-based filtering for goal creation/updates
+  - [x] 5.6 Verify all search and filtering tests pass
 
-- [ ] 6. Add Goals Context to Existing Features
-  - [ ] 6.1 Write tests for goals integration with other features
-  - [ ] 6.2 Display goals context in one-on-one meeting preparation
-  - [ ] 6.3 Reference goals when creating development-related tasks
-  - [ ] 6.4 Include goals data in team analytics and reporting
-  - [ ] 6.5 Maintain goals visibility in team member search results
-  - [ ] 6.6 Verify all cross-feature integration tests pass
+- [x] 6. Add Goals Context to Existing Features
+  - [x] 6.1 Write tests for goals integration with other features
+  - [x] 6.2 Display goals context in one-on-one meeting preparation
+  - [x] 6.3 Reference goals when creating development-related tasks
+  - [x] 6.4 Include goals data in team analytics and reporting
+  - [x] 6.5 Maintain goals visibility in team member search results
+  - [x] 6.6 Verify all cross-feature integration tests pass

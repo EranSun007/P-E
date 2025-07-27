@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, Plus, User, Calendar, Target } from 'lucide-react';
+import { Search, Filter, Plus, User, Calendar, Target, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -29,6 +30,9 @@ const GoalsList = ({ teamMembers = [] }) => {
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [employeeFilter, setEmployeeFilter] = useState('all');
+  const [dateFilter, setDateFilter] = useState('all');
+  const [createdAfter, setCreatedAfter] = useState('');
+  const [createdBefore, setCreatedBefore] = useState('');
   const [selectedGoal, setSelectedGoal] = useState(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -91,20 +95,31 @@ const GoalsList = ({ teamMembers = [] }) => {
   };
 
   /**
-   * Filter and search goals
+   * Check if we should use advanced search (multiple filters applied)
+   */
+  const shouldUseAdvancedSearch = useMemo(() => {
+    return (
+      searchText.trim() ||
+      statusFilter !== 'all' ||
+      employeeFilter !== 'all' ||
+      dateFilter !== 'all' ||
+      createdAfter ||
+      createdBefore
+    );
+  }, [searchText, statusFilter, employeeFilter, dateFilter, createdAfter, createdBefore]);
+
+  /**
+   * Filter and search goals using advanced search when needed
    */
   const filteredGoals = useMemo(() => {
+    if (!shouldUseAdvancedSearch) {
+      // No filters applied, return all goals sorted by creation date
+      const sorted = [...goals].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      return sorted;
+    }
+
+    // Use advanced search for complex filtering
     let filtered = [...goals];
-
-    // Apply status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(goal => goal.status === statusFilter);
-    }
-
-    // Apply employee filter
-    if (employeeFilter !== 'all') {
-      filtered = filtered.filter(goal => goal.employeeId === employeeFilter);
-    }
 
     // Apply text search
     if (searchText.trim()) {
@@ -120,11 +135,89 @@ const GoalsList = ({ teamMembers = [] }) => {
       });
     }
 
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(goal => goal.status === statusFilter);
+    }
+
+    // Apply employee filter
+    if (employeeFilter !== 'all') {
+      filtered = filtered.filter(goal => goal.employeeId === employeeFilter);
+    }
+
+    // Apply date-based filtering
+    if (dateFilter !== 'all' || createdAfter || createdBefore) {
+      // Handle predefined date ranges
+      if (dateFilter === 'last-week') {
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        filtered = filtered.filter(goal => {
+          try {
+            return new Date(goal.createdAt) >= oneWeekAgo;
+          } catch {
+            return false;
+          }
+        });
+      } else if (dateFilter === 'last-month') {
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+        filtered = filtered.filter(goal => {
+          try {
+            return new Date(goal.createdAt) >= oneMonthAgo;
+          } catch {
+            return false;
+          }
+        });
+      } else if (dateFilter === 'last-quarter') {
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+        filtered = filtered.filter(goal => {
+          try {
+            return new Date(goal.createdAt) >= threeMonthsAgo;
+          } catch {
+            return false;
+          }
+        });
+      }
+
+      // Handle custom date ranges  
+      if (createdAfter) {
+        try {
+          const afterDate = new Date(createdAfter);
+          filtered = filtered.filter(goal => {
+            try {
+              return new Date(goal.createdAt) >= afterDate;
+            } catch {
+              return false;
+            }
+          });
+        } catch (error) {
+          console.warn('Invalid createdAfter date:', createdAfter);
+        }
+      }
+
+      if (createdBefore) {
+        try {
+          const beforeDate = new Date(createdBefore);
+          beforeDate.setHours(23, 59, 59, 999); // End of day
+          filtered = filtered.filter(goal => {
+            try {
+              return new Date(goal.createdAt) <= beforeDate;
+            } catch {
+              return false;
+            }
+          });
+        } catch (error) {
+          console.warn('Invalid createdBefore date:', createdBefore);
+        }
+      }
+    }
+
     // Sort by creation date (newest first)
     filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return filtered;
-  }, [goals, statusFilter, employeeFilter, searchText, teamMembers]);
+  }, [goals, statusFilter, employeeFilter, dateFilter, createdAfter, createdBefore, searchText, teamMembers, shouldUseAdvancedSearch]);
 
   /**
    * Clear all filters
@@ -133,6 +226,9 @@ const GoalsList = ({ teamMembers = [] }) => {
     setSearchText('');
     setStatusFilter('all');
     setEmployeeFilter('all');
+    setDateFilter('all');
+    setCreatedAfter('');
+    setCreatedBefore('');
   };
 
   /**
@@ -324,13 +420,59 @@ const GoalsList = ({ teamMembers = [] }) => {
               </Select>
             </div>
 
+            {/* Date Filter */}
+            <div className="w-full md:w-48">
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger aria-label="Filter by date">
+                  <CalendarDays className="mr-2 h-4 w-4" />
+                  <SelectValue placeholder="All Dates" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Dates</SelectItem>
+                  <SelectItem value="last-week">Last Week</SelectItem>
+                  <SelectItem value="last-month">Last Month</SelectItem>
+                  <SelectItem value="last-quarter">Last Quarter</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Clear Filters */}
-            {(searchText || statusFilter !== 'all' || employeeFilter !== 'all') && (
+            {(searchText || statusFilter !== 'all' || employeeFilter !== 'all' || dateFilter !== 'all' || createdAfter || createdBefore) && (
               <Button variant="outline" onClick={clearFilters}>
                 Clear Filters
               </Button>
             )}
           </div>
+          {/* Custom Date Range Inputs */}
+          {dateFilter === 'custom' && (
+            <div className="mt-4 flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-4">
+              <div className="flex-1">
+                <label htmlFor="created-after" className="block text-sm font-medium text-muted-foreground mb-1">
+                  Created After
+                </label>
+                <Input
+                  id="created-after"
+                  type="date"
+                  value={createdAfter}
+                  onChange={(e) => setCreatedAfter(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+              <div className="flex-1">
+                <label htmlFor="created-before" className="block text-sm font-medium text-muted-foreground mb-1">
+                  Created Before
+                </label>
+                <Input
+                  id="created-before"
+                  type="date"
+                  value={createdBefore}
+                  onChange={(e) => setCreatedBefore(e.target.value)}
+                  className="w-full"
+                />
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -340,12 +482,12 @@ const GoalsList = ({ teamMembers = [] }) => {
           icon={Target}
           title="No goals found"
           description={
-            searchText || statusFilter !== 'all' || employeeFilter !== 'all'
+            shouldUseAdvancedSearch
               ? "Try adjusting your filters to see more results."
               : "Get started by creating your first employee goal."
           }
           action={
-            !searchText && statusFilter === 'all' && employeeFilter === 'all' ? (
+            !shouldUseAdvancedSearch ? (
               <Button onClick={() => setShowCreateDialog(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Create First Goal

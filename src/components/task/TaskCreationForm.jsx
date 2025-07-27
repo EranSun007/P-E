@@ -7,15 +7,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { Check, Calendar as CalendarIcon, Loader2, Plus, X } from "lucide-react";
+import { Check, Calendar as CalendarIcon, Loader2, Plus, X, Target, Lightbulb } from "lucide-react";
 import MeetingMetadataForm from "./metadata/MeetingMetadataForm";
 import MetricMetadataForm from "./metadata/MetricMetadataForm";
 import ActionMetadataForm from "./metadata/ActionMetadataForm";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Project } from "@/api/entities";
 import { Stakeholder, TeamMember, Peer } from "@/api/entities";
+import EmployeeGoalsService from "@/services/employeeGoalsService.js";
 import TagInput from "../ui/tag-input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export default function TaskCreationForm({ onCreateTask, initialTaskData = null }) {
   const [taskInput, setTaskInput] = useState("");
@@ -39,6 +42,7 @@ export default function TaskCreationForm({ onCreateTask, initialTaskData = null 
     strategic: false,
     reminders: [],
     subtasks: [],
+    relatedGoals: [], // New field for goal associations
     metadata: {
       meeting: {
         participants: [],
@@ -82,6 +86,10 @@ export default function TaskCreationForm({ onCreateTask, initialTaskData = null 
         ? [...initialTaskData.subtasks]
         : [];
     
+    safeInitialData.relatedGoals = Array.isArray(initialTaskData.relatedGoals)
+        ? [...initialTaskData.relatedGoals]
+        : [];
+    
     // Handle nested metadata object
     safeInitialData.metadata = {
       ...defaultTaskData.metadata,
@@ -119,6 +127,12 @@ export default function TaskCreationForm({ onCreateTask, initialTaskData = null 
   const [assigneeId, setAssigneeId] = useState("");
 
   const [newSubtask, setNewSubtask] = useState("");
+  
+  // Goals integration state
+  const [relatedGoals, setRelatedGoals] = useState(safeInitialData.relatedGoals || []);
+  const [showGoalSuggestions, setShowGoalSuggestions] = useState(false);
+  const [goalSuggestions, setGoalSuggestions] = useState([]);
+  const [loadingGoalSuggestions, setLoadingGoalSuggestions] = useState(false);
 
   useEffect(() => {
     // Load projects for dropdown
@@ -284,6 +298,52 @@ export default function TaskCreationForm({ onCreateTask, initialTaskData = null 
       setTaskData(prev => ({ ...prev, [field]: safeValue }));
     } else {
       setTaskData(prev => ({ ...prev, [field]: value }));
+    }
+  };
+
+  // Goals integration functions
+  const loadGoalSuggestions = async () => {
+    if (!taskData.title && !taskData.description) return;
+    
+    setLoadingGoalSuggestions(true);
+    try {
+      const searchTerm = taskData.title + ' ' + taskData.description;
+      const suggestions = await EmployeeGoalsService.findRelatedGoals(searchTerm);
+      setGoalSuggestions(suggestions);
+      setShowGoalSuggestions(suggestions.length > 0);
+    } catch (error) {
+      console.error('Error loading goal suggestions:', error);
+    } finally {
+      setLoadingGoalSuggestions(false);
+    }
+  };
+
+  const addRelatedGoal = (goal) => {
+    if (!relatedGoals.find(g => g.id === goal.id)) {
+      const newRelatedGoals = [...relatedGoals, goal];
+      setRelatedGoals(newRelatedGoals);
+      updateTaskField('relatedGoals', newRelatedGoals);
+    }
+    setShowGoalSuggestions(false);
+  };
+
+  const removeRelatedGoal = (goalId) => {
+    const newRelatedGoals = relatedGoals.filter(g => g.id !== goalId);
+    setRelatedGoals(newRelatedGoals);
+    updateTaskField('relatedGoals', newRelatedGoals);
+  };
+
+  const loadTaskSuggestionsFromAssignee = async () => {
+    if (!assigneeId || assigneeType !== 'team_member') return;
+    
+    try {
+      const suggestions = await EmployeeGoalsService.suggestTasksFromGoals(assigneeId);
+      if (suggestions.length > 0) {
+        // Show the first few suggestions as a hint
+        console.log('Task suggestions for assignee:', suggestions.slice(0, 3));
+      }
+    } catch (error) {
+      console.error('Error loading task suggestions:', error);
     }
   };
 
@@ -723,6 +783,111 @@ export default function TaskCreationForm({ onCreateTask, initialTaskData = null 
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                {/* Goals Integration Section */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium">Related Goals</label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={loadGoalSuggestions}
+                        disabled={loadingGoalSuggestions || (!taskData.title && !taskData.description)}
+                        className="flex items-center gap-1"
+                      >
+                        {loadingGoalSuggestions ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Lightbulb className="h-3 w-3" />
+                        )}
+                        Suggest Goals
+                      </Button>
+                      {assigneeId && assigneeType === 'team_member' && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={loadTaskSuggestionsFromAssignee}
+                          className="flex items-center gap-1"
+                        >
+                          <Target className="h-3 w-3" />
+                          Get Ideas
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Related Goals Display */}
+                  {relatedGoals.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {relatedGoals.map((goal) => (
+                        <Badge
+                          key={goal.id}
+                          variant="secondary"
+                          className="flex items-center gap-1"
+                        >
+                          <Target className="h-3 w-3" />
+                          {goal.title}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto p-0 ml-1"
+                            onClick={() => removeRelatedGoal(goal.id)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Goal Suggestions Dialog */}
+                  <Dialog open={showGoalSuggestions} onOpenChange={setShowGoalSuggestions}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Related Goal Suggestions</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {goalSuggestions.map((goal) => (
+                          <div
+                            key={goal.id}
+                            className="flex items-start justify-between p-3 border rounded-lg hover:bg-muted/50"
+                          >
+                            <div className="flex-1">
+                              <h4 className="font-medium text-sm mb-1">{goal.title}</h4>
+                              <p className="text-xs text-muted-foreground mb-1">
+                                <strong>Focus:</strong> {goal.developmentNeed}
+                              </p>
+                              {goal.developmentActivity && (
+                                <p className="text-xs text-muted-foreground">
+                                  <strong>Activity:</strong> {goal.developmentActivity.substring(0, 100)}
+                                  {goal.developmentActivity.length > 100 && '...'}
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => addRelatedGoal(goal)}
+                              disabled={relatedGoals.find(g => g.id === goal.id)}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                        {goalSuggestions.length === 0 && (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            No related goals found. Try updating the task title or description.
+                          </p>
+                        )}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </div>
 

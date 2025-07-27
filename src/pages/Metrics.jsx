@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, lazy, Suspense } from "react";
 import { Task } from "@/api/entities";
+import EmployeeGoalsService from "@/services/employeeGoalsService.js";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, BarChart2, ArrowUpRight, ArrowDownRight, ArrowRight } from "lucide-react";
-import { ResponsiveContainer, BarChart, XAxis, YAxis, Bar, Tooltip, LineChart, Line } from "recharts";
+import { Plus, BarChart2, ArrowUpRight, ArrowDownRight, ArrowRight, Target, TrendingUp } from "lucide-react";
+import { ResponsiveContainer, BarChart, XAxis, YAxis, Bar, Tooltip, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { format, parseISO } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -16,9 +17,15 @@ export default function MetricsPage() {
   const [tasks, setTasks] = useState([]);
   const [metricTasks, setMetricTasks] = useState([]);
   const [showTaskCreation, setShowTaskCreation] = useState(false);
+  
+  // Goals analytics state
+  const [goalsAnalytics, setGoalsAnalytics] = useState(null);
+  const [employeeProgress, setEmployeeProgress] = useState({});
+  const [loadingGoals, setLoadingGoals] = useState(true);
 
   useEffect(() => {
     loadTasks();
+    loadGoalsAnalytics();
   }, []);
 
   const loadTasks = async () => {
@@ -30,6 +37,23 @@ export default function MetricsPage() {
       setMetricTasks(metrics);
     } catch (err) {
       console.error("Failed to load tasks:", err);
+    }
+  };
+
+  const loadGoalsAnalytics = async () => {
+    try {
+      setLoadingGoals(true);
+      const [analytics, progress] = await Promise.all([
+        EmployeeGoalsService.getGoalsAnalytics(),
+        EmployeeGoalsService.getEmployeeGoalsProgress()
+      ]);
+      
+      setGoalsAnalytics(analytics);
+      setEmployeeProgress(progress);
+    } catch (error) {
+      console.error('Error loading goals analytics:', error);
+    } finally {
+      setLoadingGoals(false);
     }
   };
 
@@ -220,6 +244,176 @@ export default function MetricsPage() {
             })}
           </div>
         )}
+
+        {/* Goals Analytics Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Target className="h-5 w-5" />
+              Goals Analytics
+            </h2>
+          </div>
+
+          {loadingGoals ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <Card key={i}>
+                  <CardContent className="p-6">
+                    <div className="animate-pulse space-y-3">
+                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                      <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-full"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : goalsAnalytics ? (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+              {/* Total Goals */}
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Total Goals</p>
+                      <div className="flex items-baseline gap-2">
+                        <h3 className="text-2xl font-bold">{goalsAnalytics.totalGoals}</h3>
+                        <TrendingUp className="h-4 w-4 text-green-500" />
+                      </div>
+                    </div>
+                    <Target className="h-8 w-8 text-blue-500" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Active Goals */}
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Active Goals</p>
+                      <div className="flex items-baseline gap-2">
+                        <h3 className="text-2xl font-bold text-blue-600">
+                          {goalsAnalytics.statusBreakdown.active}
+                        </h3>
+                        <Badge variant="outline" className="text-xs">
+                          {goalsAnalytics.totalGoals > 0 
+                            ? Math.round((goalsAnalytics.statusBreakdown.active / goalsAnalytics.totalGoals) * 100)
+                            : 0}%
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                      <ArrowUpRight className="h-4 w-4 text-blue-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Completed Goals */}
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Completed</p>
+                      <div className="flex items-baseline gap-2">
+                        <h3 className="text-2xl font-bold text-green-600">
+                          {goalsAnalytics.statusBreakdown.completed}
+                        </h3>
+                        <Badge variant="outline" className="text-xs bg-green-50">
+                          {Math.round(goalsAnalytics.completionRate * 100)}%
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                      <ArrowUpRight className="h-4 w-4 text-green-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Paused Goals */}
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Paused</p>
+                      <div className="flex items-baseline gap-2">
+                        <h3 className="text-2xl font-bold text-yellow-600">
+                          {goalsAnalytics.statusBreakdown.paused}
+                        </h3>
+                        <Badge variant="outline" className="text-xs">
+                          {goalsAnalytics.totalGoals > 0 
+                            ? Math.round((goalsAnalytics.statusBreakdown.paused / goalsAnalytics.totalGoals) * 100)
+                            : 0}%
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                      <ArrowRight className="h-4 w-4 text-yellow-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-6">
+                <p className="text-center text-muted-foreground">
+                  No goals data available. Goals will appear here once team members have development goals.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Goals Progress by Employee */}
+          {Object.keys(employeeProgress).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart2 className="h-5 w-5" />
+                  Employee Goals Progress
+                </CardTitle>
+                <CardDescription>
+                  Goal completion rates by team member
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {Object.entries(employeeProgress)
+                    .sort(([,a], [,b]) => b.completionRate - a.completionRate)
+                    .slice(0, 10)
+                    .map(([employeeId, progress]) => (
+                    <div key={employeeId} className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                          <Target className="h-4 w-4 text-gray-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">Employee {employeeId.slice(-4)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {progress.completed} of {progress.total} goals completed
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-green-500 transition-all duration-300"
+                            style={{ width: `${progress.completionRate * 100}%` }}
+                          />
+                        </div>
+                        <Badge variant={progress.completionRate >= 0.7 ? "default" : "secondary"}>
+                          {Math.round(progress.completionRate * 100)}%
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
         {/* Metric Creation Dialog */}
         <Dialog open={showTaskCreation} onOpenChange={setShowTaskCreation}>

@@ -291,6 +291,52 @@ class EmployeeGoalsService {
         results = results.filter(goal => goal.importSource === validatedParams.importSource);
       }
 
+      // Filter by creation date range
+      if (validatedParams.createdAfter) {
+        const afterDate = new Date(validatedParams.createdAfter);
+        results = results.filter(goal => {
+          try {
+            return new Date(goal.createdAt) >= afterDate;
+          } catch {
+            return false;
+          }
+        });
+      }
+
+      if (validatedParams.createdBefore) {
+        const beforeDate = new Date(validatedParams.createdBefore);
+        results = results.filter(goal => {
+          try {
+            return new Date(goal.createdAt) <= beforeDate;
+          } catch {
+            return false;
+          }
+        });
+      }
+
+      // Filter by update date range
+      if (validatedParams.updatedAfter) {
+        const afterDate = new Date(validatedParams.updatedAfter);
+        results = results.filter(goal => {
+          try {
+            return new Date(goal.updatedAt) >= afterDate;
+          } catch {
+            return false;
+          }
+        });
+      }
+
+      if (validatedParams.updatedBefore) {
+        const beforeDate = new Date(validatedParams.updatedBefore);
+        results = results.filter(goal => {
+          try {
+            return new Date(goal.updatedAt) <= beforeDate;
+          } catch {
+            return false;
+          }
+        });
+      }
+
       return results;
     } catch (error) {
       console.error('Error in advanced search:', error);
@@ -346,6 +392,257 @@ class EmployeeGoalsService {
     } catch (error) {
       console.error(`Error reactivating goal ${id}:`, error);
       throw error;
+    }
+  }
+
+  // Integration Methods for Cross-Feature Functionality
+
+  /**
+   * Get goals context for one-on-one meeting preparation
+   * @param {string} employeeId - Employee ID
+   * @returns {Promise<Object>} Goals context for meeting
+   */
+  static async getGoalsForMeeting(employeeId) {
+    try {
+      const allGoals = await this.getGoalsByEmployee(employeeId);
+      const activeGoals = allGoals.filter(goal => goal.status === 'active');
+      
+      const goalsSummary = {
+        total: allGoals.length,
+        active: allGoals.filter(g => g.status === 'active').length,
+        completed: allGoals.filter(g => g.status === 'completed').length,
+        paused: allGoals.filter(g => g.status === 'paused').length
+      };
+
+      const suggestedTopics = activeGoals.map(goal => 
+        `${goal.developmentNeed} development progress`
+      ).filter(topic => topic && topic.trim() !== ' development progress');
+
+      return {
+        activeGoals,
+        goalsSummary,
+        suggestedTopics
+      };
+    } catch (error) {
+      console.error('Error getting goals for meeting:', error);
+      return {
+        activeGoals: [],
+        goalsSummary: { total: 0, active: 0, completed: 0, paused: 0 },
+        suggestedTopics: [],
+        error: 'Failed to load goals for meeting context'
+      };
+    }
+  }
+
+  /**
+   * Suggest agenda items based on employee goals
+   * @param {string} employeeId - Employee ID
+   * @returns {Promise<Array>} Array of suggested agenda items
+   */
+  static async suggestAgendaItems(employeeId) {
+    try {
+      const goals = await this.getGoalsByEmployee(employeeId);
+      const activeGoals = goals.filter(goal => goal.status === 'active');
+      
+      return activeGoals.map(goal => 
+        `Discuss progress on ${goal.title} goal`
+      );
+    } catch (error) {
+      console.error('Error suggesting agenda items:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Find goals related to a given task or topic
+   * @param {string} searchTerm - Search term to match against goals
+   * @returns {Promise<Array>} Array of related goals
+   */
+  static async findRelatedGoals(searchTerm) {
+    try {
+      const goals = await this.getAllGoals();
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      
+      return goals.filter(goal => 
+        goal.title.toLowerCase().includes(lowerSearchTerm) ||
+        goal.developmentNeed.toLowerCase().includes(lowerSearchTerm) ||
+        goal.developmentActivity.toLowerCase().includes(lowerSearchTerm) ||
+        goal.developmentGoalDescription.toLowerCase().includes(lowerSearchTerm)
+      );
+    } catch (error) {
+      console.error('Error finding related goals:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Suggest tasks based on employee goals
+   * @param {string} employeeId - Employee ID
+   * @returns {Promise<Array>} Array of suggested task titles
+   */
+  static async suggestTasksFromGoals(employeeId) {
+    try {
+      const goals = await this.getGoalsByEmployee(employeeId);
+      const suggestions = [];
+      
+      goals.forEach(goal => {
+        // Extract tasks from development activities
+        if (goal.developmentActivity && goal.developmentActivity.trim()) {
+          // Split on numbered points (1., 2., etc.)
+          const activities = goal.developmentActivity.split(/\d+\.\s+/)
+            .filter(activity => activity.trim())
+            .map(activity => activity.replace(/^\d+\.\s*/, '').trim());
+          
+          activities.forEach(activity => {
+            if (activity) {
+              suggestions.push(activity);
+            }
+          });
+        }
+        
+        // Extract tasks from goal descriptions
+        if (goal.developmentGoalDescription && goal.developmentGoalDescription.trim()) {
+          const descriptions = goal.developmentGoalDescription.split(/\d+\.\s+/)
+            .filter(desc => desc.trim())
+            .map(desc => desc.replace(/^\d+\.\s*/, '').trim());
+          
+          descriptions.forEach(desc => {
+            if (desc) {
+              suggestions.push(`${desc.split(' ').slice(0, 6).join(' ')} for ${goal.title}`);
+            }
+          });
+        }
+      });
+      
+      return [...new Set(suggestions)]; // Remove duplicates
+    } catch (error) {
+      console.error('Error suggesting tasks from goals:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get analytics data for goals
+   * @returns {Promise<Object>} Goals analytics
+   */
+  static async getGoalsAnalytics() {
+    try {
+      const goals = await this.getAllGoals();
+      
+      const statusBreakdown = {
+        active: goals.filter(g => g.status === 'active').length,
+        completed: goals.filter(g => g.status === 'completed').length,
+        paused: goals.filter(g => g.status === 'paused').length
+      };
+      
+      const completionRate = goals.length > 0 
+        ? statusBreakdown.completed / goals.length 
+        : 0;
+      
+      // Group by month for trends
+      const monthlyData = {};
+      goals.forEach(goal => {
+        const date = new Date(goal.createdAt);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        monthlyData[monthKey] = (monthlyData[monthKey] || 0) + 1;
+      });
+      
+      const monthlyTrends = Object.entries(monthlyData).map(([month, count]) => ({
+        month,
+        count
+      }));
+      
+      return {
+        totalGoals: goals.length,
+        statusBreakdown,
+        monthlyTrends,
+        completionRate: Math.round(completionRate * 100) / 100
+      };
+    } catch (error) {
+      console.error('Error getting goals analytics:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get goals progress by employee
+   * @returns {Promise<Object>} Progress data by employee
+   */
+  static async getEmployeeGoalsProgress() {
+    try {
+      const goals = await this.getAllGoals();
+      const employeeProgress = {};
+      
+      goals.forEach(goal => {
+        if (!employeeProgress[goal.employeeId]) {
+          employeeProgress[goal.employeeId] = {
+            total: 0,
+            completed: 0,
+            completionRate: 0
+          };
+        }
+        
+        employeeProgress[goal.employeeId].total++;
+        if (goal.status === 'completed') {
+          employeeProgress[goal.employeeId].completed++;
+        }
+      });
+      
+      // Calculate completion rates
+      Object.keys(employeeProgress).forEach(employeeId => {
+        const progress = employeeProgress[employeeId];
+        progress.completionRate = progress.total > 0 
+          ? Math.round((progress.completed / progress.total) * 100) / 100
+          : 0;
+      });
+      
+      return employeeProgress;
+    } catch (error) {
+      console.error('Error getting employee goals progress:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Search goals for global search results
+   * @param {string} searchTerm - Search term
+   * @returns {Promise<Array>} Array of search results
+   */
+  static async searchGoalsForGlobalResults(searchTerm) {
+    try {
+      const goals = await this.getAllGoals();
+      const lowerSearchTerm = searchTerm.toLowerCase();
+      
+      const results = goals
+        .filter(goal => 
+          goal.title.toLowerCase().includes(lowerSearchTerm) ||
+          goal.developmentNeed.toLowerCase().includes(lowerSearchTerm) ||
+          goal.developmentActivity.toLowerCase().includes(lowerSearchTerm) ||
+          goal.developmentGoalDescription.toLowerCase().includes(lowerSearchTerm)
+        )
+        .map(goal => {
+          // Calculate relevance score
+          let relevanceScore = 0;
+          if (goal.title.toLowerCase().includes(lowerSearchTerm)) relevanceScore += 3;
+          if (goal.developmentNeed.toLowerCase().includes(lowerSearchTerm)) relevanceScore += 2;
+          if (goal.developmentActivity.toLowerCase().includes(lowerSearchTerm)) relevanceScore += 1;
+          if (goal.developmentGoalDescription.toLowerCase().includes(lowerSearchTerm)) relevanceScore += 1;
+          
+          return {
+            type: 'goal',
+            id: goal.id,
+            title: goal.title,
+            description: `Development Need: ${goal.developmentNeed}`,
+            employeeId: goal.employeeId,
+            relevanceScore
+          };
+        })
+        .sort((a, b) => b.relevanceScore - a.relevanceScore);
+
+      return results;
+    } catch (error) {
+      console.error('Error searching goals for global results:', error);
+      return [];
     }
   }
 }

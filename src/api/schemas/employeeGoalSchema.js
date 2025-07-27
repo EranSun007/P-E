@@ -96,7 +96,27 @@ export const goalSearchSchema = z.object({
   
   importSource: z.string()
     .optional()
-    .describe('Filter by import source')
+    .describe('Filter by import source'),
+  
+  createdAfter: z.string()
+    .datetime()
+    .optional()
+    .describe('Filter goals created after this date'),
+  
+  createdBefore: z.string()
+    .datetime()
+    .optional()
+    .describe('Filter goals created before this date'),
+  
+  updatedAfter: z.string()
+    .datetime()
+    .optional()
+    .describe('Filter goals updated after this date'),
+  
+  updatedBefore: z.string()
+    .datetime()
+    .optional()
+    .describe('Filter goals updated before this date')
 });
 
 // Type definitions for TypeScript-like usage
