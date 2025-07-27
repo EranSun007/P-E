@@ -15,21 +15,21 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 1.5 Implement data migration system for goals schema versioning
   - [x] 1.6 Verify all service layer tests pass
 
-- [ ] 2. Build Goals Import and Data Management System
-  - [ ] 2.1 Write tests for import utilities and CSV parsing
-  - [ ] 2.2 Create CSV/JSON import parsing utilities with field mapping
-  - [ ] 2.3 Build import interface with field mapping and validation
-  - [ ] 2.4 Implement batch goal creation and duplicate detection
-  - [ ] 2.5 Add error handling and user feedback for import process
-  - [ ] 2.6 Verify all import functionality tests pass
+- [x] 2. Build Goals Import and Data Management System
+  - [x] 2.1 Write tests for import utilities and CSV parsing
+  - [x] 2.2 Create CSV/JSON import parsing utilities with field mapping
+  - [x] 2.3 Build import interface with field mapping and validation
+  - [x] 2.4 Implement batch goal creation and duplicate detection
+  - [x] 2.5 Add error handling and user feedback for import process
+  - [x] 2.6 Verify all import functionality tests pass
 
-- [ ] 3. Create Goals Management User Interface
-  - [ ] 3.1 Write tests for goals management components
-  - [ ] 3.2 Build goals list component with filtering and search
-  - [ ] 3.3 Create goal form component for creation and editing
-  - [ ] 3.4 Implement goal status management and transitions
-  - [ ] 3.5 Add goal deletion with proper confirmation dialogs
-  - [ ] 3.6 Verify all UI component tests pass
+- [x] 3. Create Goals Management User Interface
+  - [x] 3.1 Write tests for goals management components
+  - [x] 3.2 Build goals list component with filtering and search
+  - [x] 3.3 Create goal form component for creation and editing
+  - [x] 3.4 Implement goal status management and transitions
+  - [x] 3.5 Add goal deletion with proper confirmation dialogs
+  - [x] 3.6 Verify all UI component tests pass
 
 - [ ] 4. Integrate Goals with Team Member Profiles
   - [ ] 4.1 Write tests for team member goals integration
