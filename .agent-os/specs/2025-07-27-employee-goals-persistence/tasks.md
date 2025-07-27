@@ -7,13 +7,13 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
 
 ## Tasks
 
-- [ ] 1. Create Employee Goals Data Model and Service Layer
-  - [ ] 1.1 Write tests for EmployeeGoalsService class methods
-  - [ ] 1.2 Create EmployeeGoal entity with validation schema using Zod
-  - [ ] 1.3 Implement EmployeeGoalsService with CRUD operations
-  - [ ] 1.4 Add goals storage integration to existing local storage service
-  - [ ] 1.5 Implement data migration system for goals schema versioning
-  - [ ] 1.6 Verify all service layer tests pass
+- [x] 1. Create Employee Goals Data Model and Service Layer
+  - [x] 1.1 Write tests for EmployeeGoalsService class methods
+  - [x] 1.2 Create EmployeeGoal entity with validation schema using Zod
+  - [x] 1.3 Implement EmployeeGoalsService with CRUD operations
+  - [x] 1.4 Add goals storage integration to existing local storage service
+  - [x] 1.5 Implement data migration system for goals schema versioning
+  - [x] 1.6 Verify all service layer tests pass
 
 - [ ] 2. Build Goals Import and Data Management System
   - [ ] 2.1 Write tests for import utilities and CSV parsing
