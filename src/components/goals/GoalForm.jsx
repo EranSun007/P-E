@@ -44,14 +44,16 @@ const GoalForm = ({
   onSubmit, 
   onCancel,
   isLoading = false,
-  isSubmitting = false 
+  isSubmitting = false,
+  prefilledEmployeeId = null,
+  hideEmployeeSelection = false
 }) => {
   const [generalError, setGeneralError] = useState('');
 
   const form = useForm({
     resolver: zodResolver(goalFormSchema),
     defaultValues: {
-      employeeId: initialData?.employeeId || '',
+      employeeId: initialData?.employeeId || prefilledEmployeeId || '',
       title: initialData?.title || '',
       developmentNeed: initialData?.developmentNeed || '',
       developmentActivity: initialData?.developmentActivity || '',
@@ -67,15 +69,25 @@ const GoalForm = ({
   useEffect(() => {
     if (initialData) {
       reset({
-        employeeId: initialData.employeeId || '',
+        employeeId: initialData.employeeId || prefilledEmployeeId || '',
         title: initialData.title || '',
         developmentNeed: initialData.developmentNeed || '',
         developmentActivity: initialData.developmentActivity || '',
         developmentGoalDescription: initialData.developmentGoalDescription || '',
         status: initialData.status || 'active'
       });
+    } else if (prefilledEmployeeId) {
+      // Set prefilled employee ID when no initial data
+      reset({
+        employeeId: prefilledEmployeeId,
+        title: '',
+        developmentNeed: '',
+        developmentActivity: '',
+        developmentGoalDescription: '',
+        status: 'active'
+      });
     }
-  }, [initialData, reset]);
+  }, [initialData, prefilledEmployeeId, reset]);
 
   /**
    * Get employee name by ID
@@ -137,50 +149,64 @@ const GoalForm = ({
               </Alert>
             )}
 
-            {/* Employee Selection */}
-            <FormField
-              control={form.control}
-              name="employeeId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center space-x-2">
-                    <User className="h-4 w-4" />
-                    <span>Employee</span>
-                  </FormLabel>
-                  <Select 
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      handleFieldChange('employeeId');
-                    }} 
-                    value={field.value}
-                    disabled={isFormLoading}
-                  >
-                    <FormControl>
-                      <SelectTrigger 
-                        className={cn(errors.employeeId && "border-destructive")}
-                        aria-invalid={!!errors.employeeId}
-                      >
-                        <SelectValue placeholder="Select an employee" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {teamMembers.length === 0 ? (
-                        <SelectItem value="" disabled>
-                          No team members available
-                        </SelectItem>
-                      ) : (
-                        teamMembers.map((member) => (
-                          <SelectItem key={member.id} value={member.id}>
-                            {member.name}
+            {/* Employee Selection - Conditional Display */}
+            {!hideEmployeeSelection ? (
+              <FormField
+                control={form.control}
+                name="employeeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center space-x-2">
+                      <User className="h-4 w-4" />
+                      <span>Employee</span>
+                    </FormLabel>
+                    <Select 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        handleFieldChange('employeeId');
+                      }} 
+                      value={field.value}
+                      disabled={isFormLoading}
+                    >
+                      <FormControl>
+                        <SelectTrigger 
+                          className={cn(errors.employeeId && "border-destructive")}
+                          aria-invalid={!!errors.employeeId}
+                        >
+                          <SelectValue placeholder="Select an employee" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {teamMembers.length === 0 ? (
+                          <SelectItem value="" disabled>
+                            No team members available
                           </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                        ) : (
+                          teamMembers.map((member) => (
+                            <SelectItem key={member.id} value={member.id}>
+                              {member.name}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : (
+              <div className="space-y-2">
+                <Label className="flex items-center space-x-2">
+                  <User className="h-4 w-4" />
+                  <span>Employee</span>
+                </Label>
+                <div className="p-3 bg-muted rounded-md border">
+                  <span className="text-sm font-medium">
+                    {getEmployeeName(form.watch('employeeId'))}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Goal Title */}
             <FormField

@@ -31,13 +31,13 @@ These are the tasks to be completed for the spec detailed in @.agent-os/specs/20
   - [x] 3.5 Add goal deletion with proper confirmation dialogs
   - [x] 3.6 Verify all UI component tests pass
 
-- [ ] 4. Integrate Goals with Team Member Profiles
-  - [ ] 4.1 Write tests for team member goals integration
-  - [ ] 4.2 Extend team member profile to display goals section
-  - [ ] 4.3 Add goals count indicators to team member lists
-  - [ ] 4.4 Create navigation between goals and other member data
-  - [ ] 4.5 Handle team members with no goals gracefully
-  - [ ] 4.6 Verify all integration tests pass
+- [x] 4. Integrate Goals with Team Member Profiles
+  - [x] 4.1 Write tests for team member goals integration
+  - [x] 4.2 Extend team member profile to display goals section
+  - [x] 4.3 Add goals count indicators to team member lists
+  - [x] 4.4 Create navigation between goals and other member data
+  - [x] 4.5 Handle team members with no goals gracefully
+  - [x] 4.6 Verify all integration tests pass
 
 - [ ] 5. Implement Goals Search and Filtering
   - [ ] 5.1 Write tests for search and filtering functionality

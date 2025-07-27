@@ -5,6 +5,7 @@ import { TeamMember, OneOnOne, Task, Project, Stakeholder, OutOfOffice, Duty } f
 import { AgendaService } from "@/utils/agendaService";
 import { CalendarService } from "@/utils/calendarService";
 import { CalendarEventGenerationService } from "@/services/calendarEventGenerationService";
+import EmployeeGoalsService from "@/services/employeeGoalsService";
 import AgendaItemCard from "@/components/agenda/AgendaItemCard";
 import AgendaItemList from "@/components/agenda/AgendaItemList";
 import AgendaSection from "@/components/agenda/AgendaSection";
@@ -14,6 +15,8 @@ import OutOfOfficeCounter from "@/components/team/OutOfOfficeCounter";
 import OutOfOfficeManager from "@/components/team/OutOfOfficeManager";
 import DutyForm from "@/components/duty/DutyForm";
 import DutyCard from "@/components/duty/DutyCard";
+import GoalsList from "@/components/goals/GoalsList";
+import GoalForm from "@/components/goals/GoalForm";
 import { createPageUrl } from "@/utils";
 import {
   Card,
@@ -70,11 +73,13 @@ import {
   Shield,
   History,
   AlertTriangle,
+  Target,
 } from "lucide-react";
 
 export default function TeamMemberProfile() {
   const [searchParams] = useSearchParams();
   const memberId = searchParams.get("id");
+  const defaultTab = searchParams.get("tab") || "meetings";
 
   const [member, setMember] = useState(null);
   const [oneOnOnes, setOneOnOnes] = useState([]);
@@ -85,13 +90,17 @@ export default function TeamMemberProfile() {
   const [allStakeholders, setAllStakeholders] = useState([]);
   const [outOfOfficeStats, setOutOfOfficeStats] = useState(null);
   const [duties, setDuties] = useState([]);
+  const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [goalsLoading, setGoalsLoading] = useState(false);
   const [showNewMeetingDialog, setShowNewMeetingDialog] = useState(false);
   const [showActionItemDialog, setShowActionItemDialog] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
   const [showDutyForm, setShowDutyForm] = useState(false);
   const [editingDuty, setEditingDuty] = useState(null);
   const [dutyConflicts, setDutyConflicts] = useState([]);
+  const [showGoalForm, setShowGoalForm] = useState(false);
+  const [editingGoal, setEditingGoal] = useState(null);
   const [noteForm, setNoteForm] = useState({
     text: "",
     referenced_entity: { type: "team_member", id: "" },
@@ -171,6 +180,15 @@ export default function TeamMemberProfile() {
       // Load duties for this team member
       const memberDuties = await Duty.getByTeamMember(memberId);
       setDuties(memberDuties);
+
+      // Load goals for this team member
+      try {
+        const memberGoals = await EmployeeGoalsService.getGoalsByEmployee(memberId);
+        setGoals(memberGoals);
+      } catch (goalsError) {
+        console.error("Error loading goals:", goalsError);
+        setGoals([]); // Continue without goals data
+      }
 
       // Load next meeting information
       await loadNextMeetingInfo(memberOneOnOnes);
@@ -502,6 +520,63 @@ export default function TeamMemberProfile() {
     }
   }, [duties]);
 
+  // Goal management functions
+  const handleCreateGoal = () => {
+    setEditingGoal(null);
+    setShowGoalForm(true);
+  };
+
+  const handleEditGoal = (goal) => {
+    setEditingGoal(goal);
+    setShowGoalForm(true);
+  };
+
+  const handleSaveGoal = async (goalData) => {
+    try {
+      setGoalsLoading(true);
+      
+      // Ensure the goal is assigned to the current team member
+      const goalWithEmployee = {
+        ...goalData,
+        employeeId: memberId
+      };
+
+      if (editingGoal) {
+        const updatedGoal = await EmployeeGoalsService.updateGoal(editingGoal.id, goalWithEmployee);
+        setGoals(prev => prev.map(goal => goal.id === editingGoal.id ? updatedGoal : goal));
+      } else {
+        const newGoal = await EmployeeGoalsService.createGoal(goalWithEmployee);
+        setGoals(prev => [newGoal, ...prev]);
+      }
+      
+      setShowGoalForm(false);
+      setEditingGoal(null);
+    } catch (error) {
+      console.error("Error saving goal:", error);
+      throw error; // Re-throw to let form handle it
+    } finally {
+      setGoalsLoading(false);
+    }
+  };
+
+  const handleDeleteGoal = async (goalId) => {
+    try {
+      setGoalsLoading(true);
+      await EmployeeGoalsService.deleteGoal(goalId);
+      setGoals(prev => prev.filter(goal => goal.id !== goalId));
+    } catch (error) {
+      console.error("Error deleting goal:", error);
+    } finally {
+      setGoalsLoading(false);
+    }
+  };
+
+  const handleGoalStatusChange = (updatedGoal) => {
+    setGoals(prev => prev.map(goal => 
+      goal.id === updatedGoal.id ? updatedGoal : goal
+    ));
+  };
+
   if (loading) {
     return <div className="p-6">Loading...</div>;
   }
@@ -560,8 +635,8 @@ export default function TeamMemberProfile() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content with Tabs */}
           <div className="lg:col-span-2 space-y-6">
-            <Tabs defaultValue="meetings" className="w-full">
-              <TabsList className="grid grid-cols-3 mb-4">
+            <Tabs defaultValue={defaultTab} className="w-full">
+              <TabsList className="grid grid-cols-4 mb-4">
                 <TabsTrigger value="meetings">
                   <MessageSquare className="h-4 w-4 mr-2" />
                   1:1 Meetings
@@ -569,6 +644,10 @@ export default function TeamMemberProfile() {
                 <TabsTrigger value="agenda">
                   <Clock className="h-4 w-4 mr-2" />
                   1:1 Agenda
+                </TabsTrigger>
+                <TabsTrigger value="goals">
+                  <Target className="h-4 w-4 mr-2" />
+                  Goals
                 </TabsTrigger>
                 <TabsTrigger value="personal-file">
                   <FileText className="h-4 w-4 mr-2" />
@@ -919,6 +998,121 @@ export default function TeamMemberProfile() {
                   teamMemberId={memberId} 
                   teamMemberName={member?.name} 
                 />
+              </TabsContent>
+              
+              {/* Goals Tab */}
+              <TabsContent value="goals" className="mt-0">
+                <Card>
+                  <CardHeader>
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="flex items-center gap-2">
+                        <Target className="h-5 w-5" />
+                        Development Goals
+                      </CardTitle>
+                      <Button onClick={handleCreateGoal} disabled={goalsLoading}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Goal
+                      </Button>
+                    </div>
+                    <CardDescription>
+                      Track and manage {member?.name}'s development goals and growth objectives
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {goalsLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full"></div>
+                        <span className="ml-2 text-muted-foreground">Loading goals...</span>
+                      </div>
+                    ) : goals.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Target className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No goals found</h3>
+                        <p className="text-gray-500 mb-4">
+                          Get started by creating your first goal for this team member.
+                        </p>
+                        <Button onClick={handleCreateGoal}>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Create First Goal
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {goals
+                          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                          .map((goal) => (
+                          <Card key={goal.id} className="border-l-4 border-l-blue-500">
+                            <CardHeader className="pb-3">
+                              <div className="flex items-start justify-between">
+                                <div className="space-y-1">
+                                  <CardTitle className="text-lg leading-tight">
+                                    {goal.title}
+                                  </CardTitle>
+                                  <div className="flex items-center space-x-2">
+                                    <Badge variant={
+                                      goal.status === 'active' ? 'default' :
+                                      goal.status === 'completed' ? 'secondary' :
+                                      'outline'
+                                    }>
+                                      {goal.status}
+                                    </Badge>
+                                    <span className="text-sm text-muted-foreground">
+                                      Created {format(new Date(goal.createdAt), 'MMM dd, yyyy')}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => handleEditGoal(goal)}
+                                    disabled={goalsLoading}
+                                  >
+                                    Edit
+                                  </Button>
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => handleDeleteGoal(goal.id)}
+                                    className="text-destructive hover:text-destructive"
+                                    disabled={goalsLoading}
+                                  >
+                                    Delete
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-3">
+                                {/* Development Need */}
+                                <div>
+                                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Development Need</h4>
+                                  <p className="text-sm">
+                                    {goal.developmentNeed || 'No development need specified'}
+                                  </p>
+                                </div>
+
+                                {/* Development Activity */}
+                                {goal.developmentActivity && (
+                                  <div>
+                                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Development Activity</h4>
+                                    <p className="text-sm">{goal.developmentActivity}</p>
+                                  </div>
+                                )}
+
+                                {/* Goal Description */}
+                                <div>
+                                  <h4 className="text-sm font-medium text-muted-foreground mb-1">Goal Description</h4>
+                                  <p className="text-sm">{goal.developmentGoalDescription}</p>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
               
               {/* Personal File Tab */}
@@ -1377,6 +1571,27 @@ export default function TeamMemberProfile() {
                   </div>
 
                   <div>
+                    <Label>Development Goals</Label>
+                    <div className="flex items-center gap-2">
+                      <p className="text-gray-600">{goals.length} total</p>
+                      {goals.length > 0 && (
+                        <div className="flex gap-1">
+                          {goals.filter(g => g.status === 'active').length > 0 && (
+                            <Badge variant="default" className="text-xs">
+                              {goals.filter(g => g.status === 'active').length} active
+                            </Badge>
+                          )}
+                          {goals.filter(g => g.status === 'completed').length > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              {goals.filter(g => g.status === 'completed').length} completed
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
                     <Label>Total 1:1s</Label>
                     <div className="flex items-center gap-2">
                       <p className="text-gray-600">{oneOnOnes.length}</p>
@@ -1816,6 +2031,30 @@ export default function TeamMemberProfile() {
               Reschedule Meeting
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Goal Form Dialog */}
+      <Dialog open={showGoalForm} onOpenChange={setShowGoalForm}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingGoal ? 'Edit Goal' : 'Create New Goal'}
+            </DialogTitle>
+          </DialogHeader>
+          <GoalForm
+            teamMembers={allTeamMembers}
+            initialData={editingGoal}
+            onSubmit={handleSaveGoal}
+            onCancel={() => {
+              setShowGoalForm(false);
+              setEditingGoal(null);
+            }}
+            isSubmitting={goalsLoading}
+            // Pre-fill the employee for this team member
+            prefilledEmployeeId={memberId}
+            hideEmployeeSelection={true}
+          />
         </DialogContent>
       </Dialog>
 

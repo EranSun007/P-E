@@ -2,7 +2,9 @@ import React, { useState, useEffect, lazy, Suspense } from "react";
 import { Task } from "@/api/entities";
 import { TeamMember } from "@/api/entities";
 import { AgendaService } from "@/utils/agendaService";
+import EmployeeGoalsService from "@/services/employeeGoalsService";
 import { AgendaBadge } from "@/components/agenda/AgendaBadge";
+import GoalsBadge from "@/components/team/GoalsBadge";
 import { ComponentLoadingSkeleton } from "@/components/ui/loading-skeletons";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -31,6 +33,7 @@ export default function TeamPage() {
   const [tasks, setTasks] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [agendaSummary, setAgendaSummary] = useState({});
+  const [goalsStats, setGoalsStats] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
@@ -76,7 +79,42 @@ export default function TeamPage() {
       }
       setAgendaSummary(agendaData);
       
-      // Attach task data and agenda data to team member records
+      // Load goals statistics for all team members
+      let goalsData = {};
+      try {
+        const allGoals = await EmployeeGoalsService.getAllGoals();
+        
+        // Group goals by employee and calculate stats
+        goalsData = allGoals.reduce((acc, goal) => {
+          if (!acc[goal.employeeId]) {
+            acc[goal.employeeId] = {
+              total: 0,
+              active: 0,
+              completed: 0,
+              paused: 0
+            };
+          }
+          
+          acc[goal.employeeId].total++;
+          
+          if (goal.status === 'active') {
+            acc[goal.employeeId].active++;
+          } else if (goal.status === 'completed') {
+            acc[goal.employeeId].completed++;
+          } else if (goal.status === 'paused') {
+            acc[goal.employeeId].paused++;
+          }
+          
+          return acc;
+        }, {});
+        
+      } catch (goalsError) {
+        console.error("Failed to load goals data:", goalsError);
+        // Continue without goals data rather than failing completely
+      }
+      setGoalsStats(goalsData);
+      
+      // Attach task data, agenda data, and goals stats to team member records
       const enhancedMembers = (memberData || []).map(member => {
         const relatedTasks = (taskData || []).filter(task => 
           (task.metadata?.meeting?.participants || []).includes(member.name)
@@ -98,12 +136,21 @@ export default function TeamPage() {
           hasUnresolved: false
         };
         
+        // Add goals information to member data
+        const memberGoals = goalsData[member.id] || {
+          total: 0,
+          active: 0,
+          completed: 0,
+          paused: 0
+        };
+        
         return {
           ...member,
           tasks: relatedTasks,
           taskCount: relatedTasks.length,
           lastActivity: lastActivity ? lastActivity.toISOString() : null,
-          agenda: memberAgenda
+          agenda: memberAgenda,
+          goals: memberGoals
         };
       });
       
@@ -323,6 +370,10 @@ export default function TeamPage() {
     navigate(createPageUrl("TeamMemberProfile") + `?id=${memberId}`);
   };
 
+  const goToMemberGoals = (memberId) => {
+    navigate(createPageUrl("TeamMemberProfile") + `?id=${memberId}&tab=goals`);
+  };
+
   return (
     <div className="p-6">
       <div className="max-w-7xl mx-auto">
@@ -443,6 +494,16 @@ export default function TeamPage() {
                           hasUnresolved={member.agenda.hasUnresolved}
                           onClick={() => goToMemberProfile(member.id)}
                           memberName={member.name}
+                          size="sm"
+                        />
+                      )}
+                      {member.goals && member.goals.total > 0 && (
+                        <GoalsBadge
+                          totalGoals={member.goals.total}
+                          activeGoals={member.goals.active}
+                          completedGoals={member.goals.completed}
+                          pausedGoals={member.goals.paused}
+                          onClick={() => goToMemberGoals(member.id)}
                           size="sm"
                         />
                       )}
