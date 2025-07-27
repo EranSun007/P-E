@@ -1334,6 +1334,94 @@ export const localClient = {
         
         return userItems;
       }
+    },
+    EmployeeGoal: {
+      async list() {
+        return getData('employee_goals');
+      },
+      async get(id) {
+        const goals = getData('employee_goals');
+        return goals.find(g => g.id === id) || null;
+      },
+      async create(goal) {
+        const goals = getData('employee_goals');
+        
+        // Validate required fields
+        if (!goal.employeeId) {
+          throw new Error('employeeId is required');
+        }
+        if (!goal.title) {
+          throw new Error('title is required');
+        }
+        if (!goal.developmentNeed) {
+          throw new Error('developmentNeed is required');
+        }
+        if (!goal.developmentActivity) {
+          throw new Error('developmentActivity is required');
+        }
+        if (!goal.developmentGoalDescription) {
+          throw new Error('developmentGoalDescription is required');
+        }
+
+        const newGoal = {
+          ...goal,
+          id: generateId(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          // Initialize with defaults
+          status: goal.status || 'active',
+          importSource: goal.importSource || null
+        };
+
+        goals.unshift(newGoal);
+        setData('employee_goals', goals);
+        return newGoal;
+      },
+      async update(id, updates) {
+        const goals = getData('employee_goals');
+        const idx = goals.findIndex(g => g.id === id);
+        if (idx !== -1) {
+          const updatedGoal = {
+            ...goals[idx],
+            ...updates,
+            updatedAt: new Date().toISOString()
+          };
+          goals[idx] = updatedGoal;
+          setData('employee_goals', goals);
+          return updatedGoal;
+        }
+        throw new Error('Employee goal not found');
+      },
+      async delete(id) {
+        let goals = getData('employee_goals');
+        const goalExists = goals.some(g => g.id === id);
+        if (!goalExists) {
+          throw new Error('Employee goal not found');
+        }
+        goals = goals.filter(g => g.id !== id);
+        setData('employee_goals', goals);
+        return true;
+      },
+      async getByTeamMember(teamMemberId) {
+        const goals = getData('employee_goals');
+        return goals.filter(g => g.employeeId === teamMemberId);
+      },
+      async getByStatus(status) {
+        const goals = getData('employee_goals');
+        return goals.filter(g => g.status === status);
+      },
+      async search(searchText) {
+        if (!searchText) return [];
+        const goals = getData('employee_goals');
+        const searchLower = searchText.toLowerCase();
+        return goals.filter(goal => {
+          const titleMatch = goal.title?.toLowerCase().includes(searchLower);
+          const descriptionMatch = goal.developmentGoalDescription?.toLowerCase().includes(searchLower);
+          const needMatch = goal.developmentNeed?.toLowerCase().includes(searchLower);
+          const activityMatch = goal.developmentActivity?.toLowerCase().includes(searchLower);
+          return titleMatch || descriptionMatch || needMatch || activityMatch;
+        });
+      }
     }
   },
   auth: {

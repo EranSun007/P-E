@@ -19,6 +19,7 @@ export const Peer = localClient.entities.Peer;
 export const Duty = localClient.entities.Duty;
 export const AgendaItem = localClient.entities.AgendaItem;
 export const PersonalFileItem = localClient.entities.PersonalFileItem;
+export const EmployeeGoal = localClient.entities.EmployeeGoal;
 
 // User entity that works with new authentication system
 export const User = {

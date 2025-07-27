@@ -2,7 +2,7 @@
 // Handles migration from old schema to new schema with additional fields
 
 export class DataMigration {
-  static MIGRATION_VERSION = '1.0.0';
+  static MIGRATION_VERSION = '1.1.0';
   static MIGRATION_KEY = 'pe_manager_migration_version';
 
   static async runMigrations() {
@@ -17,6 +17,7 @@ export class DataMigration {
       await this.migrateTeamMembersSchema();
       await this.migrateOneOnOnesSchema();
       await this.migrateTaskAttributesSchema();
+      await this.migrateEmployeeGoalsSchema();
       
       localStorage.setItem(this.MIGRATION_KEY, this.MIGRATION_VERSION);
       console.log('Data migration completed successfully');
@@ -134,6 +135,37 @@ export class DataMigration {
 
     this.setData('task_attributes', migratedAttributes);
     console.log(`Migrated ${migratedAttributes.length} task attributes`);
+  }
+
+  static async migrateEmployeeGoalsSchema() {
+    const employeeGoals = this.getData('employee_goals');
+    if (!employeeGoals.length) return;
+
+    const migratedGoals = employeeGoals.map(goal => ({
+      ...goal,
+      // Ensure all required fields have proper defaults
+      id: goal.id || this.generateId(),
+      employeeId: goal.employeeId || goal.team_member_id || null,
+      title: goal.title || 'Untitled Goal',
+      developmentNeed: goal.developmentNeed || goal.development_need || '',
+      developmentActivity: goal.developmentActivity || goal.development_activity || '',
+      developmentGoalDescription: goal.developmentGoalDescription || goal.development_goal_description || goal.description || '',
+      status: goal.status || 'active',
+      createdAt: goal.createdAt || goal.created_date || new Date().toISOString(),
+      updatedAt: goal.updatedAt || goal.updated_date || new Date().toISOString(),
+      importSource: goal.importSource || goal.import_source || null
+    }));
+
+    this.setData('employee_goals', migratedGoals);
+    console.log(`Migrated ${migratedGoals.length} employee goals`);
+  }
+
+  // Helper method to generate ID for migration
+  static generateId() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return '_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
   }
 
   // Helper methods
