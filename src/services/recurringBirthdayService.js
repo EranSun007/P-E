@@ -77,15 +77,46 @@ export class RecurringBirthdayService {
             () => CalendarEvent.getBirthdayEvents(),
             {
               maxRetries: 2,
+              baseDelay: 500,
               operationName: `load birthday events for ${teamMember.name}`,
-              shouldRetry: (error) => !(error instanceof ValidationError)
+              shouldRetry: (error, attempt) => {
+                // Don't retry validation errors
+                if (error instanceof ValidationError) {
+                  return false;
+                }
+                // Don't retry if it's a persistent data error
+                if (error instanceof DataError && attempt > 1) {
+                  return false;
+                }
+                // Retry network and temporary errors
+                return error instanceof NetworkError || 
+                       error.message?.includes('network') ||
+                       error.message?.includes('timeout');
+              }
             }
           );
           
-          const existingBirthdayEvent = existingEvents.find(event => 
-            event.team_member_id === teamMember.id && 
-            new Date(event.start_date).getFullYear() === year
-          );
+          // Defensive check: ensure existingEvents is an array
+          const eventsArray = Array.isArray(existingEvents) ? existingEvents : [];
+          
+          const existingBirthdayEvent = eventsArray.find(event => {
+            // Defensive checks for event object
+            if (!event || typeof event !== 'object') {
+              return false;
+            }
+            
+            if (event.team_member_id !== teamMember.id) {
+              return false;
+            }
+            
+            try {
+              const eventYear = new Date(event.start_date).getFullYear();
+              return eventYear === year;
+            } catch (error) {
+              console.warn('Error parsing event date:', event.start_date, error);
+              return false;
+            }
+          });
 
           if (existingBirthdayEvent) {
             console.log(`Birthday event already exists for ${teamMember.name} in ${year}`);
@@ -114,8 +145,27 @@ export class RecurringBirthdayService {
             }),
             {
               maxRetries: 2,
+              baseDelay: 1000,
+              backoffMultiplier: 1.5,
               operationName: `create birthday event for ${teamMember.name} in ${year}`,
-              shouldRetry: (error) => !(error instanceof ValidationError)
+              shouldRetry: (error, attempt) => {
+                // Don't retry validation errors
+                if (error instanceof ValidationError) {
+                  return false;
+                }
+                // Don't retry duplicate errors
+                if (error.message?.includes('duplicate') || error.message?.includes('already exists')) {
+                  return false;
+                }
+                // Retry network and temporary errors
+                return error instanceof NetworkError || 
+                       error.message?.includes('network') ||
+                       error.message?.includes('timeout') ||
+                       error.message?.includes('server error');
+              },
+              onRetry: (error, attempt, delay) => {
+                console.warn(`Retrying birthday event creation for ${teamMember.name} in ${year}, attempt ${attempt}, delay ${delay}ms`);
+              }
             }
           );
 
@@ -137,8 +187,8 @@ export class RecurringBirthdayService {
     }, {
       operationName,
       showLoading: false, // Individual operations don't need loading indicators
-      showSuccess: createdEvents?.length > 0,
-      successMessage: `Created ${createdEvents?.length || 0} birthday events for ${teamMember?.name}`,
+      showSuccess: false, // Will be handled by the calling function
+      successMessage: null, // Will be handled by the calling function
       retryOptions: {
         maxRetries: 0 // Don't retry the entire operation, individual steps have their own retry logic
       },
@@ -177,7 +227,18 @@ export class RecurringBirthdayService {
         () => TeamMember.get(teamMemberId),
         {
           operationName: `load team member ${teamMemberId}`,
-          maxRetries: 2
+          maxRetries: 2,
+          baseDelay: 500,
+          shouldRetry: (error, attempt) => {
+            // Don't retry not found errors
+            if (error instanceof DataError && error.entityType === 'TeamMember') {
+              return false;
+            }
+            // Retry network errors
+            return error instanceof NetworkError || 
+                   error.message?.includes('network') ||
+                   error.message?.includes('timeout');
+          }
         }
       );
       
@@ -190,18 +251,47 @@ export class RecurringBirthdayService {
         () => CalendarEvent.getBirthdayEvents(),
         {
           operationName: 'load birthday events',
-          maxRetries: 2
+          maxRetries: 2,
+          baseDelay: 500,
+          shouldRetry: (error, attempt) => {
+            // Don't retry validation errors
+            if (error instanceof ValidationError) {
+              return false;
+            }
+            // Retry network and temporary errors
+            return error instanceof NetworkError || 
+                   error.message?.includes('network') ||
+                   error.message?.includes('timeout');
+          }
         }
       );
       
-      const memberBirthdayEvents = allBirthdayEvents.filter(event => 
-        event.team_member_id === teamMemberId
-      );
+      // Defensive check: ensure allBirthdayEvents is an array
+      const eventsArray = Array.isArray(allBirthdayEvents) ? allBirthdayEvents : [];
+      
+      const memberBirthdayEvents = eventsArray.filter(event => {
+        // Defensive checks for event object
+        if (!event || typeof event !== 'object') {
+          return false;
+        }
+        return event.team_member_id === teamMemberId;
+      });
 
       const currentYear = new Date().getFullYear();
-      const futureEvents = memberBirthdayEvents.filter(event => 
-        new Date(event.start_date).getFullYear() >= currentYear
-      );
+      const futureEvents = memberBirthdayEvents.filter(event => {
+        // Defensive checks for event date
+        if (!event || !event.start_date) {
+          return false;
+        }
+        
+        try {
+          const eventYear = new Date(event.start_date).getFullYear();
+          return !isNaN(eventYear) && eventYear >= currentYear;
+        } catch (error) {
+          console.warn('Error parsing event date:', event.start_date, error);
+          return false;
+        }
+      });
 
       // Delete all future birthday events for this team member
       const deletionResults = [];
@@ -212,7 +302,21 @@ export class RecurringBirthdayService {
             {
               operationName: `delete birthday event ${event.id}`,
               maxRetries: 2,
-              shouldRetry: (error) => !(error instanceof ValidationError)
+              baseDelay: 500,
+              shouldRetry: (error, attempt) => {
+                // Don't retry validation errors
+                if (error instanceof ValidationError) {
+                  return false;
+                }
+                // Don't retry not found errors (already deleted)
+                if (error instanceof DataError && error.code === 'NOT_FOUND') {
+                  return false;
+                }
+                // Retry network and temporary errors
+                return error instanceof NetworkError || 
+                       error.message?.includes('network') ||
+                       error.message?.includes('timeout');
+              }
             }
           );
           
@@ -300,7 +404,21 @@ export class RecurringBirthdayService {
             {
               operationName: `delete birthday event ${event.id}`,
               maxRetries: 2,
-              shouldRetry: (error) => !(error instanceof ValidationError)
+              baseDelay: 500,
+              shouldRetry: (error, attempt) => {
+                // Don't retry validation errors
+                if (error instanceof ValidationError) {
+                  return false;
+                }
+                // Don't retry not found errors (already deleted)
+                if (error instanceof DataError && error.code === 'NOT_FOUND') {
+                  return false;
+                }
+                // Retry network and temporary errors
+                return error instanceof NetworkError || 
+                       error.message?.includes('network') ||
+                       error.message?.includes('timeout');
+              }
             }
           );
           
@@ -369,7 +487,18 @@ export class RecurringBirthdayService {
           () => TeamMember.list(),
           {
             operationName: 'load team members for birthday sync',
-            maxRetries: 2
+            maxRetries: 2,
+            baseDelay: 500,
+            shouldRetry: (error, attempt) => {
+              // Don't retry validation errors
+              if (error instanceof ValidationError) {
+                return false;
+              }
+              // Retry network and temporary errors
+              return error instanceof NetworkError || 
+                     error.message?.includes('network') ||
+                     error.message?.includes('timeout');
+            }
           }
         );
       }
@@ -389,21 +518,43 @@ export class RecurringBirthdayService {
         summary: {}
       };
 
-      // Filter team members who have birthdays
-      const membersWithBirthdays = teamMembers.filter(member => member.birthday);
+      // Defensive check: ensure teamMembers is an array
+      const membersArray = Array.isArray(teamMembers) ? teamMembers : [];
+      
+      // Filter team members who have birthdays with defensive checks
+      const membersWithBirthdays = membersArray.filter(member => {
+        // Defensive checks for member object
+        if (!member || typeof member !== 'object') {
+          return false;
+        }
+        return member.birthday && typeof member.birthday === 'string';
+      });
+      
       results.processedMembers = membersWithBirthdays.length;
-      results.skippedMembers = teamMembers.length - membersWithBirthdays.length;
+      results.skippedMembers = membersArray.length - membersWithBirthdays.length;
 
       // Process each team member with individual error handling
       for (const teamMember of membersWithBirthdays) {
         try {
-          for (const year of targetYears) {
+          // Defensive check: ensure targetYears is an array
+          const yearsArray = Array.isArray(targetYears) ? targetYears : [];
+          
+          for (const year of yearsArray) {
+            // Defensive check: ensure year is a valid number
+            if (typeof year !== 'number' || isNaN(year)) {
+              console.warn('Invalid year in targetYears:', year);
+              continue;
+            }
+            
             const createdEvents = await this.generateBirthdayEventsForYears(
               teamMember, 
               year, 
               year
             );
-            results.createdEvents += createdEvents.length;
+            
+            // Defensive check: ensure createdEvents is an array
+            const eventsArray = Array.isArray(createdEvents) ? createdEvents : [];
+            results.createdEvents += eventsArray.length;
           }
         } catch (error) {
           const errorResult = ErrorHandlingService.handleError(error, {

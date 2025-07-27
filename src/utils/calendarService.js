@@ -49,38 +49,64 @@ export class OperationError extends CalendarServiceError {
  */
 export class CalendarService {
   /**
-   * Retry mechanism for calendar operations
+   * Enhanced retry mechanism for calendar operations with exponential backoff
    * @param {Function} operation - The operation to retry
-   * @param {number} maxRetries - Maximum number of retry attempts
-   * @param {string} operationName - Name of the operation for logging
-   * @param {number} delayMs - Delay between retries in milliseconds
+   * @param {Object} options - Retry configuration options
    * @returns {Promise<any>} Result of the operation
    */
-  static async _retryOperation(operation, maxRetries = 3, operationName = 'operation', delayMs = 1000) {
+  static async _retryOperation(operation, options = {}) {
+    const {
+      maxRetries = 3,
+      baseDelay = 1000,
+      maxDelay = 10000,
+      backoffMultiplier = 2,
+      operationName = 'operation',
+      shouldRetry = null,
+      onRetry = null
+    } = options;
+
     let lastError;
+    let delay = baseDelay;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const result = await operation();
         if (attempt > 1) {
-          console.log(`${operationName} succeeded on attempt ${attempt}`);
+          console.log(`${operationName} succeeded on attempt ${attempt}/${maxRetries}`);
         }
         return result;
       } catch (error) {
         lastError = error;
         
-        // Don't retry validation errors or not found errors
-        if (error instanceof ValidationError || error instanceof NotFoundError) {
+        // Determine if error is retryable
+        const isRetryable = shouldRetry ? 
+          shouldRetry(error, attempt) : 
+          this._isRetryableError(error);
+        
+        // Don't retry non-retryable errors
+        if (!isRetryable) {
+          console.log(`${operationName} failed with non-retryable error: ${error.message}`);
           throw error;
         }
         
-        if (attempt < maxRetries) {
-          console.warn(`${operationName} failed on attempt ${attempt}/${maxRetries}: ${error.message}. Retrying in ${delayMs}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delayMs));
-          delayMs *= 1.5; // Exponential backoff
-        } else {
+        if (attempt >= maxRetries) {
           console.error(`${operationName} failed after ${maxRetries} attempts: ${error.message}`);
+          break;
         }
+
+        console.warn(`${operationName} failed on attempt ${attempt}/${maxRetries}: ${error.message}. Retrying in ${delay}ms...`);
+        
+        // Call retry callback if provided
+        if (onRetry) {
+          onRetry(error, attempt, delay);
+        }
+
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, delay));
+        
+        // Exponential backoff with jitter to prevent thundering herd
+        const jitter = Math.random() * 0.1 * delay; // 10% jitter
+        delay = Math.min(delay * backoffMultiplier + jitter, maxDelay);
       }
     }
     
@@ -89,6 +115,71 @@ export class CalendarService {
       operationName,
       lastError
     );
+  }
+
+  /**
+   * Determine if an error is retryable
+   * @param {Error} error - Error to check
+   * @returns {boolean} True if error is retryable
+   */
+  static _isRetryableError(error) {
+    // Never retry validation errors - they indicate bad input
+    if (error instanceof ValidationError) {
+      return false;
+    }
+    
+    // Never retry not found errors - the resource doesn't exist
+    if (error instanceof NotFoundError) {
+      return false;
+    }
+    
+    // Never retry duplicate errors - they indicate data conflicts
+    if (error instanceof DuplicateError) {
+      return false;
+    }
+    
+    // Check error message patterns for non-retryable conditions
+    const message = error.message?.toLowerCase() || '';
+    
+    // Don't retry permission/authorization errors
+    if (message.includes('permission') || 
+        message.includes('unauthorized') || 
+        message.includes('forbidden') ||
+        message.includes('access denied')) {
+      return false;
+    }
+    
+    // Don't retry quota/limit errors
+    if (message.includes('quota') || 
+        message.includes('limit exceeded') ||
+        message.includes('rate limit')) {
+      return false;
+    }
+    
+    // Don't retry malformed request errors
+    if (message.includes('malformed') || 
+        message.includes('invalid format') ||
+        message.includes('bad request')) {
+      return false;
+    }
+    
+    // Retry network-related errors
+    if (message.includes('network') || 
+        message.includes('timeout') ||
+        message.includes('connection') ||
+        message.includes('fetch')) {
+      return true;
+    }
+    
+    // Retry temporary server errors
+    if (message.includes('server error') || 
+        message.includes('service unavailable') ||
+        message.includes('internal error')) {
+      return true;
+    }
+    
+    // Default to retryable for unknown errors (conservative approach)
+    return true;
   }
 
   /**
@@ -152,13 +243,26 @@ export class CalendarService {
   }
 
   /**
+   * Generate standardized title for 1:1 meetings
+   * @param {string} teamMemberName - Name of the team member
+   * @returns {string} Formatted title
+   */
+  static generateOneOnOneTitle(teamMemberName) {
+    if (!teamMemberName || typeof teamMemberName !== 'string' || teamMemberName.trim().length === 0) {
+      throw new ValidationError('Team member name is required and must be a non-empty string', 'teamMemberName');
+    }
+    return `${teamMemberName.trim()} 1:1`;
+  }
+
+  /**
    * Validate date/time format and constraints
    * @param {string} dateTime - ISO string of the date/time
    * @param {string} fieldName - Name of the field for error reporting
    * @param {boolean} allowPast - Whether to allow past dates
+   * @param {number} bufferMinutes - Buffer time in minutes for near-current dates (default: 5)
    * @returns {Date} Parsed and validated date
    */
-  static _validateDateTime(dateTime, fieldName = 'dateTime', allowPast = false) {
+  static _validateDateTime(dateTime, fieldName = 'dateTime', allowPast = false, bufferMinutes = 5) {
     if (!dateTime) {
       throw new ValidationError(`${fieldName} is required`, fieldName);
     }
@@ -170,22 +274,39 @@ export class CalendarService {
     // Parse the date/time
     const parsedDate = new Date(dateTime);
     if (isNaN(parsedDate.getTime())) {
-      throw new ValidationError(`Invalid ${fieldName} format. Expected ISO string.`, fieldName);
+      throw new ValidationError(
+        `Invalid ${fieldName} format. Expected ISO string, received: "${dateTime}"`, 
+        fieldName
+      );
     }
 
+    // Get current time with proper timezone handling
+    const now = new Date();
+    
     // Check if date is too far in the future (more than 2 years)
-    const twoYearsFromNow = new Date();
+    const twoYearsFromNow = new Date(now);
     twoYearsFromNow.setFullYear(twoYearsFromNow.getFullYear() + 2);
     if (parsedDate > twoYearsFromNow) {
-      throw new ValidationError(`${fieldName} cannot be more than 2 years in the future`, fieldName);
+      throw new ValidationError(
+        `${fieldName} cannot be more than 2 years in the future. Provided date: ${parsedDate.toISOString()}, maximum allowed: ${twoYearsFromNow.toISOString()}`, 
+        fieldName
+      );
     }
 
-    // Check if date is in the past (with buffer)
+    // Check if date is in the past (with configurable buffer)
     if (!allowPast) {
-      const now = new Date();
-      const fiveMinutesAgo = new Date(now.getTime() - (5 * 60 * 1000));
-      if (parsedDate < fiveMinutesAgo) {
-        throw new ValidationError(`${fieldName} cannot be in the past`, fieldName);
+      // Use configurable buffer time to prevent edge case rejections
+      const bufferMs = Math.max(bufferMinutes, 1) * 60 * 1000; // Ensure minimum 1 minute buffer
+      const bufferTime = new Date(now.getTime() - bufferMs);
+      
+      if (parsedDate < bufferTime) {
+        const timeDifferenceMs = now.getTime() - parsedDate.getTime();
+        const timeDifferenceMinutes = Math.round(timeDifferenceMs / (60 * 1000));
+        
+        throw new ValidationError(
+          `${fieldName} cannot be in the past. Provided date: ${parsedDate.toISOString()}, current time: ${now.toISOString()} (${timeDifferenceMinutes} minutes ago)`, 
+          fieldName
+        );
       }
     }
 
@@ -207,9 +328,20 @@ export class CalendarService {
       throw new ValidationError(`${fieldName} must be a string`, fieldName);
     }
 
-    const teamMember = await TeamMember.get(teamMemberId);
+    let teamMember = null;
+    try {
+      teamMember = await TeamMember.get(teamMemberId);
+    } catch (error) {
+      throw new OperationError(`Failed to fetch team member: ${error.message}`, 'validateTeamMember', error);
+    }
+
     if (!teamMember) {
       throw new NotFoundError('Team member not found', 'TeamMember', teamMemberId);
+    }
+
+    // Defensive check: ensure team member has required properties
+    if (!teamMember.id || !teamMember.name) {
+      throw new ValidationError('Team member missing required properties (id, name)', fieldName);
     }
 
     return teamMember;
@@ -251,20 +383,51 @@ export class CalendarService {
    * @returns {Promise<Object|null>} Duplicate event if found, null otherwise
    */
   static async _checkForDuplicateEvents(teamMemberId, date, excludeEventId = null) {
+    // Defensive parameter validation
     if (!teamMemberId || !date) {
+      return null;
+    }
+
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+      console.warn('Invalid date provided to _checkForDuplicateEvents:', date);
       return null;
     }
 
     try {
       const existingEvents = await this.getOneOnOneMeetingsForTeamMember(teamMemberId);
+      
+      // Defensive check: ensure existingEvents is an array
+      if (!Array.isArray(existingEvents)) {
+        console.warn('getOneOnOneMeetingsForTeamMember returned non-array:', existingEvents);
+        return null;
+      }
+
       const dateString = date.toDateString();
       
       const duplicateEvent = existingEvents.find(event => {
+        // Defensive checks for event object
+        if (!event || typeof event !== 'object') {
+          return false;
+        }
+        
         if (excludeEventId && event.id === excludeEventId) {
           return false; // Skip the excluded event
         }
-        const eventDate = new Date(event.start_date);
-        return eventDate.toDateString() === dateString;
+        
+        if (!event.start_date) {
+          return false;
+        }
+        
+        try {
+          const eventDate = new Date(event.start_date);
+          if (isNaN(eventDate.getTime())) {
+            return false;
+          }
+          return eventDate.toDateString() === dateString;
+        } catch (error) {
+          console.warn('Error parsing event date:', event.start_date, error);
+          return false;
+        }
       });
       
       return duplicateEvent || null;
@@ -289,8 +452,25 @@ export class CalendarService {
       throw new ValidationError(`${fieldName} must be a string`, fieldName);
     }
 
-    const oneOnOnes = await OneOnOne.list();
-    const oneOnOne = oneOnOnes.find(o => o.id === oneOnOneId);
+    let oneOnOnes = null;
+    try {
+      oneOnOnes = await OneOnOne.list();
+    } catch (error) {
+      throw new OperationError(`Failed to fetch OneOnOne records: ${error.message}`, 'validateOneOnOne', error);
+    }
+
+    // Defensive check: ensure oneOnOnes is an array
+    if (!Array.isArray(oneOnOnes)) {
+      throw new DataError('OneOnOne.list() returned invalid data - expected array', 'OneOnOne');
+    }
+
+    const oneOnOne = oneOnOnes.find(o => {
+      // Defensive check: ensure record is a valid object
+      if (!o || typeof o !== 'object') {
+        return false;
+      }
+      return o.id === oneOnOneId;
+    });
     
     if (!oneOnOne) {
       throw new NotFoundError('OneOnOne record not found', 'OneOnOne', oneOnOneId);
@@ -601,24 +781,31 @@ export class CalendarService {
         throw new NotFoundError('Team member not found', 'TeamMember', teamMemberId);
       }
 
-      // Parse and validate date/time
-      const startDate = new Date(dateTime);
-      if (isNaN(startDate.getTime())) {
-        throw new ValidationError('Invalid date/time format. Expected ISO string.', 'dateTime');
-      }
+      // Parse and validate date/time using improved validation method
+      const startDate = this._validateDateTime(dateTime, 'dateTime', false, 5);
 
-      // Validate date is not in the past (with 5 minute buffer)
-      const now = new Date();
-      const fiveMinutesAgo = new Date(now.getTime() - (5 * 60 * 1000));
-      if (startDate < fiveMinutesAgo) {
-        throw new ValidationError('Meeting date cannot be in the past', 'dateTime');
-      }
-
-      // Check for duplicate events on the same date
+      // Check for duplicate events on the same date with defensive checks
       const existingEvents = await this.getOneOnOneMeetingsForTeamMember(teamMemberId);
-      const sameDate = existingEvents.find(event => {
-        const eventDate = new Date(event.start_date);
-        return eventDate.toDateString() === startDate.toDateString();
+      
+      // Defensive check: ensure existingEvents is an array
+      const eventsArray = Array.isArray(existingEvents) ? existingEvents : [];
+      
+      const sameDate = eventsArray.find(event => {
+        // Defensive checks for event object
+        if (!event || typeof event !== 'object' || !event.start_date) {
+          return false;
+        }
+        
+        try {
+          const eventDate = new Date(event.start_date);
+          if (isNaN(eventDate.getTime())) {
+            return false;
+          }
+          return eventDate.toDateString() === startDate.toDateString();
+        } catch (error) {
+          console.warn('Error parsing event date:', event.start_date, error);
+          return false;
+        }
       });
       
       if (sameDate) {
@@ -634,7 +821,7 @@ export class CalendarService {
       // Generate event title in required format
       const title = this.generateOneOnOneTitle(teamMemberName);
 
-      // Create calendar event with retry mechanism
+      // Create calendar event with enhanced retry mechanism
       const calendarEvent = await this._retryOperation(async () => {
         return await CalendarEvent.create({
           title,
@@ -648,7 +835,18 @@ export class CalendarService {
           linked_entity_type: 'one_on_one',
           linked_entity_id: null // Will be set when linking to OneOnOne record
         });
-      }, 3, `create calendar event for ${teamMemberName}`);
+      }, {
+        maxRetries: 3,
+        baseDelay: 1000,
+        operationName: `create calendar event for ${teamMemberName}`,
+        shouldRetry: (error, attempt) => {
+          // Don't retry if it's a date validation error that keeps failing
+          if (error instanceof ValidationError && error.field === 'dateTime' && attempt > 1) {
+            return false;
+          }
+          return this._isRetryableError(error);
+        }
+      });
 
       console.log(`Successfully created calendar event: ${title} (${calendarEvent.id})`);
       return calendarEvent;
@@ -699,18 +897,8 @@ export class CalendarService {
         throw new ValidationError('Event is not a 1:1 meeting', 'eventType');
       }
 
-      // Parse and validate new date/time
-      const startDate = new Date(dateTime);
-      if (isNaN(startDate.getTime())) {
-        throw new ValidationError('Invalid date/time format. Expected ISO string.', 'dateTime');
-      }
-
-      // Validate date is not in the past (with 5 minute buffer)
-      const now = new Date();
-      const fiveMinutesAgo = new Date(now.getTime() - (5 * 60 * 1000));
-      if (startDate < fiveMinutesAgo) {
-        throw new ValidationError('Meeting date cannot be in the past', 'dateTime');
-      }
+      // Parse and validate new date/time using improved validation method
+      const startDate = this._validateDateTime(dateTime, 'dateTime', false, 5);
 
       // Check for conflicts with other meetings for the same team member
       if (existingEvent.team_member_id) {
@@ -732,13 +920,24 @@ export class CalendarService {
       // Calculate new end time
       const endDate = new Date(startDate.getTime() + (durationMinutes * 60 * 1000));
 
-      // Update the calendar event with retry mechanism
+      // Update the calendar event with enhanced retry mechanism
       const updatedEvent = await this._retryOperation(async () => {
         return await CalendarEvent.update(eventId, {
           start_date: startDate.toISOString(),
           end_date: endDate.toISOString()
         });
-      }, 3, `update calendar event ${eventId}`);
+      }, {
+        maxRetries: 3,
+        baseDelay: 1000,
+        operationName: `update calendar event ${eventId}`,
+        shouldRetry: (error, attempt) => {
+          // Don't retry if it's a date validation error that keeps failing
+          if (error instanceof ValidationError && error.field === 'dateTime' && attempt > 1) {
+            return false;
+          }
+          return this._isRetryableError(error);
+        }
+      });
 
       console.log(`Successfully updated calendar event: ${existingEvent.title} (${eventId})`);
       return updatedEvent;
@@ -811,14 +1010,55 @@ export class CalendarService {
     try {
       const allEvents = await CalendarEvent.list();
       
-      // Filter for 1:1 meeting events
-      const oneOnOneMeetings = allEvents.filter(event => 
-        event.event_type === 'one_on_one'
-      );
+      // Defensive check: ensure allEvents is an array
+      if (!Array.isArray(allEvents)) {
+        console.warn('CalendarEvent.list() returned non-array:', allEvents);
+        return [];
+      }
+      
+      // Filter for 1:1 meeting events with defensive checks
+      const oneOnOneMeetings = allEvents.filter(event => {
+        // Defensive check: ensure event is a valid object
+        if (!event || typeof event !== 'object') {
+          return false;
+        }
+        return event.event_type === 'one_on_one';
+      });
 
       return oneOnOneMeetings;
     } catch (error) {
       console.error('Error fetching 1:1 meeting calendar events:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all 1:1 meeting calendar events for a specific team member
+   * @param {string} teamMemberId - ID of the team member
+   * @returns {Promise<Array>} Array of 1:1 meeting calendar events for the team member
+   */
+  static async getOneOnOneMeetingsForTeamMember(teamMemberId) {
+    try {
+      // Defensive parameter validation
+      if (!teamMemberId || typeof teamMemberId !== 'string') {
+        console.warn('Invalid teamMemberId provided to getOneOnOneMeetingsForTeamMember:', teamMemberId);
+        return [];
+      }
+
+      const allOneOnOneMeetings = await this.getOneOnOneMeetings();
+      
+      // Filter for events belonging to the specific team member with defensive checks
+      const teamMemberMeetings = allOneOnOneMeetings.filter(event => {
+        // Defensive check: ensure event is a valid object
+        if (!event || typeof event !== 'object') {
+          return false;
+        }
+        return event.team_member_id === teamMemberId;
+      });
+
+      return teamMemberMeetings;
+    } catch (error) {
+      console.error(`Error fetching 1:1 meeting calendar events for team member ${teamMemberId}:`, error);
       throw error;
     }
   }

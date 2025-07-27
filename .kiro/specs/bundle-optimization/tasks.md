@@ -6,7 +6,7 @@
   - Add bundle size tracking to package.json scripts
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 2. Configure manual chunking for vendor libraries
+- [x] 2. Configure manual chunking for vendor libraries
   - Update vite.config.js with manual chunks configuration for vendor libraries
   - Group React core libraries into vendor-core chunk
   - Group Radix UI components into vendor-ui chunk

@@ -34,22 +34,81 @@ export class OperationError extends SynchronizationError {
  */
 export class CalendarSynchronizationService {
   /**
-   * Retry mechanism for synchronization operations using ErrorHandlingService
+   * Enhanced retry mechanism for synchronization operations with improved error handling
    * @param {Function} operation - The operation to retry
-   * @param {string} operationName - Name of the operation for logging
-   * @param {Object} options - Retry options
+   * @param {Object} options - Retry configuration options
    * @returns {Promise<any>} Result of the operation
    */
-  static async _retryOperation(operation, operationName = 'operation', options = {}) {
+  static async _retryOperation(operation, options = {}) {
+    const {
+      maxRetries = 3,
+      baseDelay = 1000,
+      maxDelay = 10000,
+      backoffMultiplier = 2,
+      operationName = 'operation',
+      shouldRetry = null,
+      onRetry = null
+    } = options;
+
     return ErrorHandlingService.retryOperation(operation, {
-      maxRetries: 3,
-      baseDelay: 1000,
+      maxRetries,
+      baseDelay,
+      maxDelay,
+      backoffMultiplier,
       operationName,
-      shouldRetry: (error, attempt) => {
-        // Don't retry validation errors or not found errors
-        return !(error instanceof ValidationError || error instanceof NotFoundError);
-      },
-      ...options
+      shouldRetry: shouldRetry || ((error, attempt) => {
+        // Never retry validation errors - they indicate bad input
+        if (error instanceof ValidationError) {
+          return false;
+        }
+        
+        // Never retry not found errors - the resource doesn't exist
+        if (error instanceof NotFoundError) {
+          return false;
+        }
+        
+        // Don't retry date validation errors that keep failing
+        if (error.message?.includes('dateTime cannot be in the past') && attempt > 1) {
+          return false;
+        }
+        
+        // Don't retry infinite loop scenarios
+        if (error.message?.includes('validation loop') || 
+            error.message?.includes('infinite retry')) {
+          return false;
+        }
+        
+        // Check error message patterns for non-retryable conditions
+        const message = error.message?.toLowerCase() || '';
+        
+        // Don't retry permission/authorization errors
+        if (message.includes('permission') || 
+            message.includes('unauthorized') || 
+            message.includes('forbidden')) {
+          return false;
+        }
+        
+        // Don't retry quota/limit errors
+        if (message.includes('quota') || 
+            message.includes('limit exceeded')) {
+          return false;
+        }
+        
+        // Retry network and temporary errors
+        if (message.includes('network') || 
+            message.includes('timeout') ||
+            message.includes('connection') ||
+            message.includes('server error') ||
+            message.includes('service unavailable')) {
+          return true;
+        }
+        
+        // Default to retryable for synchronization errors
+        return error instanceof SynchronizationError || 
+               error instanceof NetworkError ||
+               error.name === 'OperationError';
+      }),
+      onRetry
     });
   }
 
@@ -106,14 +165,40 @@ export class CalendarSynchronizationService {
         })
       ]);
 
+      // Defensive check: ensure arrays are defined and valid
+      if (!Array.isArray(oneOnOnes)) {
+        throw new DataError('OneOnOne.list() returned invalid data - expected array', 'OneOnOne');
+      }
+      if (!Array.isArray(teamMembers)) {
+        throw new DataError('TeamMember.list() returned invalid data - expected array', 'TeamMember');
+      }
+
       results.totalOneOnOnes = oneOnOnes.length;
 
-      // Create a map of team members for quick lookup
-      const teamMemberMap = new Map(teamMembers.map(tm => [tm.id, tm]));
+      // Create a map of team members for quick lookup with defensive checks
+      const teamMemberMap = new Map();
+      if (teamMembers && Array.isArray(teamMembers)) {
+        teamMembers.forEach(tm => {
+          if (tm && tm.id) {
+            teamMemberMap.set(tm.id, tm);
+          }
+        });
+      }
 
-      // Process each OneOnOne record
-      for (const oneOnOne of oneOnOnes) {
+      // Process each OneOnOne record with defensive checks
+      for (const oneOnOne of oneOnOnes || []) {
         try {
+          // Defensive check: ensure oneOnOne is a valid object
+          if (!oneOnOne || typeof oneOnOne !== 'object') {
+            results.errors.push({
+              oneOnOneId: 'unknown',
+              teamMemberId: 'unknown',
+              error: 'Invalid OneOnOne record - not an object',
+              action: 'skipped'
+            });
+            continue;
+          }
+
           results.processed++;
 
           // Skip if no next meeting date is set
@@ -126,8 +211,8 @@ export class CalendarSynchronizationService {
             continue;
           }
 
-          // Skip if team member doesn't exist
-          const teamMember = teamMemberMap.get(oneOnOne.team_member_id);
+          // Skip if team member doesn't exist with defensive checks
+          const teamMember = oneOnOne.team_member_id ? teamMemberMap.get(oneOnOne.team_member_id) : null;
           if (!teamMember) {
             results.errors.push({
               oneOnOneId: oneOnOne.id,
@@ -143,8 +228,14 @@ export class CalendarSynchronizationService {
           let existingEvent = null;
 
           if (oneOnOne.next_meeting_calendar_event_id) {
-            // Verify the referenced calendar event exists
-            existingEvent = await CalendarEvent.get(oneOnOne.next_meeting_calendar_event_id);
+            // Verify the referenced calendar event exists with defensive error handling
+            try {
+              existingEvent = await CalendarEvent.get(oneOnOne.next_meeting_calendar_event_id);
+            } catch (error) {
+              console.warn(`Error fetching calendar event ${oneOnOne.next_meeting_calendar_event_id}:`, error);
+              existingEvent = null;
+            }
+            
             if (!existingEvent) {
               needsCalendarEvent = true;
               console.warn(`OneOnOne ${oneOnOne.id} references non-existent calendar event ${oneOnOne.next_meeting_calendar_event_id}`);
@@ -160,7 +251,17 @@ export class CalendarSynchronizationService {
                       existingEvent.id,
                       oneOnOne.next_meeting_date
                     );
-                  }, `update calendar event for OneOnOne ${oneOnOne.id}`);
+                  }, {
+                    operationName: `update calendar event for OneOnOne ${oneOnOne.id}`,
+                    maxRetries: 2, // Fewer retries for updates to avoid loops
+                    shouldRetry: (error, attempt) => {
+                      // Don't retry date validation errors
+                      if (error.message?.includes('dateTime cannot be in the past')) {
+                        return false;
+                      }
+                      return !(error instanceof ValidationError || error instanceof NotFoundError);
+                    }
+                  });
                 }
 
                 results.updated.push({
@@ -186,7 +287,21 @@ export class CalendarSynchronizationService {
                   oneOnOne.team_member_id,
                   oneOnOne.next_meeting_date
                 );
-              }, `create calendar event for OneOnOne ${oneOnOne.id}`);
+              }, {
+                operationName: `create calendar event for OneOnOne ${oneOnOne.id}`,
+                maxRetries: 3,
+                shouldRetry: (error, attempt) => {
+                  // Don't retry date validation errors that keep failing
+                  if (error.message?.includes('dateTime cannot be in the past') && attempt > 1) {
+                    return false;
+                  }
+                  // Don't retry validation or not found errors
+                  return !(error instanceof ValidationError || error instanceof NotFoundError);
+                },
+                onRetry: (error, attempt, delay) => {
+                  console.warn(`Retrying calendar event creation for OneOnOne ${oneOnOne.id}, attempt ${attempt}, delay ${delay}ms`);
+                }
+              });
 
               results.created.push({
                 oneOnOneId: oneOnOne.id,
@@ -244,7 +359,7 @@ export class CalendarSynchronizationService {
       operationName,
       showLoading: showProgress,
       showSuccess: true,
-      successMessage: `Synchronized ${results?.summary?.createdCount || 0} OneOnOne meetings`,
+      successMessage: 'OneOnOne meeting synchronization completed successfully',
       retryOptions: {
         maxRetries: 1 // Don't retry the entire sync operation
       },

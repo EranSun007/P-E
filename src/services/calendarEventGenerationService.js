@@ -27,9 +27,19 @@ export class CalendarEventGenerationService {
         teamMembers = await TeamMember.list();
       }
 
+      // Defensive check: ensure teamMembers is an array
+      if (!Array.isArray(teamMembers)) {
+        console.warn('TeamMember.list() returned non-array:', teamMembers);
+        return [];
+      }
+
       const birthdayEvents = [];
 
       for (const teamMember of teamMembers) {
+        // Defensive check: ensure teamMember is a valid object
+        if (!teamMember || typeof teamMember !== 'object') {
+          continue;
+        }
         if (!teamMember.birthday) {
           continue; // Skip team members without birthday data
         }
@@ -47,10 +57,28 @@ export class CalendarEventGenerationService {
           
           // Check if birthday event already exists for this team member and year
           const existingEvents = await CalendarEvent.getBirthdayEvents();
-          const existingBirthdayEvent = existingEvents.find(event => 
-            event.team_member_id === teamMember.id && 
-            new Date(event.start_date).getFullYear() === year
-          );
+          
+          // Defensive check: ensure existingEvents is an array
+          const eventsArray = Array.isArray(existingEvents) ? existingEvents : [];
+          
+          const existingBirthdayEvent = eventsArray.find(event => {
+            // Defensive checks for event object
+            if (!event || typeof event !== 'object') {
+              return false;
+            }
+            
+            if (event.team_member_id !== teamMember.id) {
+              return false;
+            }
+            
+            try {
+              const eventYear = new Date(event.start_date).getFullYear();
+              return eventYear === year;
+            } catch (error) {
+              console.warn('Error parsing event date:', event.start_date, error);
+              return false;
+            }
+          });
 
           if (existingBirthdayEvent) {
             console.log(`Birthday event already exists for ${teamMember.name} in ${year}`);
@@ -223,9 +251,19 @@ export class CalendarEventGenerationService {
         duties = await Duty.list();
       }
 
+      // Defensive check: ensure duties is an array
+      if (!Array.isArray(duties)) {
+        console.warn('Duty.list() returned non-array:', duties);
+        return [];
+      }
+
       const dutyEvents = [];
 
       for (const duty of duties) {
+        // Defensive check: ensure duty is a valid object
+        if (!duty || typeof duty !== 'object') {
+          continue;
+        }
         try {
           const dutyEvent = await this.convertDutyToCalendarEvent(duty);
           dutyEvents.push(dutyEvent);
@@ -253,9 +291,19 @@ export class CalendarEventGenerationService {
         outOfOfficeRecords = await OutOfOffice.list();
       }
 
+      // Defensive check: ensure outOfOfficeRecords is an array
+      if (!Array.isArray(outOfOfficeRecords)) {
+        console.warn('OutOfOffice.list() returned non-array:', outOfOfficeRecords);
+        return [];
+      }
+
       const oooEvents = [];
 
       for (const outOfOffice of outOfOfficeRecords) {
+        // Defensive check: ensure outOfOffice is a valid object
+        if (!outOfOffice || typeof outOfOffice !== 'object') {
+          continue;
+        }
         try {
           const oooEvent = await this.convertOutOfOfficeToCalendarEvent(outOfOffice);
           oooEvents.push(oooEvent);
