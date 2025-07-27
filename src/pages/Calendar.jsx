@@ -1,10 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { Task, CalendarEvent, TeamMember, OutOfOffice, Duty } from "@/api/entities";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, addDays, isSameMonth, isSameDay, addMonths, subMonths, parseISO, differenceInDays, isAfter, isBefore } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, Plus, Calendar, CalendarDays, MessageSquare, Menu, X, RefreshCw, AlertCircle, CheckCircle } from "lucide-react";
-import TaskCreationForm from "../components/task/TaskCreationForm";
+import { FormLoadingSkeleton, ComponentLoadingSkeleton } from "@/components/ui/loading-skeletons";
+
+import { ComponentChunkErrorBoundary, retryImport } from "@/components/ui/error-boundaries";
+
+// Lazy load TaskCreationForm for better performance with error handling
+const TaskCreationForm = lazy(() => retryImport(() => import("../components/task/TaskCreationForm"), 3, 1000));
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -16,8 +21,12 @@ import { CalendarEventGenerationService } from "@/services/calendarEventGenerati
 import AgendaContextActions from "@/components/agenda/AgendaContextActions";
 import { AgendaIndicatorService } from "@/services/agendaIndicatorService";
 import { CalendarAgendaIndicator, CalendarAgendaCount } from "@/components/calendar/CalendarAgendaIndicator";
-import MeetingDetailView from "@/components/calendar/MeetingDetailView";
-import WeeklyMeetingSidebar from "@/components/calendar/WeeklyMeetingSidebar";
+
+// Lazy load MeetingDetailView for better performance with error handling
+const MeetingDetailView = lazy(() => retryImport(() => import("@/components/calendar/MeetingDetailView"), 3, 1000));
+
+// Lazy load WeeklyMeetingSidebar for better performance with error handling
+const WeeklyMeetingSidebar = lazy(() => retryImport(() => import("@/components/calendar/WeeklyMeetingSidebar"), 3, 1000));
 import { useIsMobile } from "@/hooks/use-mobile";
 import { EventStylingService } from "@/utils/eventStylingService";
 import { CalendarSyncStatusService } from "@/services/calendarSyncStatusService";
@@ -1222,19 +1231,23 @@ export default function CalendarPage() {
                     </Button>
                   </div>
                 )}
-                <WeeklyMeetingSidebar
-                  currentWeek={currentWeek}
-                  meetings={weeklyMeetings}
-                  onMeetingClick={handleSidebarMeetingClick}
-                  onDateNavigate={handleSidebarDateNavigate}
-                  agendaCounts={agendaCounts}
-                  isLoading={isLoading}
-                  error={loadingError}
-                  onRetry={() => loadCalendarData(true)}
-                  className={cn(
-                    isMobile && "static"
-                  )}
-                />
+                <ComponentChunkErrorBoundary componentName="Weekly Meeting Sidebar" inline>
+                  <Suspense fallback={<ComponentLoadingSkeleton />}>
+                    <WeeklyMeetingSidebar
+                      currentWeek={currentWeek}
+                      meetings={weeklyMeetings}
+                      onMeetingClick={handleSidebarMeetingClick}
+                      onDateNavigate={handleSidebarDateNavigate}
+                      agendaCounts={agendaCounts}
+                      isLoading={isLoading}
+                      error={loadingError}
+                      onRetry={() => loadCalendarData(true)}
+                      className={cn(
+                        isMobile && "static"
+                      )}
+                    />
+                  </Suspense>
+                </ComponentChunkErrorBoundary>
               </div>
             )}
           </div>
@@ -1255,28 +1268,36 @@ export default function CalendarPage() {
             <DialogHeader>
               <DialogTitle>Add Task for {format(selectedDate, "MMMM d, yyyy")}</DialogTitle>
             </DialogHeader>
-            <TaskCreationForm 
-              onCreateTask={handleCreateTask} 
-              initialTaskData={{
-                due_date: selectedDate.toISOString(),
-                status: "todo",
-                priority: "medium",
-                type: "generic"
-              }}
-            />
+            <ComponentChunkErrorBoundary componentName="Task Creation Form">
+              <Suspense fallback={<FormLoadingSkeleton />}>
+                <TaskCreationForm 
+                  onCreateTask={handleCreateTask} 
+                  initialTaskData={{
+                    due_date: selectedDate.toISOString(),
+                    status: "todo",
+                    priority: "medium",
+                    type: "generic"
+                  }}
+                />
+              </Suspense>
+            </ComponentChunkErrorBoundary>
           </DialogContent>
         </Dialog>
 
         {/* Meeting Detail Dialog */}
         <Dialog open={showMeetingDetail} onOpenChange={handleCloseMeetingDetail}>
           <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-            <MeetingDetailView
-              event={selectedMeetingEvent}
-              teamMember={selectedMeetingEvent ? teamMembers.find(tm => tm.id === selectedMeetingEvent.team_member_id) : null}
-              isOpen={showMeetingDetail}
-              onClose={handleCloseMeetingDetail}
-              onNavigateToProfile={handleNavigateToProfile}
-            />
+            <ComponentChunkErrorBoundary componentName="Meeting Detail View">
+              <Suspense fallback={<ComponentLoadingSkeleton />}>
+                <MeetingDetailView
+                  event={selectedMeetingEvent}
+                  teamMember={selectedMeetingEvent ? teamMembers.find(tm => tm.id === selectedMeetingEvent.team_member_id) : null}
+                  isOpen={showMeetingDetail}
+                  onClose={handleCloseMeetingDetail}
+                  onNavigateToProfile={handleNavigateToProfile}
+                />
+              </Suspense>
+            </ComponentChunkErrorBoundary>
           </DialogContent>
         </Dialog>
 

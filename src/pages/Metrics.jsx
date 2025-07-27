@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { Task } from "@/api/entities";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,9 @@ import { Plus, BarChart2, ArrowUpRight, ArrowDownRight, ArrowRight } from "lucid
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Bar, Tooltip, LineChart, Line } from "recharts";
 import { format, parseISO } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import TaskCreationForm from "../components/task/TaskCreationForm";
+
+// Lazy load TaskCreationForm for better performance
+const TaskCreationForm = lazy(() => import("../components/task/TaskCreationForm"));
 import { Badge } from "@/components/ui/badge";
 
 export default function MetricsPage() {
@@ -225,17 +227,24 @@ export default function MetricsPage() {
             <DialogHeader>
               <DialogTitle>Track New Metric</DialogTitle>
             </DialogHeader>
-            <TaskCreationForm 
-              onCreateTask={handleCreateMetric} 
-              initialTaskData={{
-                status: "todo",
-                priority: "medium",
-                type: "metric",
-                metadata: {
-                  metric: {}
-                }
-              }}
-            />
+            <Suspense fallback={
+              <div className="flex items-center justify-center p-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <span className="ml-2 text-sm text-gray-600">Loading task form...</span>
+              </div>
+            }>
+              <TaskCreationForm 
+                onCreateTask={handleCreateMetric} 
+                initialTaskData={{
+                  status: "todo",
+                  priority: "medium",
+                  type: "metric",
+                  metadata: {
+                    metric: {}
+                  }
+                }}
+              />
+            </Suspense>
           </DialogContent>
         </Dialog>
       </div>

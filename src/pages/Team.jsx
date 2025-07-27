@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { Task } from "@/api/entities";
 import { TeamMember } from "@/api/entities";
 import { AgendaService } from "@/utils/agendaService";
 import { AgendaBadge } from "@/components/agenda/AgendaBadge";
+import { ComponentLoadingSkeleton } from "@/components/ui/loading-skeletons";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,11 @@ import TagInput from "../components/ui/tag-input";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { CalendarEventGenerationService } from "@/services/calendarEventGenerationService";
-import TeamMemberDeletionDialog from "@/components/team/TeamMemberDeletionDialog";
+
+import { ComponentChunkErrorBoundary, retryImport } from "@/components/ui/error-boundaries";
+
+// Lazy load TeamMemberDeletionDialog for better performance with error handling
+const TeamMemberDeletionDialog = lazy(() => retryImport(() => import("@/components/team/TeamMemberDeletionDialog"), 3, 1000));
 
 export default function TeamPage() {
   const navigate = useNavigate();
@@ -643,13 +648,25 @@ export default function TeamPage() {
       </Dialog>
 
       {/* Team Member Deletion Dialog */}
-      <TeamMemberDeletionDialog
-        open={showDeleteDialog}
-        onOpenChange={setShowDeleteDialog}
-        teamMember={memberToDelete}
-        onConfirm={handleDeleteConfirm}
-        onCancel={handleDeleteCancel}
-      />
+      {showDeleteDialog && (
+        <ComponentChunkErrorBoundary componentName="Team Member Deletion Dialog">
+          <Suspense fallback={
+            <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+              <DialogContent>
+                <ComponentLoadingSkeleton />
+              </DialogContent>
+            </Dialog>
+          }>
+            <TeamMemberDeletionDialog
+              open={showDeleteDialog}
+              onOpenChange={setShowDeleteDialog}
+              teamMember={memberToDelete}
+              onConfirm={handleDeleteConfirm}
+              onCancel={handleDeleteCancel}
+            />
+          </Suspense>
+        </ComponentChunkErrorBoundary>
+      )}
     </div>
   );
 }

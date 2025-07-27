@@ -1,12 +1,16 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { Task } from "@/api/entities";
 import { Plus, CheckSquare, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatePresence, motion } from "framer-motion";
 import { format } from "date-fns";
+import { FormLoadingSkeleton } from "@/components/ui/loading-skeletons";
 
-import TaskCreationForm from "../components/task/TaskCreationForm";
+import { ComponentChunkErrorBoundary, retryImport } from "@/components/ui/error-boundaries";
+
+// Lazy load TaskCreationForm for better performance with error handling
+const TaskCreationForm = lazy(() => retryImport(() => import("../components/task/TaskCreationForm"), 3, 1000));
 import TaskList from "../components/task/TaskList";
 import TaskFilterBar from "../components/task/TaskFilterBar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -207,10 +211,14 @@ export default function TasksPage() {
               exit={{ opacity: 0, y: -20 }}
               className="mb-8"
             >
-              <TaskCreationForm 
-                onCreateTask={handleCreateTask}
-                initialTaskData={editingTask}
-              />
+              <ComponentChunkErrorBoundary componentName="Task Creation Form">
+                <Suspense fallback={<FormLoadingSkeleton />}>
+                  <TaskCreationForm 
+                    onCreateTask={handleCreateTask}
+                    initialTaskData={editingTask}
+                  />
+                </Suspense>
+              </ComponentChunkErrorBoundary>
             </motion.div>
           ) : (
             <motion.div

@@ -11,6 +11,12 @@
     "analyze": "node scripts/bundle-analysis.js",
     "bundle:report": "npm run build:analyze",
     "bundle:visual": "npm run build && open dist/bundle-analysis.html",
+    "bundle:test": "node scripts/test-bundle-size.js",
+    "test:bundle": "vitest run scripts/__tests__/bundle-size-regression.test.js",
+    "test:bundle-analysis": "vitest run scripts/__tests__/bundle-analysis.test.js",
+    "test:loading-performance": "vitest run scripts/__tests__/loading-performance.test.js",
+    "performance:test": "node scripts/test-loading-performance.js",
+    "test:optimization": "node scripts/test-optimization-validation.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest"

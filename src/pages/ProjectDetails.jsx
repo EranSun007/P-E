@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { Project, Task, Stakeholder, TeamMember } from "@/api/entities";
 import { InvokeLLM } from "@/api/integrations";
@@ -31,7 +31,9 @@ import {
   UserPlus
 } from "lucide-react";
 import TaskList from "../components/task/TaskList";
-import TaskCreationForm from "../components/task/TaskCreationForm";
+
+// Lazy load TaskCreationForm for better performance
+const TaskCreationForm = lazy(() => import("../components/task/TaskCreationForm"));
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import AgendaContextActions from "@/components/agenda/AgendaContextActions";
 
@@ -460,13 +462,20 @@ export default function ProjectDetailsPage() {
             <DialogHeader>
               <DialogTitle>Add New Task</DialogTitle>
             </DialogHeader>
-            <TaskCreationForm 
-              onCreateTask={handleCreateTask}
-              initialTaskData={{
-                project: project.name,
-                status: "todo"
-              }}
-            />
+            <Suspense fallback={
+              <div className="flex items-center justify-center p-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <span className="ml-2 text-sm text-gray-600">Loading task form...</span>
+              </div>
+            }>
+              <TaskCreationForm 
+                onCreateTask={handleCreateTask}
+                initialTaskData={{
+                  project: project.name,
+                  status: "todo"
+                }}
+              />
+            </Suspense>
           </DialogContent>
         </Dialog>
 
