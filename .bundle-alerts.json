@@ -1,0 +1,18 @@
+[
+  {
+    "type": "CRITICAL",
+    "message": "Chunk chunk-An1cF_3A.js (401.59 KB) exceeds maximum chunk size (400 KB)",
+    "threshold": 409600,
+    "actual": 411230,
+    "chunk": "chunk-An1cF_3A.js",
+    "timestamp": "2025-07-27T07:10:12.167Z"
+  },
+  {
+    "type": "CRITICAL",
+    "message": "Chunk chunk-An1cF_3A.js (401.59 KB) exceeds maximum chunk size (400 KB)",
+    "threshold": 409600,
+    "actual": 411230,
+    "chunk": "chunk-An1cF_3A.js",
+    "timestamp": "2025-07-27T07:10:25.224Z"
+  }
+]

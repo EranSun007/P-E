@@ -207,7 +207,10 @@ npm run build
 Before deploying:
 - [ ] All tests pass
 - [ ] No TypeScript errors (when applicable)
-- [ ] Performance checks pass
+- [ ] Bundle size regression tests pass (`npm run test:bundle`)
+- [ ] Loading performance tests pass (`npm run test:loading-performance`)
+- [ ] Bundle analysis shows no critical alerts (`npm run analyze`)
+- [ ] Performance budgets within limits
 - [ ] AI code review completed
 - [ ] Documentation updated
 
@@ -239,18 +242,65 @@ test: add integration tests for project flow
 
 ## Performance Optimization
 
+### Bundle Optimization Strategy
+The application implements comprehensive bundle optimization to ensure fast loading times and optimal user experience:
+
+**Code Splitting Implementation:**
+- Route-based code splitting for all major pages
+- Component-level lazy loading for large features
+- Manual chunking for vendor libraries
+- Automated bundle size monitoring
+
+**Bundle Monitoring Commands:**
+```bash
+# Bundle analysis and monitoring
+npm run analyze                    # Detailed bundle size analysis
+npm run bundle:visual             # Interactive bundle explorer
+npm run bundle:report             # Complete bundle analysis report
+npm run test:bundle               # Bundle size regression tests
+npm run test:loading-performance  # Loading performance validation
+npm run test:optimization         # Full optimization test suite
+
+# Real-time monitoring
+node scripts/bundle-monitoring-dashboard.js  # Bundle monitoring dashboard
+node scripts/bundle-monitoring-dashboard.js alert  # CI/CD alerts
+```
+
+**Performance Budgets:**
+- Maximum chunk size: 400 kB
+- Initial bundle size: <300 kB
+- Route chunks: <150 kB each
+- Total bundle size: <2 MB
+
 ### AI-Assisted Optimization
 - Use AI to identify performance bottlenecks
 - AI-generated performance test scenarios
-- Automated bundle size analysis
+- Automated bundle size analysis and recommendations
 - Memory usage optimization suggestions
+- Component splitting candidate identification
+
+### Bundle Size Regression Prevention
+**Automated Testing:**
+- Bundle size regression tests run on every build
+- Performance budget enforcement in CI/CD
+- Automated alerts for threshold breaches
+- Historical bundle size tracking
+
+**Development Guidelines:**
+- Monitor bundle impact when adding dependencies
+- Use dynamic imports for large, rarely-used components
+- Regular bundle analysis during feature development
+- Component size awareness (keep components <50 kB when possible)
 
 ### Monitoring in Discovery Phase
 Track key metrics:
-- Page load times
+- Bundle size trends and composition
+- Page load times and Time to Interactive
 - Component render performance
+- Route transition performance
 - Data operation efficiency
 - Memory usage patterns
+- Chunk loading success rates
 
 ## Migration Planning
 

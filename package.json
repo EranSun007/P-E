@@ -17,6 +17,10 @@
     "test:loading-performance": "vitest run scripts/__tests__/loading-performance.test.js",
     "performance:test": "node scripts/test-loading-performance.js",
     "test:optimization": "node scripts/test-optimization-validation.js",
+    "monitor:bundle": "node scripts/bundle-monitoring-dashboard.js",
+    "monitor:alert": "node scripts/bundle-monitoring-dashboard.js alert",
+    "monitor:check": "node scripts/bundle-monitoring-dashboard.js check",
+    "ci:bundle-check": "node scripts/ci-bundle-check.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest"
