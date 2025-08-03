@@ -1,5 +1,3 @@
-import { base44 } from './base44Client';
-
 // Provide empty mocks for integrations to avoid errors after migration
 export const Core = {};
 export const InvokeLLM = async () => { throw new Error('LLM integration not available in local mode'); };
