@@ -140,14 +140,7 @@ export class CalendarEventGenerationService {
         throw new Error(`Team member not found: ${duty.team_member_id}`);
       }
 
-      // Check if calendar event already exists for this duty
-      if (!forceCreate) {
-        const existingEvents = await CalendarEvent.getByDutyId(duty.id);
-        if (existingEvents.length > 0) {
-          console.log(`Calendar event already exists for duty ${duty.id}`);
-          return existingEvents[0];
-        }
-      }
+      // Note: Duplicate checking is now handled in createDutyEvent method itself
 
       // Create duty type icon mapping
       const dutyIcons = {

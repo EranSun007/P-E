@@ -10,6 +10,8 @@ import { ComponentChunkErrorBoundary, retryImport } from "@/components/ui/error-
 
 // Lazy load TaskCreationForm for better performance with error handling
 const TaskCreationForm = lazy(() => retryImport(() => import("../components/task/TaskCreationForm"), 3, 1000));
+// Lazy load DutyForm for better performance with error handling
+const DutyForm = lazy(() => retryImport(() => import("../components/duty/DutyForm"), 3, 1000));
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -32,6 +34,7 @@ import { EventStylingService } from "@/utils/eventStylingService";
 import { CalendarSyncStatusService } from "@/services/calendarSyncStatusService";
 import { ErrorHandlingService } from "@/services/errorHandlingService";
 import { useToast } from "@/components/ui/use-toast";
+import DutyRefreshService from "@/services/dutyRefreshService";
 
 export default function CalendarPage() {
   const [tasks, setTasks] = useState([]);
@@ -44,6 +47,8 @@ export default function CalendarPage() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showTaskCreation, setShowTaskCreation] = useState(false);
+  const [showDutyCreation, setShowDutyCreation] = useState(false);
+  const [editingDuty, setEditingDuty] = useState(null);
   const [currentViewMode, setCurrentViewMode] = useState(viewModeManager.getCurrentViewMode());
   const [isLoading, setIsLoading] = useState(true);
   const [agendaCounts, setAgendaCounts] = useState({});
@@ -127,9 +132,21 @@ export default function CalendarPage() {
     CalendarSyncStatusService.initialize();
     CalendarSyncStatusService.addStatusListener(setSyncStatus);
     
+    // Register for duty refresh callbacks
+    const unregisterRefresh = DutyRefreshService.registerRefreshCallback(
+      async (refreshData) => {
+        // Refresh calendar data when duties are updated
+        if (refreshData.includeCalendar) {
+          await loadCalendarData(true);
+        }
+      },
+      'calendar-page'
+    );
+    
     // Cleanup on unmount
     return () => {
       CalendarSyncStatusService.removeStatusListener(setSyncStatus);
+      unregisterRefresh();
     };
   }, []);
 
@@ -366,6 +383,57 @@ export default function CalendarPage() {
       errorOptions: {
         severity: ErrorHandlingService.SEVERITY.MEDIUM,
         context: { taskTitle: taskData.title, dueDate: taskData.due_date }
+      }
+    });
+  };
+
+  const handleCreateDuty = () => {
+    setEditingDuty(null);
+    setShowDutyCreation(true);
+  };
+
+  const handleEditDuty = (duty) => {
+    setEditingDuty(duty);
+    setShowDutyCreation(true);
+  };
+
+  const handleSaveDuty = async (dutyData) => {
+    return ErrorHandlingService.wrapOperation(async () => {
+      let savedDuty;
+      
+      if (editingDuty) {
+        // Update existing duty with refresh service
+        savedDuty = await DutyRefreshService.updateDutyWithRefresh(editingDuty.id, dutyData, {
+          showOptimistic: true,
+          highlightUpdated: true,
+          refreshViews: true
+        });
+      } else {
+        // Create new duty with refresh service
+        savedDuty = await DutyRefreshService.createDutyWithRefresh(dutyData, {
+          showOptimistic: true,
+          highlightNew: true,
+          refreshViews: true
+        });
+      }
+      
+      setShowDutyCreation(false);
+      setEditingDuty(null);
+      
+      // Refresh calendar data to show the new/updated duty
+      await loadCalendarData(true);
+      
+      return savedDuty;
+    }, {
+      operationName: editingDuty ? 'Update Duty' : 'Create Duty',
+      showLoading: false, // DutyForm handles its own loading states
+      showSuccess: false, // DutyForm handles its own success feedback
+      retryOptions: {
+        maxRetries: 2
+      },
+      errorOptions: {
+        severity: ErrorHandlingService.SEVERITY.MEDIUM,
+        context: { dutyTitle: dutyData.title, teamMemberId: dutyData.team_member_id }
       }
     });
   };
@@ -1191,10 +1259,16 @@ export default function CalendarPage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-3xl font-bold">Calendar</h1>
-              <Button onClick={() => setShowTaskCreation(true)} disabled={isLoading}>
-                <Plus className="h-4 w-4 mr-2" />
-                New Task
-              </Button>
+              <div className="flex space-x-2">
+                <Button onClick={() => setShowTaskCreation(true)} disabled={isLoading}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Task
+                </Button>
+                <Button variant="outline" onClick={handleCreateDuty} disabled={isLoading}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Duty
+                </Button>
+              </div>
             </div>
             {isLoading ? (
               <CalendarLoadingEmptyState />
@@ -1277,6 +1351,25 @@ export default function CalendarPage() {
                     status: "todo",
                     priority: "medium",
                     type: "generic"
+                  }}
+                />
+              </Suspense>
+            </ComponentChunkErrorBoundary>
+          </DialogContent>
+        </Dialog>
+
+        {/* Duty Creation Dialog */}
+        <Dialog open={showDutyCreation} onOpenChange={setShowDutyCreation}>
+          <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+            <ComponentChunkErrorBoundary componentName="Duty Form">
+              <Suspense fallback={<FormLoadingSkeleton />}>
+                <DutyForm
+                  duty={editingDuty}
+                  teamMembers={teamMembers}
+                  onSave={handleSaveDuty}
+                  onCancel={() => {
+                    setShowDutyCreation(false);
+                    setEditingDuty(null);
                   }}
                 />
               </Suspense>

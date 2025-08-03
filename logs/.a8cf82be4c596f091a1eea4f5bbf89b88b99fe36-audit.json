@@ -6,16 +6,6 @@
     "auditLog": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/.a8cf82be4c596f091a1eea4f5bbf89b88b99fe36-audit.json",
     "files": [
         {
-            "date": 1752778956799,
-            "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-07-17.log",
-            "hash": "a67de35052cc2f214a72a68cb9f9dfd39f8b044bda9bbb290d40ee2fb96bf915"
-        },
-        {
-            "date": 1752938181987,
-            "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-07-19.log",
-            "hash": "c6552332ccaf585b320e95612446cfdf6e50d797b8de73c037094ac19a8eb47c"
-        },
-        {
             "date": 1753007166217,
             "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-07-20.log",
             "hash": "e00ad661855ab8d068067b21e778b0a15fcd060de45c8e1bb8d591d32ba5e4ea"
@@ -44,6 +34,21 @@
             "date": 1753521435670,
             "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-07-26.log",
             "hash": "f3f1e603cdf65ff030accb5d971eca0e2e6cb47a39202ff232bf54a5b13fdadc"
+        },
+        {
+            "date": 1753734676694,
+            "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-07-28.log",
+            "hash": "dd9a1bd0a14f7c8ebb9f0d95f388fa41bfbcbb2d3dbc87baf074373a863bc19e"
+        },
+        {
+            "date": 1753854122978,
+            "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-07-30.log",
+            "hash": "e5ffa6664b5d2021a25edf7e54c58bef8e7aa497c468f95dfbad06b0ecf9bfcd"
+        },
+        {
+            "date": 1754154767791,
+            "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-08-02.log",
+            "hash": "1cb7d66337027caf192b190f36c1ec59226b95401050fa4f8341585471e2320f"
         }
     ],
     "hashType": "sha256"

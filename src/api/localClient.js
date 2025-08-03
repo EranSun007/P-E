@@ -47,6 +47,16 @@ function getCurrentUser() {
   }
 }
 
+// Import session management service
+let sessionManagementService;
+async function getSessionService() {
+  if (!sessionManagementService) {
+    const module = await import('../services/sessionManagementService.js');
+    sessionManagementService = module.default;
+  }
+  return sessionManagementService;
+}
+
 function checkAccess(operation, resourceType, resourceData = null) {
   const currentUser = getCurrentUser();
   
@@ -574,6 +584,13 @@ export const localClient = {
       },
       // Helper methods for creating specific event types
       async createDutyEvent(dutyId, teamMemberId, title, startDate, endDate, description = null) {
+        // Check for existing events first to ensure idempotent behavior
+        const existingEvents = await this.getByDutyId(dutyId);
+        if (existingEvents.length > 0) {
+          console.log(`Calendar event already exists for duty ${dutyId}`);
+          return existingEvents[0];
+        }
+
         return await this.create({
           title,
           description: description || `Duty assignment: ${title}`,
@@ -645,6 +662,83 @@ export const localClient = {
         return events.filter(event => 
           event.event_type === 'meeting' || event.event_type === 'one_on_one'
         );
+      },
+      
+      // Cleanup utility to remove duplicate calendar events
+      async cleanupDuplicateEvents() {
+        const events = await this.list();
+        const duplicatesRemoved = [];
+        const seenDutyIds = new Set();
+        const eventsToKeep = [];
+        
+        for (const event of events) {
+          if (event.event_type === 'duty' && event.duty_id) {
+            if (seenDutyIds.has(event.duty_id)) {
+              // This is a duplicate, mark for removal
+              duplicatesRemoved.push(event);
+            } else {
+              // First occurrence, keep it
+              seenDutyIds.add(event.duty_id);
+              eventsToKeep.push(event);
+            }
+          } else {
+            // Non-duty events, keep them
+            eventsToKeep.push(event);
+          }
+        }
+        
+        // Update storage with deduplicated events
+        if (duplicatesRemoved.length > 0) {
+          setData('calendar_events', eventsToKeep);
+          console.log(`Removed ${duplicatesRemoved.length} duplicate calendar events`);
+        }
+        
+        return {
+          duplicatesRemoved: duplicatesRemoved.length,
+          duplicateEvents: duplicatesRemoved
+        };
+      },
+      
+      // Validate data consistency between duties and calendar events
+      async validateDutyEventConsistency() {
+        const dutyEvents = await this.getDutyEvents();
+        const duties = getData('duties');
+        const inconsistencies = [];
+        
+        // Check for calendar events without corresponding duties
+        for (const event of dutyEvents) {
+          if (event.duty_id) {
+            const correspondingDuty = duties.find(d => d.id === event.duty_id);
+            if (!correspondingDuty) {
+              inconsistencies.push({
+                type: 'orphaned_calendar_event',
+                event: event,
+                issue: `Calendar event ${event.id} references non-existent duty ${event.duty_id}`
+              });
+            }
+          }
+        }
+        
+        // Check for duties without corresponding calendar events
+        for (const duty of duties) {
+          const correspondingEvents = dutyEvents.filter(e => e.duty_id === duty.id);
+          if (correspondingEvents.length === 0) {
+            inconsistencies.push({
+              type: 'missing_calendar_event',
+              duty: duty,
+              issue: `Duty ${duty.id} has no corresponding calendar event`
+            });
+          } else if (correspondingEvents.length > 1) {
+            inconsistencies.push({
+              type: 'multiple_calendar_events',
+              duty: duty,
+              events: correspondingEvents,
+              issue: `Duty ${duty.id} has ${correspondingEvents.length} calendar events`
+            });
+          }
+        }
+        
+        return inconsistencies;
       }
     },
     Notification: {
@@ -934,70 +1028,179 @@ export const localClient = {
         return duties.find(d => d.id === id) || null;
       },
       async create(duty) {
+        // Get session management service and clean up expired sessions first
+        const sessionService = await getSessionService();
+        sessionService.cleanupExpiredSessions();
+        
         const duties = getData('duties');
         
-        // Validate required fields
-        if (!duty.team_member_id) {
-          throw new Error('team_member_id is required');
+        // Import validation utilities
+        const { validateForm, sanitizeFormData } = await import('../utils/dutyValidation.js');
+        
+        // Sanitize input data first
+        const sanitizedDuty = sanitizeFormData(duty);
+        
+        // Session-based idempotency check - if session exists and is active, prevent duplicate
+        if (sanitizedDuty.creation_session_id) {
+          // Check if this session already completed a duty creation
+          const existingDuty = sessionService.findDutyBySession(sanitizedDuty.creation_session_id);
+          if (existingDuty) {
+            console.log('Idempotent request detected - returning existing duty for session:', sanitizedDuty.creation_session_id);
+            return existingDuty;
+          }
+          
+          // Check if session is currently active (another request in progress)
+          if (sessionService.isSessionActive(sanitizedDuty.creation_session_id)) {
+            // Register this session to track the request
+            sessionService.registerSession(sanitizedDuty.creation_session_id, sanitizedDuty);
+          }
         }
-        if (!duty.type) {
-          throw new Error('duty type is required');
+        
+        // Comprehensive server-side validation
+        const validationResult = validateForm(sanitizedDuty);
+        if (Object.keys(validationResult.errors).length > 0) {
+          const errorMessages = Object.entries(validationResult.errors)
+            .map(([field, error]) => `${field}: ${error}`)
+            .join('; ');
+          throw new Error(`Validation failed: ${errorMessages}`);
         }
-        if (!duty.title) {
-          throw new Error('duty title is required');
-        }
-        if (!duty.start_date) {
-          throw new Error('start_date is required');
-        }
-        if (!duty.end_date) {
-          throw new Error('end_date is required');
-        }
-
-        // Validate duty type
-        const validTypes = ['devops', 'on_call', 'other'];
-        if (!validTypes.includes(duty.type)) {
-          throw new Error(`Invalid duty type. Must be one of: ${validTypes.join(', ')}`);
-        }
-
-        // Validate date range
-        const startDate = new Date(duty.start_date);
-        const endDate = new Date(duty.end_date);
+        
+        // Use sanitized data for further processing
+        const validatedDuty = validationResult.sanitizedData;
+        
+        // Additional server-side business rule validation
+        await this.validateBusinessRules(validatedDuty, duties);
+        
+        // Validate date range (additional server-side check)
+        const startDate = new Date(validatedDuty.start_date);
+        const endDate = new Date(validatedDuty.end_date);
         if (startDate >= endDate) {
           throw new Error('start_date must be before end_date');
         }
-
-        // Check for conflicts with existing duties for the same team member
-        const existingDuties = duties.filter(d => d.team_member_id === duty.team_member_id);
-        const hasConflict = existingDuties.some(existingDuty => {
-          const existingStart = new Date(existingDuty.start_date);
-          const existingEnd = new Date(existingDuty.end_date);
-          
-          // Check if date ranges overlap
-          return (startDate <= existingEnd && endDate >= existingStart);
-        });
-
-        if (hasConflict) {
-          console.warn('Duty assignment conflicts with existing duty for this team member');
-          // Don't throw error, just warn - allow conflicts but log them
+        
+        // Validate date is not in invalid range
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+          throw new Error('Invalid date format provided');
         }
 
+        // Use enhanced duplicate detection with session awareness
+        const duplicateWarnings = await this.checkForDuplicates(validatedDuty);
+        
+        // Check for session-based duplicates (highest priority)
+        const sessionDuplicates = duplicateWarnings.filter(w => w.type === 'session_duplicate');
+        if (sessionDuplicates.length > 0) {
+          // Return the existing duty instead of creating a duplicate
+          const existingDuty = sessionService.findDutyBySession(validatedDuty.creation_session_id);
+          if (existingDuty) {
+            console.log('Prevented duplicate submission with session ID:', validatedDuty.creation_session_id);
+            return existingDuty;
+          }
+        }
+
+        // Check for high-severity duplicates that should block creation
+        const highSeverityWarnings = duplicateWarnings.filter(w => w.severity === 'high' && w.type !== 'session_duplicate');
+        if (highSeverityWarnings.length > 0) {
+          const errorMessages = highSeverityWarnings.map(w => w.message).join('; ');
+          throw new Error(`Duplicate duty detected: ${errorMessages}`);
+        }
+
+        // Validate rotation-specific fields
+        if (validatedDuty.is_rotation) {
+          if (!validatedDuty.rotation_id) {
+            throw new Error('rotation_id is required when is_rotation is true');
+          }
+          if (typeof validatedDuty.rotation_participants !== 'number' || validatedDuty.rotation_participants < 2) {
+            throw new Error('rotation_participants must be a number >= 2 when is_rotation is true');
+          }
+          if (typeof validatedDuty.rotation_sequence !== 'number' || validatedDuty.rotation_sequence < 0) {
+            throw new Error('rotation_sequence must be a number >= 0 when is_rotation is true');
+          }
+          if (typeof validatedDuty.rotation_cycle_weeks !== 'number' || validatedDuty.rotation_cycle_weeks < 1) {
+            throw new Error('rotation_cycle_weeks must be a number >= 1 when is_rotation is true');
+          }
+          if (validatedDuty.rotation_sequence >= validatedDuty.rotation_participants) {
+            throw new Error('rotation_sequence must be less than rotation_participants');
+          }
+        } else {
+          // Ensure rotation fields are null when not a rotation
+          if (validatedDuty.rotation_id || validatedDuty.rotation_participants || (validatedDuty.rotation_sequence !== null && validatedDuty.rotation_sequence !== undefined) || validatedDuty.rotation_cycle_weeks) {
+            throw new Error('Rotation fields must be null when is_rotation is false');
+          }
+        }
+
+        // Begin atomic transaction - create duty and calendar event together
         const newDuty = {
-          ...duty,
+          ...validatedDuty,
           id: generateId(),
           created_date: new Date().toISOString(),
           updated_date: new Date().toISOString(),
           // Ensure proper field initialization
-          team_member_id: duty.team_member_id,
-          type: duty.type,
-          title: duty.title,
-          description: duty.description || null,
-          start_date: duty.start_date,
-          end_date: duty.end_date
+          team_member_id: validatedDuty.team_member_id,
+          type: validatedDuty.type,
+          title: validatedDuty.title,
+          description: validatedDuty.description || null,
+          start_date: validatedDuty.start_date,
+          end_date: validatedDuty.end_date,
+          // Session-based duplicate prevention
+          creation_session_id: validatedDuty.creation_session_id || null,
+          // New rotation fields
+          is_rotation: validatedDuty.is_rotation || false,
+          rotation_id: validatedDuty.rotation_id || null,
+          rotation_participants: validatedDuty.rotation_participants || null,
+          rotation_sequence: validatedDuty.rotation_sequence !== undefined ? validatedDuty.rotation_sequence : null,
+          rotation_cycle_weeks: validatedDuty.rotation_cycle_weeks || null
         };
 
+        // Atomic operation: save duty first
         duties.unshift(newDuty);
         setData('duties', duties);
-        return newDuty;
+        
+        try {
+          // Create corresponding calendar event atomically
+          await localClient.entities.CalendarEvent.createDutyEvent(
+            newDuty.id,
+            newDuty.team_member_id,
+            newDuty.title,
+            newDuty.start_date,
+            newDuty.end_date,
+            newDuty.description
+          );
+          
+          // Mark session as completed if session ID provided
+          if (newDuty.creation_session_id) {
+            sessionService.markSessionCompleted(newDuty.creation_session_id, newDuty.id);
+          }
+          
+          // Log successful creation for audit
+          try {
+            await logAuditEvent(AUDIT_ACTIONS.CREATE, AUDIT_RESOURCES.DUTY, newDuty.id, {
+              team_member_id: newDuty.team_member_id,
+              type: newDuty.type,
+              title: newDuty.title,
+              session_id: newDuty.creation_session_id
+            });
+          } catch (auditError) {
+            console.warn('Failed to log audit event:', auditError);
+            // Don't fail the operation for audit logging issues
+          }
+          
+          return newDuty;
+          
+        } catch (error) {
+          // Atomic rollback: if calendar event creation fails, rollback the duty creation
+          console.error('Failed to create calendar event for duty, rolling back:', error);
+          const rollbackDuties = getData('duties').filter(d => d.id !== newDuty.id);
+          setData('duties', rollbackDuties);
+          
+          // Clean up session if it was registered
+          if (newDuty.creation_session_id) {
+            const sessions = sessionService.getActiveSessions();
+            delete sessions[newDuty.creation_session_id];
+            sessionService.setActiveSessions(sessions);
+          }
+          
+          throw new Error(`Failed to create duty: Calendar event creation failed - ${error.message}`);
+        }
       },
       async update(id, updates) {
         const duties = getData('duties');
@@ -1008,29 +1211,73 @@ export const localClient = {
 
         const currentDuty = duties[idx];
         
-        // Validate duty type if being updated
-        if (updates.type) {
-          const validTypes = ['devops', 'on_call', 'other'];
-          if (!validTypes.includes(updates.type)) {
-            throw new Error(`Invalid duty type. Must be one of: ${validTypes.join(', ')}`);
+        // Import validation utilities
+        const { sanitizeFormData, validateField } = await import('../utils/dutyValidation.js');
+        
+        // Sanitize update data
+        const sanitizedUpdates = sanitizeFormData(updates);
+        
+        // Validate each updated field
+        const errors = {};
+        Object.keys(sanitizedUpdates).forEach(fieldName => {
+          if (sanitizedUpdates[fieldName] !== undefined) {
+            // Create merged data for cross-field validation
+            const mergedData = { ...currentDuty, ...sanitizedUpdates };
+            const error = validateField(fieldName, sanitizedUpdates[fieldName], mergedData);
+            if (error) {
+              errors[fieldName] = error;
+            }
           }
+        });
+        
+        if (Object.keys(errors).length > 0) {
+          const errorMessages = Object.entries(errors)
+            .map(([field, error]) => `${field}: ${error}`)
+            .join('; ');
+          throw new Error(`Validation failed: ${errorMessages}`);
         }
-
+        
+        // Use sanitized data for further processing
+        const validatedUpdates = sanitizedUpdates;
+        
         // Validate date range if dates are being updated
-        const startDate = new Date(updates.start_date || currentDuty.start_date);
-        const endDate = new Date(updates.end_date || currentDuty.end_date);
+        const startDate = new Date(validatedUpdates.start_date || currentDuty.start_date);
+        const endDate = new Date(validatedUpdates.end_date || currentDuty.end_date);
         if (startDate >= endDate) {
           throw new Error('start_date must be before end_date');
         }
+        
+        // Validate merged duty data against business rules
+        const mergedDuty = { ...currentDuty, ...validatedUpdates };
+        await this.validateBusinessRules(mergedDuty, duties.filter(d => d.id !== id));
 
-        // Check for conflicts if dates or team member are being updated
-        if (updates.start_date || updates.end_date || updates.team_member_id) {
-          const teamMemberId = updates.team_member_id || currentDuty.team_member_id;
+        // Check for conflicts if dates, team member, type, or title are being updated
+        if (validatedUpdates.start_date || validatedUpdates.end_date || validatedUpdates.team_member_id || validatedUpdates.type || validatedUpdates.title) {
+          const teamMemberId = validatedUpdates.team_member_id || currentDuty.team_member_id;
+          const dutyType = validatedUpdates.type || currentDuty.type;
+          const dutyTitle = validatedUpdates.title || currentDuty.title;
+          
           const existingDuties = duties.filter(d => 
             d.team_member_id === teamMemberId && d.id !== id
           );
           
-          const hasConflict = existingDuties.some(existingDuty => {
+          // Check for exact duplicates (same team member, type, title, and date range)
+          const exactDuplicate = existingDuties.find(existingDuty => {
+            return existingDuty.type === dutyType &&
+                   existingDuty.title === dutyTitle &&
+                   existingDuty.start_date === startDate.toISOString().split('T')[0] &&
+                   existingDuty.end_date === endDate.toISOString().split('T')[0];
+          });
+
+          if (exactDuplicate) {
+            throw new Error(`Duplicate duty detected: A duty with the same type "${dutyType}", title "${dutyTitle}", and date range already exists for this team member`);
+          }
+
+          // Check for overlapping duty periods of the same type
+          const overlappingDutiesOfSameType = existingDuties.filter(existingDuty => {
+            // Only check for overlaps within the same duty type
+            if (existingDuty.type !== dutyType) return false;
+            
             const existingStart = new Date(existingDuty.start_date);
             const existingEnd = new Date(existingDuty.end_date);
             
@@ -1038,15 +1285,47 @@ export const localClient = {
             return (startDate <= existingEnd && endDate >= existingStart);
           });
 
-          if (hasConflict) {
-            console.warn('Updated duty assignment conflicts with existing duty for this team member');
-            // Don't throw error, just warn - allow conflicts but log them
+          if (overlappingDutiesOfSameType.length > 0) {
+            const conflictDetails = overlappingDutiesOfSameType.map(d => 
+              `"${d.title}" (${d.type}) from ${d.start_date} to ${d.end_date}`
+            ).join(', ');
+            throw new Error(`Duty assignment conflicts with existing duties of the same type for this team member: ${conflictDetails}. Overlapping duty periods of the same type are not allowed.`);
+          }
+        }
+
+        // Validate rotation-specific fields if being updated
+        const isRotation = validatedUpdates.is_rotation !== undefined ? validatedUpdates.is_rotation : currentDuty.is_rotation;
+        if (isRotation) {
+          const rotationId = validatedUpdates.rotation_id !== undefined ? validatedUpdates.rotation_id : currentDuty.rotation_id;
+          const rotationParticipants = validatedUpdates.rotation_participants !== undefined ? validatedUpdates.rotation_participants : currentDuty.rotation_participants;
+          const rotationSequence = validatedUpdates.rotation_sequence !== undefined ? validatedUpdates.rotation_sequence : currentDuty.rotation_sequence;
+          const rotationCycleWeeks = validatedUpdates.rotation_cycle_weeks !== undefined ? validatedUpdates.rotation_cycle_weeks : currentDuty.rotation_cycle_weeks;
+
+          if (!rotationId) {
+            throw new Error('rotation_id is required when is_rotation is true');
+          }
+          if (typeof rotationParticipants !== 'number' || rotationParticipants < 2) {
+            throw new Error('rotation_participants must be a number >= 2 when is_rotation is true');
+          }
+          if (typeof rotationSequence !== 'number' || rotationSequence < 0) {
+            throw new Error('rotation_sequence must be a number >= 0 when is_rotation is true');
+          }
+          if (typeof rotationCycleWeeks !== 'number' || rotationCycleWeeks < 1) {
+            throw new Error('rotation_cycle_weeks must be a number >= 1 when is_rotation is true');
+          }
+          if (rotationSequence >= rotationParticipants) {
+            throw new Error('rotation_sequence must be less than rotation_participants');
+          }
+        } else if (validatedUpdates.is_rotation === false) {
+          // When explicitly setting is_rotation to false, ensure rotation fields are cleared
+          if (validatedUpdates.rotation_id || validatedUpdates.rotation_participants || (validatedUpdates.rotation_sequence !== null && validatedUpdates.rotation_sequence !== undefined) || validatedUpdates.rotation_cycle_weeks) {
+            throw new Error('Rotation fields must be null when is_rotation is false');
           }
         }
 
         const updatedDuty = {
           ...currentDuty,
-          ...updates,
+          ...validatedUpdates,
           updated_date: new Date().toISOString()
         };
 
@@ -1092,6 +1371,368 @@ export const localClient = {
           
           // Check if date ranges overlap
           return (start <= dutyEnd && end >= dutyStart);
+        });
+      },
+      async checkForDuplicates(dutyData, excludeId = null) {
+        const duties = getData('duties');
+        const warnings = [];
+        const start = new Date(dutyData.start_date);
+        const end = new Date(dutyData.end_date);
+        
+        // Optimized filtering with early returns for better performance
+        const teamMemberDuties = duties.filter(duty => {
+          // Quick exclusion checks first
+          if (excludeId && duty.id === excludeId) return false;
+          if (duty.team_member_id !== dutyData.team_member_id) return false;
+          
+          // Pre-filter by date range to reduce processing
+          const dutyStart = new Date(duty.start_date);
+          const dutyEnd = new Date(duty.end_date);
+          
+          // Only include duties that could potentially conflict
+          return (start <= dutyEnd && end >= dutyStart) || 
+                 (duty.type === dutyData.type && duty.title === dutyData.title);
+        });
+        
+        // Optimized duplicate checking with single pass through duties
+        const exactDuplicates = [];
+        const sameTypeOverlaps = [];
+        const generalOverlaps = [];
+        
+        // Single pass through filtered duties for better performance
+        for (const duty of teamMemberDuties) {
+          const dutyStart = new Date(duty.start_date);
+          const dutyEnd = new Date(duty.end_date);
+          const hasDateOverlap = (start <= dutyEnd && end >= dutyStart);
+          
+          // Check for exact duplicates
+          if (duty.type === dutyData.type &&
+              duty.title === dutyData.title &&
+              duty.start_date === dutyData.start_date &&
+              duty.end_date === dutyData.end_date) {
+            exactDuplicates.push(duty);
+          }
+          // Check for same type overlaps (excluding exact duplicates)
+          else if (duty.type === dutyData.type && hasDateOverlap) {
+            sameTypeOverlaps.push(duty);
+          }
+          // Check for general overlaps (different types)
+          else if (duty.type !== dutyData.type && hasDateOverlap) {
+            generalOverlaps.push(duty);
+          }
+        }
+        
+        // Add warnings based on findings
+        if (exactDuplicates.length > 0) {
+          warnings.push({
+            type: 'exact_duplicate',
+            severity: 'high',
+            message: 'An identical duty assignment already exists',
+            conflictingDuties: exactDuplicates,
+            details: `Exact match found: ${dutyData.type} - ${dutyData.title} for the same dates`
+          });
+        }
+        
+        if (sameTypeOverlaps.length > 0) {
+          warnings.push({
+            type: 'same_type_overlap',
+            severity: 'high',
+            message: 'Overlapping duties of the same type detected',
+            conflictingDuties: sameTypeOverlaps,
+            details: `${dutyData.type} duties cannot overlap for the same team member`
+          });
+        }
+        
+        if (generalOverlaps.length > 0) {
+          warnings.push({
+            type: 'overlapping_dates',
+            severity: 'medium',
+            message: 'Overlapping duty periods detected',
+            conflictingDuties: generalOverlaps,
+            details: 'Multiple duties assigned to the same team member during overlapping periods'
+          });
+        }
+        
+        // Check for session-based duplicates
+        if (dutyData.creation_session_id) {
+          const sessionDuplicates = duties.filter(duty => 
+            duty.creation_session_id === dutyData.creation_session_id
+          );
+          
+          if (sessionDuplicates.length > 0) {
+            warnings.push({
+              type: 'session_duplicate',
+              severity: 'high',
+              message: 'Duplicate submission detected',
+              conflictingDuties: sessionDuplicates,
+              details: 'This duty may have already been created in this session'
+            });
+          }
+        }
+        
+        return warnings;
+      },
+      
+      // Server-side business rules validation
+      async validateBusinessRules(dutyData, existingDuties = null) {
+        const duties = existingDuties || getData('duties');
+        
+        // Validate team member exists
+        const teamMembers = getData('team_members');
+        const teamMemberExists = teamMembers.some(tm => tm.id === dutyData.team_member_id);
+        if (!teamMemberExists) {
+          throw new Error('Invalid team member: Team member does not exist');
+        }
+        
+        // Validate duty type and title combination
+        const validCombinations = {
+          'devops': ['DevOps'],
+          'on_call': ['Reporting', 'Metering'],
+          'other': ['Reporting', 'Metering', 'DevOps']
+        };
+        
+        if (!validCombinations[dutyData.type]?.includes(dutyData.title)) {
+          throw new Error(`Invalid combination: ${dutyData.type} duties cannot have title "${dutyData.title}"`);
+        }
+        
+        // Validate date constraints
+        const startDate = new Date(dutyData.start_date);
+        const endDate = new Date(dutyData.end_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Check minimum duty period (at least 1 day)
+        const timeDiff = endDate.getTime() - startDate.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        if (daysDiff < 1) {
+          throw new Error('Duty period must be at least 1 day');
+        }
+        
+        // Check maximum duty period (1 year)
+        if (daysDiff > 365) {
+          throw new Error('Duty period cannot exceed 1 year');
+        }
+        
+        // Weekend duty validation for on-call duties
+        if (dutyData.type === 'on_call') {
+          const startDayOfWeek = startDate.getDay();
+          if (startDayOfWeek === 0 || startDayOfWeek === 6) {
+            // This is a warning, not an error - log it but don't throw
+            console.warn('On-call duty starting on weekend may require additional approval');
+          }
+        }
+        
+        // Validate against existing duties for conflicts
+        const conflicts = duties.filter(existingDuty => {
+          if (existingDuty.team_member_id !== dutyData.team_member_id) return false;
+          
+          const existingStart = new Date(existingDuty.start_date);
+          const existingEnd = new Date(existingDuty.end_date);
+          
+          // Check for date overlap
+          return (startDate <= existingEnd && endDate >= existingStart);
+        });
+        
+        // Check for same-type conflicts (high severity)
+        const sameTypeConflicts = conflicts.filter(conflict => conflict.type === dutyData.type);
+        if (sameTypeConflicts.length > 0) {
+          const conflictDetails = sameTypeConflicts.map(c => 
+            `"${c.title}" from ${c.start_date} to ${c.end_date}`
+          ).join(', ');
+          throw new Error(`Duty conflicts with existing ${dutyData.type} duties: ${conflictDetails}`);
+        }
+        
+        return true;
+      }
+    },
+    DutyRotation: {
+      async list() {
+        return getData('duty_rotations');
+      },
+      async get(id) {
+        const rotations = getData('duty_rotations');
+        return rotations.find(r => r.id === id) || null;
+      },
+      async create(rotation) {
+        const rotations = getData('duty_rotations');
+        
+        // Validate required fields
+        if (!rotation.name) {
+          throw new Error('name is required');
+        }
+        if (!rotation.type) {
+          throw new Error('type is required');
+        }
+        if (!rotation.participants || !Array.isArray(rotation.participants)) {
+          throw new Error('participants must be an array');
+        }
+        if (rotation.participants.length < 2) {
+          throw new Error('rotation must have at least 2 participants');
+        }
+        if (typeof rotation.cycle_weeks !== 'number' || rotation.cycle_weeks < 1) {
+          throw new Error('cycle_weeks must be a number >= 1');
+        }
+
+        // Validate rotation type
+        const validTypes = ['Reporting', 'Metering', 'DevOps'];
+        if (!validTypes.includes(rotation.type)) {
+          throw new Error(`Invalid rotation type. Must be one of: ${validTypes.join(', ')}`);
+        }
+
+        // Validate that all participants exist
+        const teamMembers = getData('team_members');
+        const teamMemberIds = teamMembers.map(tm => tm.id);
+        const invalidParticipants = rotation.participants.filter(p => !teamMemberIds.includes(p));
+        if (invalidParticipants.length > 0) {
+          throw new Error(`Invalid participants: ${invalidParticipants.join(', ')} do not exist`);
+        }
+
+        // Check for duplicate participants
+        const uniqueParticipants = [...new Set(rotation.participants)];
+        if (uniqueParticipants.length !== rotation.participants.length) {
+          throw new Error('Duplicate participants are not allowed in a rotation');
+        }
+
+        // Validate current_assignee_index
+        const currentAssigneeIndex = rotation.current_assignee_index || 0;
+        if (currentAssigneeIndex < 0 || currentAssigneeIndex >= rotation.participants.length) {
+          throw new Error('current_assignee_index must be within the range of participants');
+        }
+
+        const newRotation = {
+          ...rotation,
+          id: generateId(),
+          created_date: new Date().toISOString(),
+          updated_date: new Date().toISOString(),
+          // Initialize with defaults
+          current_assignee_index: currentAssigneeIndex,
+          next_rotation_date: rotation.next_rotation_date || null,
+          is_active: rotation.is_active !== undefined ? rotation.is_active : true
+        };
+
+        rotations.unshift(newRotation);
+        setData('duty_rotations', rotations);
+        return newRotation;
+      },
+      async update(id, updates) {
+        const rotations = getData('duty_rotations');
+        const idx = rotations.findIndex(r => r.id === id);
+        if (idx === -1) {
+          throw new Error('DutyRotation not found');
+        }
+
+        const currentRotation = rotations[idx];
+
+        // Validate rotation type if being updated
+        if (updates.type) {
+          const validTypes = ['Reporting', 'Metering', 'DevOps'];
+          if (!validTypes.includes(updates.type)) {
+            throw new Error(`Invalid rotation type. Must be one of: ${validTypes.join(', ')}`);
+          }
+        }
+
+        // Validate participants if being updated
+        if (updates.participants) {
+          if (!Array.isArray(updates.participants)) {
+            throw new Error('participants must be an array');
+          }
+          if (updates.participants.length < 2) {
+            throw new Error('rotation must have at least 2 participants');
+          }
+
+          // Validate that all participants exist
+          const teamMembers = getData('team_members');
+          const teamMemberIds = teamMembers.map(tm => tm.id);
+          const invalidParticipants = updates.participants.filter(p => !teamMemberIds.includes(p));
+          if (invalidParticipants.length > 0) {
+            throw new Error(`Invalid participants: ${invalidParticipants.join(', ')} do not exist`);
+          }
+
+          // Check for duplicate participants
+          const uniqueParticipants = [...new Set(updates.participants)];
+          if (uniqueParticipants.length !== updates.participants.length) {
+            throw new Error('Duplicate participants are not allowed in a rotation');
+          }
+        }
+
+        // Validate cycle_weeks if being updated
+        if (updates.cycle_weeks !== undefined) {
+          if (typeof updates.cycle_weeks !== 'number' || updates.cycle_weeks < 1) {
+            throw new Error('cycle_weeks must be a number >= 1');
+          }
+        }
+
+        // Validate current_assignee_index if being updated
+        if (updates.current_assignee_index !== undefined) {
+          const participants = updates.participants || currentRotation.participants;
+          if (updates.current_assignee_index < 0 || updates.current_assignee_index >= participants.length) {
+            throw new Error('current_assignee_index must be within the range of participants');
+          }
+        }
+
+        const updatedRotation = {
+          ...currentRotation,
+          ...updates,
+          updated_date: new Date().toISOString()
+        };
+
+        rotations[idx] = updatedRotation;
+        setData('duty_rotations', rotations);
+        return updatedRotation;
+      },
+      async delete(id) {
+        let rotations = getData('duty_rotations');
+        const rotationExists = rotations.some(r => r.id === id);
+        if (!rotationExists) {
+          throw new Error('DutyRotation not found');
+        }
+
+        rotations = rotations.filter(r => r.id !== id);
+        setData('duty_rotations', rotations);
+        return true;
+      },
+      async getByType(type) {
+        const rotations = getData('duty_rotations');
+        return rotations.filter(r => r.type === type);
+      },
+      async getActive() {
+        const rotations = getData('duty_rotations');
+        return rotations.filter(r => r.is_active);
+      },
+      async getCurrentAssignee(id) {
+        const rotation = await this.get(id);
+        if (!rotation) {
+          throw new Error('DutyRotation not found');
+        }
+        
+        const currentParticipantId = rotation.participants[rotation.current_assignee_index];
+        const teamMembers = getData('team_members');
+        return teamMembers.find(tm => tm.id === currentParticipantId) || null;
+      },
+      async getNextAssignee(id) {
+        const rotation = await this.get(id);
+        if (!rotation) {
+          throw new Error('DutyRotation not found');
+        }
+        
+        const nextIndex = (rotation.current_assignee_index + 1) % rotation.participants.length;
+        const nextParticipantId = rotation.participants[nextIndex];
+        const teamMembers = getData('team_members');
+        return teamMembers.find(tm => tm.id === nextParticipantId) || null;
+      },
+      async advanceRotation(id) {
+        const rotation = await this.get(id);
+        if (!rotation) {
+          throw new Error('DutyRotation not found');
+        }
+
+        const nextIndex = (rotation.current_assignee_index + 1) % rotation.participants.length;
+        const nextRotationDate = new Date();
+        nextRotationDate.setDate(nextRotationDate.getDate() + (rotation.cycle_weeks * 7));
+
+        return await this.update(id, {
+          current_assignee_index: nextIndex,
+          next_rotation_date: nextRotationDate.toISOString()
         });
       }
     },
@@ -1424,6 +2065,116 @@ export const localClient = {
       }
     }
   },
+  
+  // Migration functions for data model updates
+  migrations: {
+    async migrateDutiesForRotationSupport() {
+      const duties = getData('duties');
+      let migrationCount = 0;
+      
+      const migratedDuties = duties.map(duty => {
+        // Check if duty already has rotation fields
+        if (duty.is_rotation !== undefined) {
+          return duty; // Already migrated
+        }
+        
+        // Add rotation fields with default values
+        migrationCount++;
+        return {
+          ...duty,
+          is_rotation: false,
+          rotation_id: null,
+          rotation_participants: null,
+          rotation_sequence: null,
+          rotation_cycle_weeks: null,
+          updated_date: new Date().toISOString()
+        };
+      });
+      
+      if (migrationCount > 0) {
+        setData('duties', migratedDuties);
+        console.log(`Migrated ${migrationCount} duties to support rotation fields`);
+      }
+      
+      return {
+        migrated: migrationCount,
+        total: duties.length
+      };
+    },
+    
+    async validateRotationDataIntegrity() {
+      const duties = getData('duties');
+      const rotations = getData('duty_rotations');
+      const issues = [];
+      
+      // Check for rotation duties without corresponding rotation records
+      const rotationDuties = duties.filter(d => d.is_rotation);
+      for (const duty of rotationDuties) {
+        if (!duty.rotation_id) {
+          issues.push({
+            type: 'missing_rotation_id',
+            duty: duty,
+            message: `Rotation duty ${duty.id} is missing rotation_id`
+          });
+          continue;
+        }
+        
+        const correspondingRotation = rotations.find(r => r.id === duty.rotation_id);
+        if (!correspondingRotation) {
+          issues.push({
+            type: 'orphaned_rotation_duty',
+            duty: duty,
+            message: `Rotation duty ${duty.id} references non-existent rotation ${duty.rotation_id}`
+          });
+        }
+      }
+      
+      // Check for rotation records without corresponding duties
+      for (const rotation of rotations) {
+        const correspondingDuties = duties.filter(d => d.rotation_id === rotation.id);
+        if (correspondingDuties.length === 0) {
+          issues.push({
+            type: 'unused_rotation',
+            rotation: rotation,
+            message: `Rotation ${rotation.id} has no corresponding duties`
+          });
+        }
+      }
+      
+      return issues;
+    },
+    
+    async cleanupRotationData() {
+      const duties = getData('duties');
+      const rotations = getData('duty_rotations');
+      let cleanupCount = 0;
+      
+      // Remove rotation records that have no corresponding duties
+      const activeRotationIds = new Set(
+        duties.filter(d => d.is_rotation && d.rotation_id).map(d => d.rotation_id)
+      );
+      
+      const cleanedRotations = rotations.filter(rotation => {
+        if (activeRotationIds.has(rotation.id)) {
+          return true;
+        } else {
+          cleanupCount++;
+          console.log(`Removing unused rotation: ${rotation.name} (${rotation.id})`);
+          return false;
+        }
+      });
+      
+      if (cleanupCount > 0) {
+        setData('duty_rotations', cleanedRotations);
+      }
+      
+      return {
+        removed: cleanupCount,
+        remaining: cleanedRotations.length
+      };
+    }
+  },
+  
   auth: {
     async me() {
       return { id: 'local-user', name: 'Local User' };

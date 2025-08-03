@@ -6,6 +6,7 @@ import { AgendaService } from "@/utils/agendaService";
 import { CalendarService } from "@/utils/calendarService";
 import { CalendarEventGenerationService } from "@/services/calendarEventGenerationService";
 import EmployeeGoalsService from "@/services/employeeGoalsService";
+import DutyRefreshService from "@/services/dutyRefreshService";
 import AgendaItemCard from "@/components/agenda/AgendaItemCard";
 import AgendaItemList from "@/components/agenda/AgendaItemList";
 import AgendaSection from "@/components/agenda/AgendaSection";
@@ -15,6 +16,7 @@ import OutOfOfficeCounter from "@/components/team/OutOfOfficeCounter";
 import OutOfOfficeManager from "@/components/team/OutOfOfficeManager";
 import DutyForm from "@/components/duty/DutyForm";
 import DutyCard from "@/components/duty/DutyCard";
+import TeamMemberRotationDisplay from "@/components/duty/TeamMemberRotationDisplay";
 import GoalsList from "@/components/goals/GoalsList";
 import GoalForm from "@/components/goals/GoalForm";
 import { createPageUrl } from "@/utils";
@@ -144,6 +146,26 @@ export default function TeamMemberProfile() {
     if (memberId) {
       loadData();
     }
+  }, [memberId]);
+
+  // Register for duty refresh callbacks
+  useEffect(() => {
+    const unregisterRefresh = DutyRefreshService.registerRefreshCallback(
+      async (refreshData) => {
+        // Refresh duties when they are updated
+        if (refreshData.includeProfile && memberId) {
+          try {
+            const memberDuties = await Duty.getByTeamMember(memberId);
+            setDuties(memberDuties);
+          } catch (error) {
+            console.error('Failed to refresh duties:', error);
+          }
+        }
+      },
+      'team-member-profile'
+    );
+    
+    return unregisterRefresh;
   }, [memberId]);
 
   const loadData = async () => {
@@ -452,16 +474,28 @@ export default function TeamMemberProfile() {
 
   const handleSaveDuty = async (dutyData) => {
     try {
+      let savedDuty;
+      
       if (editingDuty) {
-        await Duty.update(editingDuty.id, dutyData);
+        // Update existing duty with refresh service
+        savedDuty = await DutyRefreshService.updateDutyWithRefresh(editingDuty.id, dutyData, {
+          showOptimistic: true,
+          highlightUpdated: true,
+          refreshViews: true
+        });
       } else {
-        await Duty.create(dutyData);
+        // Create new duty with refresh service
+        savedDuty = await DutyRefreshService.createDutyWithRefresh(dutyData, {
+          showOptimistic: true,
+          highlightNew: true,
+          refreshViews: true
+        });
       }
       
       setShowDutyForm(false);
       setEditingDuty(null);
       
-      // Reload duties
+      // Reload duties (will be handled by refresh service callback)
       const memberDuties = await Duty.getByTeamMember(memberId);
       setDuties(memberDuties);
       
@@ -474,9 +508,13 @@ export default function TeamMemberProfile() {
 
   const handleDeleteDuty = async (duty) => {
     try {
-      await Duty.delete(duty.id);
+      // Use refresh service for consistent deletion
+      await DutyRefreshService.deleteDutyWithRefresh(duty.id, {
+        showOptimistic: true,
+        refreshViews: true
+      });
       
-      // Reload duties
+      // Reload duties (will be handled by refresh service callback)
       const memberDuties = await Duty.getByTeamMember(memberId);
       setDuties(memberDuties);
       
@@ -636,7 +674,7 @@ export default function TeamMemberProfile() {
           {/* Main Content with Tabs */}
           <div className="lg:col-span-2 space-y-6">
             <Tabs defaultValue={defaultTab} className="w-full">
-              <TabsList className="grid grid-cols-4 mb-4">
+              <TabsList className="grid grid-cols-5 mb-4">
                 <TabsTrigger value="meetings">
                   <MessageSquare className="h-4 w-4 mr-2" />
                   1:1 Meetings
@@ -648,6 +686,10 @@ export default function TeamMemberProfile() {
                 <TabsTrigger value="goals">
                   <Target className="h-4 w-4 mr-2" />
                   Goals
+                </TabsTrigger>
+                <TabsTrigger value="rotations">
+                  <Shield className="h-4 w-4 mr-2" />
+                  Rotations
                 </TabsTrigger>
                 <TabsTrigger value="personal-file">
                   <FileText className="h-4 w-4 mr-2" />
@@ -1115,6 +1157,18 @@ export default function TeamMemberProfile() {
                 </Card>
               </TabsContent>
               
+              {/* Rotations Tab */}
+              <TabsContent value="rotations" className="mt-0">
+                <TeamMemberRotationDisplay
+                  teamMemberId={memberId}
+                  teamMemberName={member?.name}
+                  onManageRotation={(rotationId) => {
+                    // Navigate to rotation management or open dialog
+                    console.log('Manage rotation:', rotationId);
+                  }}
+                />
+              </TabsContent>
+              
               {/* Personal File Tab */}
               <TabsContent value="personal-file" className="mt-0">
                 <PersonalFileSection 
@@ -1144,14 +1198,21 @@ export default function TeamMemberProfile() {
                   </Button>
                 </div>
                 {dutyConflicts.length > 0 && (
-                  <div className="mt-2">
-                    <div className="flex items-center gap-2 text-orange-600">
-                      <AlertTriangle className="h-4 w-4" />
-                      <span className="text-sm font-medium">
+                  <Alert variant="destructive" className="mt-4">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      <span className="font-medium">
                         {dutyConflicts.length} duty conflict{dutyConflicts.length > 1 ? 's' : ''} detected
                       </span>
-                    </div>
-                  </div>
+                      <div className="mt-2 space-y-1">
+                        {dutyConflicts.map((conflict, index) => (
+                          <div key={index} className="text-sm">
+                            • {conflict.duty.title} conflicts with existing duties
+                          </div>
+                        ))}
+                      </div>
+                    </AlertDescription>
+                  </Alert>
                 )}
               </CardHeader>
               <CardContent>
@@ -1172,29 +1233,42 @@ export default function TeamMemberProfile() {
                       const endDate = new Date(duty.end_date);
                       return now >= startDate && now <= endDate;
                     }).length > 0 && (
-                      <div>
-                        <h4 className="font-medium text-sm text-gray-700 mb-3 flex items-center gap-2">
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <h4 className="font-medium text-sm text-green-800 mb-3 flex items-center gap-2">
                           <Clock className="h-4 w-4" />
                           Active Duties
-                        </h4>
-                        <div className="space-y-3">
-                          {duties
-                            .filter(duty => {
+                          <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
+                            {duties.filter(duty => {
                               const now = new Date();
                               const startDate = new Date(duty.start_date);
                               const endDate = new Date(duty.end_date);
                               return now >= startDate && now <= endDate;
-                            })
-                            .map(duty => (
-                              <DutyCard
-                                key={duty.id}
-                                duty={duty}
-                                teamMember={member}
-                                onEdit={handleEditDuty}
-                                onDelete={handleDeleteDuty}
-                                compact={true}
-                              />
-                            ))}
+                            }).length}
+                          </Badge>
+                        </h4>
+                        <div className="space-y-3">
+                          {DutyRefreshService.getConsistentDutyDisplay(
+                            duties.filter(duty => duty._isActive || (duty._isActive === undefined && 
+                              (() => {
+                                const now = new Date();
+                                const startDate = new Date(duty.start_date);
+                                const endDate = new Date(duty.end_date);
+                                return now >= startDate && now <= endDate;
+                              })()
+                            )),
+                            [member],
+                            { sortBy: 'start_date', sortOrder: 'asc' }
+                          ).map(duty => (
+                            <DutyCard
+                              key={duty.id}
+                              duty={duty}
+                              teamMember={duty._teamMember || member}
+                              onEdit={handleEditDuty}
+                              onDelete={handleDeleteDuty}
+                              showActions={true}
+                              compact={true}
+                            />
+                          ))}
                         </div>
                       </div>
                     )}
@@ -1205,29 +1279,40 @@ export default function TeamMemberProfile() {
                       const startDate = new Date(duty.start_date);
                       return now < startDate;
                     }).length > 0 && (
-                      <div>
-                        <h4 className="font-medium text-sm text-gray-700 mb-3 flex items-center gap-2">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 className="font-medium text-sm text-blue-800 mb-3 flex items-center gap-2">
                           <Calendar className="h-4 w-4" />
                           Upcoming Duties
-                        </h4>
-                        <div className="space-y-3">
-                          {duties
-                            .filter(duty => {
+                          <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
+                            {duties.filter(duty => {
                               const now = new Date();
                               const startDate = new Date(duty.start_date);
                               return now < startDate;
-                            })
-                            .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
-                            .map(duty => (
-                              <DutyCard
-                                key={duty.id}
-                                duty={duty}
-                                teamMember={member}
-                                onEdit={handleEditDuty}
-                                onDelete={handleDeleteDuty}
-                                compact={true}
-                              />
-                            ))}
+                            }).length}
+                          </Badge>
+                        </h4>
+                        <div className="space-y-3">
+                          {DutyRefreshService.getConsistentDutyDisplay(
+                            duties.filter(duty => duty._isFuture || (duty._isFuture === undefined && 
+                              (() => {
+                                const now = new Date();
+                                const startDate = new Date(duty.start_date);
+                                return now < startDate;
+                              })()
+                            )),
+                            [member],
+                            { sortBy: 'start_date', sortOrder: 'asc' }
+                          ).map(duty => (
+                            <DutyCard
+                              key={duty.id}
+                              duty={duty}
+                              teamMember={duty._teamMember || member}
+                              onEdit={handleEditDuty}
+                              onDelete={handleDeleteDuty}
+                              showActions={true}
+                              compact={true}
+                            />
+                          ))}
                         </div>
                       </div>
                     )}
@@ -1238,38 +1323,40 @@ export default function TeamMemberProfile() {
                       const endDate = new Date(duty.end_date);
                       return now > endDate;
                     }).length > 0 && (
-                      <div>
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                         <h4 className="font-medium text-sm text-gray-700 mb-3 flex items-center gap-2">
                           <History className="h-4 w-4" />
-                          Past Duties ({duties.filter(duty => {
-                            const now = new Date();
-                            const endDate = new Date(duty.end_date);
-                            return now > endDate;
-                          }).length})
-                        </h4>
-                        <div className="space-y-2">
-                          {duties
-                            .filter(duty => {
+                          Past Duties
+                          <Badge variant="outline" className="bg-gray-100 text-gray-600 border-gray-300">
+                            {duties.filter(duty => {
                               const now = new Date();
                               const endDate = new Date(duty.end_date);
                               return now > endDate;
-                            })
-                            .sort((a, b) => new Date(b.end_date) - new Date(a.end_date))
-                            .slice(0, 3) // Show only last 3 past duties
-                            .map(duty => (
-                              <div key={duty.id} className="flex items-center justify-between p-2 border rounded bg-gray-50">
-                                <div className="flex items-center space-x-2">
-                                  <Shield className="h-3 w-3 text-gray-500" />
-                                  <span className="text-sm">{duty.title}</span>
-                                  <Badge variant="secondary" className="text-xs">
-                                    {duty.type === 'devops' ? 'DevOps' : duty.type === 'on_call' ? 'On-Call' : 'Other'}
-                                  </Badge>
-                                </div>
-                                <span className="text-xs text-gray-500">
-                                  {format(parseISO(duty.end_date), "MMM d, yyyy")}
-                                </span>
-                              </div>
-                            ))}
+                            }).length}
+                          </Badge>
+                        </h4>
+                        <div className="space-y-2">
+                          {DutyRefreshService.getConsistentDutyDisplay(
+                            duties.filter(duty => duty._isPast || (duty._isPast === undefined && 
+                              (() => {
+                                const now = new Date();
+                                const endDate = new Date(duty.end_date);
+                                return now > endDate;
+                              })()
+                            )),
+                            [member],
+                            { sortBy: 'end_date', sortOrder: 'desc' }
+                          ).slice(0, 3).map(duty => (
+                            <DutyCard
+                              key={duty.id}
+                              duty={duty}
+                              teamMember={duty._teamMember || member}
+                              onEdit={handleEditDuty}
+                              onDelete={handleDeleteDuty}
+                              showActions={true}
+                              compact={true}
+                            />
+                          ))}
                           {duties.filter(duty => {
                             const now = new Date();
                             const endDate = new Date(duty.end_date);

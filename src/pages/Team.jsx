@@ -15,13 +15,19 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Video, FileText, CheckSquare, BarChart2, Search, Clock, Plus, Edit, Trash2, MoreHorizontal, Mail, BriefcaseBusiness, Code } from "lucide-react";
+import { Video, FileText, CheckSquare, BarChart2, Search, Clock, Plus, Edit, Trash2, MoreHorizontal, Mail, BriefcaseBusiness, Code, RotateCcw, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import TagInput from "../components/ui/tag-input";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { CalendarEventGenerationService } from "@/services/calendarEventGenerationService";
+import DutyRotationService from "@/services/dutyRotationService";
+import RotationStatusIndicator from "@/components/duty/RotationStatusIndicator";
+import DutyRefreshService from "@/services/dutyRefreshService";
+
+// Lazy load DutyForm for better performance with error handling
+const DutyForm = lazy(() => retryImport(() => import("@/components/duty/DutyForm"), 3, 1000));
 
 import { ComponentChunkErrorBoundary, retryImport } from "@/components/ui/error-boundaries";
 
@@ -34,6 +40,8 @@ export default function TeamPage() {
   const [teamMembers, setTeamMembers] = useState([]);
   const [agendaSummary, setAgendaSummary] = useState({});
   const [goalsStats, setGoalsStats] = useState({});
+  const [activeRotations, setActiveRotations] = useState([]);
+  const [rotationDetails, setRotationDetails] = useState({});
   const [searchQuery, setSearchQuery] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
@@ -41,6 +49,8 @@ export default function TeamPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState(null);
   const [error, setError] = useState(null);
+  const [showDutyCreation, setShowDutyCreation] = useState(false);
+  const [editingDuty, setEditingDuty] = useState(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -114,6 +124,35 @@ export default function TeamPage() {
       }
       setGoalsStats(goalsData);
       
+      // Load active rotations
+      let rotationsData = [];
+      let rotationDetailsData = {};
+      try {
+        rotationsData = await DutyRotationService.getActiveRotations();
+        
+        // Load details for each rotation
+        for (const rotation of rotationsData) {
+          try {
+            const [currentAssignee, nextAssignee] = await Promise.all([
+              DutyRotationService.getCurrentAssignee(rotation.id),
+              DutyRotationService.getNextAssignee(rotation.id)
+            ]);
+            
+            rotationDetailsData[rotation.id] = {
+              currentAssignee,
+              nextAssignee
+            };
+          } catch (rotationError) {
+            console.error(`Failed to load details for rotation ${rotation.id}:`, rotationError);
+          }
+        }
+      } catch (rotationsError) {
+        console.error("Failed to load rotations data:", rotationsError);
+        // Continue without rotations data rather than failing completely
+      }
+      setActiveRotations(rotationsData);
+      setRotationDetails(rotationDetailsData);
+      
       // Attach task data, agenda data, and goals stats to team member records
       const enhancedMembers = (memberData || []).map(member => {
         const relatedTasks = (taskData || []).filter(task => 
@@ -144,13 +183,19 @@ export default function TeamPage() {
           paused: 0
         };
         
+        // Add rotation information to member data
+        const memberRotations = rotationsData.filter(rotation => 
+          rotation.participants && rotation.participants.includes(member.id)
+        );
+        
         return {
           ...member,
           tasks: relatedTasks,
           taskCount: relatedTasks.length,
           lastActivity: lastActivity ? lastActivity.toISOString() : null,
           agenda: memberAgenda,
-          goals: memberGoals
+          goals: memberGoals,
+          rotations: memberRotations
         };
       });
       
@@ -282,6 +327,49 @@ export default function TeamPage() {
     setMemberToDelete(null);
   };
 
+  const handleCreateDuty = () => {
+    setEditingDuty(null);
+    setShowDutyCreation(true);
+  };
+
+  const handleEditDuty = (duty) => {
+    setEditingDuty(duty);
+    setShowDutyCreation(true);
+  };
+
+  const handleSaveDuty = async (dutyData) => {
+    try {
+      let savedDuty;
+      
+      if (editingDuty) {
+        // Update existing duty with refresh service
+        savedDuty = await DutyRefreshService.updateDutyWithRefresh(editingDuty.id, dutyData, {
+          showOptimistic: true,
+          highlightUpdated: true,
+          refreshViews: true
+        });
+      } else {
+        // Create new duty with refresh service
+        savedDuty = await DutyRefreshService.createDutyWithRefresh(dutyData, {
+          showOptimistic: true,
+          highlightNew: true,
+          refreshViews: true
+        });
+      }
+      
+      setShowDutyCreation(false);
+      setEditingDuty(null);
+      
+      // Refresh data to show the new/updated duty
+      await loadData();
+      
+      return savedDuty;
+    } catch (error) {
+      console.error('Failed to save duty:', error);
+      throw error; // Let DutyForm handle the error display
+    }
+  };
+
   const filteredMembers = searchQuery 
     ? teamMembers.filter(member => 
         member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -390,6 +478,83 @@ export default function TeamPage() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+
+        {/* Active Rotations Overview */}
+        {activeRotations.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <RotateCcw className="h-5 w-5" />
+                <span>Active Duty Rotations</span>
+                <Badge variant="outline">{activeRotations.length}</Badge>
+              </CardTitle>
+              <CardDescription>
+                Current status of all active duty rotations
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {activeRotations.map(rotation => {
+                  const details = rotationDetails[rotation.id];
+                  return (
+                    <div key={rotation.id} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">{rotation.name}</h4>
+                        <Badge variant="outline" className="bg-purple-50 text-purple-700">
+                          {rotation.type}
+                        </Badge>
+                      </div>
+                      
+                      {details && (
+                        <RotationStatusIndicator
+                          rotation={rotation}
+                          currentAssignee={details.currentAssignee}
+                          nextAssignee={details.nextAssignee}
+                          size="sm"
+                          showDetails={true}
+                        />
+                      )}
+                      
+                      <div className="text-sm text-gray-600">
+                        <div className="flex items-center space-x-4">
+                          <span className="flex items-center space-x-1">
+                            <Users className="h-3 w-3" />
+                            <span>{rotation.participants?.length || 0} participants</span>
+                          </span>
+                          <span className="flex items-center space-x-1">
+                            <Clock className="h-3 w-3" />
+                            <span>{rotation.cycle_weeks}w cycles</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Duty Management Section */}
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center space-x-2">
+                  <BriefcaseBusiness className="h-5 w-5" />
+                  <span>Duty Management</span>
+                </CardTitle>
+                <CardDescription>
+                  Create and manage duty assignments for team members
+                </CardDescription>
+              </div>
+              <Button onClick={handleCreateDuty}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Duty
+              </Button>
+            </div>
+          </CardHeader>
+        </Card>
         
         <div className="relative mb-6">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -507,6 +672,12 @@ export default function TeamPage() {
                           size="sm"
                         />
                       )}
+                      {member.rotations && member.rotations.length > 0 && (
+                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                          <RotateCcw className="h-3 w-3 mr-1" />
+                          {member.rotations.length} rotation{member.rotations.length !== 1 ? 's' : ''}
+                        </Badge>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -549,6 +720,45 @@ export default function TeamPage() {
                                 </div>
                               </div>
                             ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Rotation Information */}
+                    {member.rotations && member.rotations.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-1">
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          Active Rotations
+                        </h4>
+                        <div className="space-y-1">
+                          {member.rotations.slice(0, 2).map(rotation => {
+                            const details = rotationDetails[rotation.id];
+                            const isCurrentAssignee = details?.currentAssignee?.assignee_id === member.id;
+                            const isNextAssignee = details?.nextAssignee?.assignee_id === member.id;
+                            
+                            return (
+                              <div key={rotation.id} className="flex items-center justify-between text-xs">
+                                <span className="font-medium">{rotation.name}</span>
+                                <div className="flex items-center space-x-1">
+                                  {isCurrentAssignee && (
+                                    <Badge variant="default" className="text-xs px-1 py-0">Current</Badge>
+                                  )}
+                                  {isNextAssignee && (
+                                    <Badge variant="secondary" className="text-xs px-1 py-0">Next</Badge>
+                                  )}
+                                  {!isCurrentAssignee && !isNextAssignee && (
+                                    <Badge variant="outline" className="text-xs px-1 py-0">Participant</Badge>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {member.rotations.length > 2 && (
+                            <p className="text-xs text-gray-400">
+                              +{member.rotations.length - 2} more rotation{member.rotations.length - 2 !== 1 ? 's' : ''}
+                            </p>
+                          )}
                         </div>
                       </div>
                     )}
@@ -728,6 +938,25 @@ export default function TeamPage() {
           </Suspense>
         </ComponentChunkErrorBoundary>
       )}
+
+      {/* Duty Creation Dialog */}
+      <Dialog open={showDutyCreation} onOpenChange={setShowDutyCreation}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <ComponentChunkErrorBoundary componentName="Duty Form">
+            <Suspense fallback={<ComponentLoadingSkeleton />}>
+              <DutyForm
+                duty={editingDuty}
+                teamMembers={teamMembers}
+                onSave={handleSaveDuty}
+                onCancel={() => {
+                  setShowDutyCreation(false);
+                  setEditingDuty(null);
+                }}
+              />
+            </Suspense>
+          </ComponentChunkErrorBoundary>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

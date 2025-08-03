@@ -199,12 +199,20 @@ describe('CalendarEventGenerationService', () => {
         title: '⚙️ DevOps Duty - John Doe'
       };
 
-      CalendarEvent.getByDutyId.mockResolvedValue([existingEvent]);
+      // Mock createDutyEvent to return existing event (idempotent behavior)
+      CalendarEvent.createDutyEvent.mockResolvedValue(existingEvent);
 
       const result = await CalendarEventGenerationService.convertDutyToCalendarEvent(mockDuty);
 
       expect(result).toEqual(existingEvent);
-      expect(CalendarEvent.createDutyEvent).not.toHaveBeenCalled();
+      expect(CalendarEvent.createDutyEvent).toHaveBeenCalledWith(
+        'duty1',
+        'tm1',
+        '⚙️ DevOps Duty - John Doe',
+        '2024-01-01T00:00:00.000Z',
+        '2024-01-07T23:59:59.999Z',
+        'devops duty assignment for John Doe'
+      );
     });
 
     it('should throw error for missing duty object', async () => {
