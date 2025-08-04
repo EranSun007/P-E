@@ -35,7 +35,6 @@ npm start            # Serve built application (requires npm run build first)
 
 ## Key Dependencies
 
-- **@base44/sdk**: Legacy SDK for potential future integrations
 - **date-fns**: Date manipulation and formatting
 - **class-variance-authority**: Component variant management
 - **tailwind-merge**: Tailwind class merging utility

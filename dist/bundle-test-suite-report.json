@@ -1,0 +1,25 @@
+{
+  "timestamp": "2025-08-04T11:21:39.633Z",
+  "testSuite": "Bundle Test Suite",
+  "status": "FAILED",
+  "results": {
+    "bundleAnalysis": "PASSED",
+    "bundleSizeTests": "PASSED",
+    "loadingPerformanceTests": "PASSED",
+    "optimizationValidation": null
+  },
+  "summary": {
+    "bundleOptimization": "Bundle analysis completed successfully",
+    "performanceValidation": "Loading performance validation passed",
+    "regressionPrevention": "Bundle size regression tests passed"
+  },
+  "reports": {
+    "bundleBudget": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/dist/performance-budget-report.json",
+    "loadingPerformance": null
+  },
+  "recommendations": [
+    "Integrate tests into CI/CD pipeline",
+    "Set up monitoring for production performance metrics",
+    "Continue monitoring bundle sizes with each deployment"
+  ]
+}

@@ -93,7 +93,7 @@
 - **Static Hosting:** Served as SPA
 
 ## Integration Layer
-- **Current:** @base44/sdk 0.1.2 (legacy)
+- **Current:** Local storage with migration system
 - **Future:** SAP AI Core integration
 - **Calendar:** Planned Outlook/Exchange integration
 - **HR Systems:** Future SAP SuccessFactors integration

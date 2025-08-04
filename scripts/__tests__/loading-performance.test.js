@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from 'vitest';
-
 describe('Loading Performance Validation', () => {
   // Mock performance API
   const mockPerformance = {

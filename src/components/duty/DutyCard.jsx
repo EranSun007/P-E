@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Badge } from '../ui/badge';
-import { Button } from '../ui/button';
-import { Avatar, AvatarFallback } from '../ui/avatar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -19,11 +19,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../ui/alert-dialog';
+} from '@/components/ui/alert-dialog';
 import { MoreVertical, Shield, Phone, Settings, Calendar, User, Trash2, Edit, RotateCcw, Users, Clock, ArrowRight, AlertTriangle, Sparkles } from 'lucide-react';
-import AgendaContextActions from '../agenda/AgendaContextActions';
-import DutyRotationService from '../../services/dutyRotationService';
-import DutyRefreshService from '../../services/dutyRefreshService';
+import AgendaContextActions from '@/components/agenda/AgendaContextActions';
+import DutyRotationService from '@/services/dutyRotationService';
+import DutyRefreshService from '@/services/dutyRefreshService';
 
 const DUTY_TYPE_CONFIG = {
   devops: {

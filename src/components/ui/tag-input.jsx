@@ -3,7 +3,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { X } from "lucide-react";
-import { safeArray } from "@/components/utils/SafeArray";
+import { safeArray } from "@/utils/arrayUtils";
 
 export default function TagInput({ 
   value = [],

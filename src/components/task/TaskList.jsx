@@ -2,7 +2,7 @@
 import React from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import TaskCard from "./TaskCard";
-import { safeArray } from "@/components/utils/SafeArray";
+import { safeArray } from "@/utils/arrayUtils";
 
 export default function TaskList({ 
   tasks = [], 

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Check, ChevronsUpDown, Plus, X } from "lucide-react";
 import { Stakeholder } from "@/api/entities";
 import { TeamMember } from "@/api/entities";
-import { safeArray } from "@/components/utils/SafeArray";
+import { safeArray } from "@/utils/arrayUtils";
 
 export default function MeetingMetadataForm({ metadata = {}, onChange }) {
   const safeMetadata = {

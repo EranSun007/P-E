@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { analyzeBundleFiles, formatBytes } from '../bundle-analysis.js';
 
+import { analyzeBundleFiles, formatBytes } from '../bundle-analysis.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
