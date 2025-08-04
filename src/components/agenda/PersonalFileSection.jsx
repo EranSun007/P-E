@@ -91,7 +91,7 @@ const PersonalFileSection = ({ teamMemberId, teamMemberName }) => {
     return item.category === activeTab;
   });
 
-  const categories = [...new Set(personalFileItems.map(item => item.category))].sort();
+  const categories = [...new Set(personalFileItems.filter(item => item && item.category).map(item => item.category))].sort();
 
   return (
     <Card className="w-full">

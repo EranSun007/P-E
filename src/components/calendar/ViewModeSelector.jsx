@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar, UserX, Shield, Cake, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ViewModeManager } from '@/services/viewModeManager';
+import { viewModeManager } from '@/services/viewModeManager';
 
 /**
  * ViewModeSelector - Tab-style interface for switching calendar view modes
@@ -44,7 +44,7 @@ export default function ViewModeSelector({
   };
 
   // Get available view modes from ViewModeManager
-  const viewModes = ViewModeManager.prototype.getAvailableViewModes();
+  const viewModes = viewModeManager.getAvailableViewModes();
 
   // Handle keyboard navigation
   const handleKeyDown = (event, index) => {

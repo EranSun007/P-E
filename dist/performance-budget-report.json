@@ -1,6 +1,6 @@
 {
-  "timestamp": "2025-08-04T11:21:35.311Z",
-  "totalSize": 1783844,
+  "timestamp": "2025-08-04T11:38:29.282Z",
+  "totalSize": 1783985,
   "totalSizeMB": "1.70",
   "chunkCount": 50,
   "largestChunk": {
@@ -12,11 +12,11 @@
   "categories": {
     "app": {
       "count": 18,
-      "size": 319901
+      "size": 319968
     },
     "async": {
       "count": 31,
-      "size": 1245622
+      "size": 1245696
     },
     "entry": {
       "count": 1,

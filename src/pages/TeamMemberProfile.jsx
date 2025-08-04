@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -725,7 +726,7 @@ export default function TeamMemberProfile() {
                             <div className="flex justify-between items-start">
                               <div>
                                 <CardTitle className="flex items-center gap-2">
-                                  {format(parseISO(meeting.date), "PPP")}
+                                  {meeting.date ? format(parseISO(meeting.date), "PPP") : "No date"}
                                   <span className="text-xl">
                                     {getMoodIcon(meeting.mood)}
                                   </span>
@@ -846,7 +847,7 @@ export default function TeamMemberProfile() {
                                             teamMemberId={memberId}
                                             teamMemberName={member.name}
                                             sourceItem={{
-                                              title: `Note from 1:1 on ${format(parseISO(meeting.date), 'MMM d, yyyy')}`,
+                                              title: `Note from 1:1 on ${meeting.date ? format(parseISO(meeting.date), 'MMM d, yyyy') : 'unknown date'}`,
                                               description: n.text,
                                               type: 'note',
                                               id: `note-${meeting.id}-${i}`
@@ -1610,7 +1611,7 @@ export default function TeamMemberProfile() {
                     <Label>Last 1:1</Label>
                     <p className="text-gray-600">
                       {oneOnOnes[0] ?
-                        format(parseISO(oneOnOnes[0].date), "PPP") :
+                        (oneOnOnes[0].date ? format(parseISO(oneOnOnes[0].date), "PPP") : "No date") :
                         "No meetings yet"}
                     </p>
                   </div>

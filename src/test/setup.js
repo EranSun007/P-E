@@ -30,3 +30,12 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: vi.fn(),
   })),
 })
+
+// Mock DOM methods for Radix UI compatibility
+Element.prototype.hasPointerCapture = vi.fn().mockReturnValue(false)
+Element.prototype.scrollIntoView = vi.fn()
+Element.prototype.releasePointerCapture = vi.fn()
+Element.prototype.setPointerCapture = vi.fn()
+
+// Mock HTMLElement methods
+HTMLElement.prototype.scrollIntoView = vi.fn()
