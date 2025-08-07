@@ -43,7 +43,37 @@ export class EventStylingService {
       hover: '#f8bbd9'        // pink-200
     },
     
-    // Duties - Purple theme
+    // DevOps duties - Green theme
+    duty_devops: {
+      primary: '#10B981',      // green-500
+      background: '#A7F3D0',   // green-200
+      light: '#ECFDF5',       // green-100
+      border: '#34D399',      // green-400
+      text: '#059669',        // green-600
+      hover: '#6EE7B7'        // green-300
+    },
+    
+    // On-call duties - Amber theme
+    duty_on_call: {
+      primary: '#F59E0B',      // amber-500
+      background: '#FDE68A',   // amber-200
+      light: '#FFFBEB',       // amber-100
+      border: '#FBBF24',      // amber-400
+      text: '#D97706',        // amber-600
+      hover: '#FCD34D'        // amber-300
+    },
+    
+    // Other duties - Purple theme
+    duty_other: {
+      primary: '#8B5CF6',      // violet-500
+      background: '#C4B5FD',   // violet-300
+      light: '#F3E8FF',       // violet-100
+      border: '#A78BFA',      // violet-400
+      text: '#7C3AED',        // violet-600
+      hover: '#DDD6FE'        // violet-200
+    },
+    
+    // Generic duty (fallback) - Purple theme
     duty: {
       primary: '#8b5cf6',      // violet-500
       background: '#c4b5fd',   // violet-300
@@ -79,6 +109,9 @@ export class EventStylingService {
     one_on_one: User,
     meeting: Calendar,
     birthday: Cake,
+    duty_devops: () => <span className="text-sm">⚙️</span>,
+    duty_on_call: () => <span className="text-sm">📞</span>,
+    duty_other: () => <span className="text-sm">🛡️</span>,
     duty: Shield,
     out_of_office: UserX,
     default: CalendarDays
@@ -89,6 +122,9 @@ export class EventStylingService {
     one_on_one: '1:1',
     meeting: 'Meeting',
     birthday: 'Birthday',
+    duty_devops: 'DevOps',
+    duty_on_call: 'On-Call',
+    duty_other: 'Other',
     duty: 'Duty',
     out_of_office: 'OOO',
     default: 'Event'
@@ -102,20 +138,98 @@ export class EventStylingService {
   };
 
   /**
+   * Determine the specific duty event type based on duty data
+   * @param {Object} event - Calendar event object
+   * @returns {string} Specific duty event type (duty_devops, duty_on_call, duty_other, or duty)
+   */
+  static getDutyEventType(event) {
+    if (!event || event.event_type !== 'duty') {
+      return event?.event_type || 'default';
+    }
+
+    // Check if the event has dutyType property (from new events)
+    if (event.dutyType) {
+      switch (event.dutyType) {
+        case 'devops':
+          return 'duty_devops';
+        case 'on_call':
+          return 'duty_on_call';
+        case 'other':
+          return 'duty_other';
+        default:
+          return 'duty';
+      }
+    }
+
+    // For existing events, try to determine from title or other properties
+    const title = event.title?.toLowerCase() || '';
+    
+    if (title.includes('devops')) {
+      return 'duty_devops';
+    } else if (title.includes('reporting') || title.includes('on-call') || title.includes('on_call')) {
+      return 'duty_on_call';
+    } else if (title.includes('metering') || title.includes('other')) {
+      return 'duty_other';
+    }
+
+    return 'duty'; // fallback
+  }
+
+  /**
+   * Format duty event title to show "FirstName: DutyTitle" format
+   * @param {Object} event - Calendar event object
+   * @param {Array} teamMembers - Array of team members to get name from
+   * @returns {string} Formatted title
+   */
+  static formatDutyTitle(event, teamMembers = []) {
+    if (!event || event.event_type !== 'duty') {
+      return event?.title || 'Untitled Event';
+    }
+
+    // Find team member
+    const teamMember = teamMembers.find(tm => tm.id === event.team_member_id);
+    if (!teamMember) {
+      return event.title || 'Untitled Duty';
+    }
+
+    // Get first name only
+    const firstName = teamMember.name.split(' ')[0];
+    
+    // Extract duty title from event title (remove any existing prefixes)
+    let dutyTitle = event.title || 'Duty';
+    
+    // Remove common prefixes that might exist in old format
+    dutyTitle = dutyTitle.replace(/^[⚙️📞🛡️]\s*/, ''); // Remove emoji prefixes
+    dutyTitle = dutyTitle.replace(/\s*-\s*.*$/, ''); // Remove " - Name" suffix if exists
+    
+    return `${firstName}: ${dutyTitle}`;
+  }
+
+  /**
    * Get comprehensive styling information for a calendar event
    * @param {Object} event - Calendar event object
    * @param {string} variant - Styling variant (default, compact, sidebar)
+   * @param {Array} teamMembers - Array of team members (for duty title formatting)
    * @returns {Object} Complete styling object with colors, icons, and CSS classes
    */
-  static getEventStyling(event, variant = EventStylingService.VARIANTS.DEFAULT) {
+  static getEventStyling(event, variant = EventStylingService.VARIANTS.DEFAULT, teamMembers = []) {
     if (!event) {
       throw new Error('Event object is required');
     }
 
-    const eventType = event.event_type || 'default';
+    // For duty events, determine the specific duty type
+    const eventType = event.event_type === 'duty' 
+      ? EventStylingService.getDutyEventType(event)
+      : (event.event_type || 'default');
+
     const colors = EventStylingService.EVENT_COLORS[eventType] || EventStylingService.EVENT_COLORS.default;
     const Icon = EventStylingService.EVENT_ICONS[eventType] || EventStylingService.EVENT_ICONS.default;
     const label = EventStylingService.EVENT_LABELS[eventType] || EventStylingService.EVENT_LABELS.default;
+
+    // Format title for duty events
+    const formattedTitle = event.event_type === 'duty' 
+      ? EventStylingService.formatDutyTitle(event, teamMembers)
+      : event.title;
 
     return {
       // Color information
@@ -133,6 +247,9 @@ export class EventStylingService {
       
       // Display label
       label: label,
+      
+      // Formatted title
+      title: formattedTitle,
       
       // CSS classes for different contexts
       className: EventStylingService.generateEventClassName(eventType, variant),
@@ -193,6 +310,15 @@ export class EventStylingService {
         break;
       case 'birthday':
         typeClasses = "bg-pink-100 text-pink-800 border-pink-400 hover:bg-pink-200 hover:shadow-sm";
+        break;
+      case 'duty_devops':
+        typeClasses = "bg-green-100 text-green-800 border-green-400 hover:bg-green-200 hover:shadow-sm";
+        break;
+      case 'duty_on_call':
+        typeClasses = "bg-amber-100 text-amber-800 border-amber-400 hover:bg-amber-200 hover:shadow-sm";
+        break;
+      case 'duty_other':
+        typeClasses = "bg-purple-100 text-purple-800 border-purple-400 hover:bg-purple-200 hover:shadow-sm";
         break;
       case 'duty':
         typeClasses = "bg-purple-100 text-purple-800 border-purple-400 hover:bg-purple-200 hover:shadow-sm";

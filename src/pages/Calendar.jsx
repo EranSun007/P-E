@@ -574,7 +574,7 @@ export default function CalendarPage() {
     const eventAgendaCounts = agendaCounts[event.id];
     
     // Get styling information for enhanced tooltip
-    const styling = EventStylingService.getEventStyling(event);
+    const styling = EventStylingService.getEventStyling(event, EventStylingService.VARIANTS.DEFAULT, teamMembers);
     
     const content = {
       title: event.title,
@@ -944,12 +944,12 @@ export default function CalendarPage() {
 
                 // Get enhanced styling from EventStylingService
                 const styling = isMultiDayEvent(event) 
-                  ? EventStylingService.getMultiDayEventStyling(event, multiDayPosition, EventStylingService.VARIANTS.DEFAULT)
-                  : EventStylingService.getEventStyling(event, EventStylingService.VARIANTS.DEFAULT);
+                  ? EventStylingService.getMultiDayEventStyling(event, multiDayPosition, EventStylingService.VARIANTS.DEFAULT, teamMembers)
+                  : EventStylingService.getEventStyling(event, EventStylingService.VARIANTS.DEFAULT, teamMembers);
                 
                 const Icon = styling.icon;
                 const tooltipContent = getEventTooltipContent(event);
-                const eventTitle = styling.titlePrefix ? `${styling.titlePrefix}${event.title}` : event.title;
+                const eventTitle = styling.titlePrefix ? `${styling.titlePrefix}${styling.title || event.title}` : (styling.title || event.title);
                 
                 // Get agenda counts for this event
                 const eventAgendaCounts = agendaCounts[event.id];

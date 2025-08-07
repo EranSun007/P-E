@@ -281,7 +281,9 @@ export class DutyRefreshService {
       }
 
       // Create the actual duty
+      console.log('DutyRefreshService: Creating duty with data:', dutyData);
       const createdDuty = await Duty.create(dutyData);
+      console.log('DutyRefreshService: Duty created successfully:', createdDuty);
       
       // Remove optimistic update
       this.removeOptimisticUpdate(tempId);
@@ -303,6 +305,13 @@ export class DutyRefreshService {
       return createdDuty;
       
     } catch (error) {
+      console.error('DutyRefreshService: Error creating duty:', error);
+      console.error('DutyRefreshService: Error details:', {
+        message: error.message,
+        stack: error.stack,
+        dutyData: dutyData
+      });
+      
       // Remove optimistic update on error
       this.removeOptimisticUpdate(tempId);
       

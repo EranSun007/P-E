@@ -142,23 +142,44 @@ export class CalendarEventGenerationService {
 
       // Note: Duplicate checking is now handled in createDutyEvent method itself
 
-      // Create duty type icon mapping
-      const dutyIcons = {
-        'devops': '⚙️',
-        'on_call': '📞',
-        'other': '🛡️'
+      // Create duty type icon and color mapping
+      const dutyConfig = {
+        'devops': {
+          icon: '⚙️',
+          color: '#10B981', // Green
+          backgroundColor: '#ECFDF5'
+        },
+        'on_call': {
+          icon: '📞',
+          color: '#F59E0B', // Amber
+          backgroundColor: '#FFFBEB'
+        },
+        'other': {
+          icon: '🛡️',
+          color: '#8B5CF6', // Purple
+          backgroundColor: '#F3E8FF'
+        }
       };
 
-      const icon = dutyIcons[duty.type] || '🛡️';
+      const config = dutyConfig[duty.type] || dutyConfig['other'];
+      
+      // Get first name only (split by space and take first part)
+      const firstName = teamMember.name.split(' ')[0];
 
-      // Create the duty calendar event
+      // Create the duty calendar event with improved title format
       const dutyEvent = await CalendarEvent.createDutyEvent(
         duty.id,
         duty.team_member_id,
-        `${icon} ${duty.title} - ${teamMember.name}`,
+        `${firstName}: ${duty.title}`,
         duty.start_date,
         duty.end_date,
-        duty.description || `${duty.type} duty assignment for ${teamMember.name}`
+        duty.description || `${duty.type} duty assignment for ${teamMember.name}`,
+        {
+          color: config.color,
+          backgroundColor: config.backgroundColor,
+          icon: config.icon,
+          dutyType: duty.type
+        }
       );
 
       console.log(`Created calendar event for duty ${duty.title}: ${dutyEvent.id}`);

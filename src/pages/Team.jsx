@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Video, FileText, CheckSquare, BarChart2, Search, Clock, Plus, Edit, Trash2, MoreHorizontal, Mail, BriefcaseBusiness, Code, RotateCcw, Users } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -942,6 +942,14 @@ export default function TeamPage() {
       {/* Duty Creation Dialog */}
       <Dialog open={showDutyCreation} onOpenChange={setShowDutyCreation}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingDuty ? "Edit Duty" : "Create New Duty"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingDuty ? "Modify the duty assignment details below." : "Create a new duty assignment for team members."}
+            </DialogDescription>
+          </DialogHeader>
           <ComponentChunkErrorBoundary componentName="Duty Form">
             <Suspense fallback={<ComponentLoadingSkeleton />}>
               <DutyForm

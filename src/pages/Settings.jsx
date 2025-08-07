@@ -10,7 +10,10 @@ import {
   Layers,
   Save,
   Trash2,
-  User
+  User,
+  Database,
+  Download,
+  Upload
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,6 +45,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import PasswordChangeForm from "@/components/auth/PasswordChangeForm";
+import ExportDialog from "@/components/data/ExportDialog";
+import ImportDialog from "@/components/data/ImportDialog";
+import { DataImportService } from "@/services/dataImportService";
 
 export default function SettingsPage() {
   const [attributes, setAttributes] = useState([]);
@@ -53,6 +59,11 @@ export default function SettingsPage() {
   const [error, setError] = useState(null);
   const [confirmDeleteDialog, setConfirmDeleteDialog] = useState(false);
   const [attributeToDelete, setAttributeToDelete] = useState(null);
+  
+  // Export/Import state
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importHistory, setImportHistory] = useState([]);
 
   const [formData, setFormData] = useState({
     type: "priority",
@@ -251,6 +262,7 @@ export default function SettingsPage() {
     { id: "taskTypes", label: "Task Types", icon: Layers },
     { id: "statuses", label: "Statuses", icon: CheckSquare },
     { id: "tags", label: "Tags", icon: Tag },
+    { id: "data", label: "Data Management", icon: Database },
     { id: "account", label: "Account", icon: User }
   ];
 
@@ -265,6 +277,53 @@ export default function SettingsPage() {
     { id: "indigo", name: "Indigo" },
     { id: "gray", name: "Gray" }
   ];
+
+  // Export/Import handlers
+  const handleExportComplete = (result) => {
+    if (result.success) {
+      console.log(`Export completed: ${result.filename} (${result.records} records)`);
+    }
+    setShowExportDialog(false);
+  };
+
+  const handleImportComplete = (result) => {
+    if (result.success) {
+      console.log(`Import completed: ${result.importId}`);
+      // Add to import history
+      const newHistory = [...importHistory, {
+        importId: result.importId,
+        startTime: new Date().toISOString(),
+        status: 'completed',
+        summary: result.summary,
+        canRollback: result.canRollback
+      }];
+      setImportHistory(newHistory);
+    }
+    setShowImportDialog(false);
+  };
+
+  const handleRollback = async (importId) => {
+    try {
+      await DataImportService.rollbackImport(importId);
+      // Update import history
+      const updatedHistory = importHistory.map(op => 
+        op.importId === importId 
+          ? { ...op, status: 'rolled_back', canRollback: false }
+          : op
+      );
+      setImportHistory(updatedHistory);
+      console.log(`Rollback completed for import ${importId}`);
+    } catch (err) {
+      console.error('Rollback failed:', err);
+      setError(`Rollback failed: ${err.message}`);
+    }
+  };
+
+  // Load import history on component mount
+  useEffect(() => {
+    const history = DataImportService.getImportHistory();
+    setImportHistory(history);
+  }, []);
 
   return (
     <div className="p-6">
@@ -282,7 +341,7 @@ export default function SettingsPage() {
               ))}
             </TabsList>
             
-            {activeTab !== 'account' && (
+            {activeTab !== 'account' && activeTab !== 'data' && (
               <div className="flex gap-4">
                 <div className="relative flex-grow">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -312,7 +371,116 @@ export default function SettingsPage() {
           
           {tabConfigs.map(tab => (
             <TabsContent key={tab.id} value={tab.id} className="space-y-4">
-              {tab.id !== 'account' ? (
+              {tab.id === 'data' ? (
+                <div className="space-y-6">
+                  {/* Export Section */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Download className="h-5 w-5" />
+                        Export Data
+                      </CardTitle>
+                      <CardDescription>
+                        Export your data to a JSON file for backup or transfer
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900">Full Data Export</h4>
+                          <p className="text-sm text-gray-600">Export all your data including tasks, projects, team members, duties, and more</p>
+                        </div>
+                        <Button onClick={() => setShowExportDialog(true)}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Export Data
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Import Section */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Upload className="h-5 w-5" />
+                        Import Data
+                      </CardTitle>
+                      <CardDescription>
+                        Import data from a JSON export file
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-gray-900">Import from File</h4>
+                          <p className="text-sm text-gray-600">Import data from a P&E Team Management export file</p>
+                        </div>
+                        <Button onClick={() => setShowImportDialog(true)}>
+                          <Upload className="h-4 w-4 mr-2" />
+                          Import Data
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Import History */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Database className="h-5 w-5" />
+                        Import History
+                      </CardTitle>
+                      <CardDescription>
+                        View recent import operations and manage rollbacks
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {importHistory.length === 0 ? (
+                        <div className="text-center p-8 border border-dashed rounded-lg">
+                          <p className="text-gray-500">No import operations yet</p>
+                        </div>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Records</TableHead>
+                              <TableHead>Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {importHistory.map((operation) => (
+                              <TableRow key={operation.importId}>
+                                <TableCell>
+                                  {new Date(operation.startTime).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={operation.status === 'completed' ? 'default' : 'destructive'}>
+                                    {operation.status}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>{operation.summary?.successful || 0}</TableCell>
+                                <TableCell>
+                                  {operation.canRollback && operation.status === 'completed' && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleRollback(operation.importId)}
+                                    >
+                                      Rollback
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : tab.id !== 'account' ? (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -514,6 +682,20 @@ export default function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Export Dialog */}
+      <ExportDialog
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        onExportComplete={handleExportComplete}
+      />
+
+      {/* Import Dialog */}
+      <ImportDialog
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        onImportComplete={handleImportComplete}
+      />
     </div>
   );
 }

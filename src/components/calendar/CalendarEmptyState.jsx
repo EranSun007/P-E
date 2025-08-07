@@ -2,7 +2,7 @@ import React from 'react';
 import { Calendar, UserX, Shield, Cake, CalendarDays, Plus, Users, Clock, Coffee } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { ViewModeManager } from '@/services/viewModeManager';
+import ViewModeManager from '@/services/viewModeManager';
 import { cn } from '@/lib/utils';
 
 /**

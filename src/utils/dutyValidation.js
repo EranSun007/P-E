@@ -410,7 +410,8 @@ export function validateBusinessRules(formData) {
     
     // If it's a weekend (Saturday = 6, Sunday = 0) and on-call duty
     if (dayOfWeek === 0 || dayOfWeek === 6) {
-      // This is just a warning, not an error
+      // This is just a warning, not a blocking error
+      // Store warnings separately so they don't block form submission
       errors._warnings = errors._warnings || [];
       errors._warnings.push('On-call duties starting on weekends may require additional approval');
     }

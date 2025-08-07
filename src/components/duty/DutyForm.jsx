@@ -135,7 +135,7 @@ export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = 
 
   const loadTeamMembers = async () => {
     try {
-      const members = await TeamMember.findAll();
+      const members = await TeamMember.list();
       setAvailableTeamMembers(members);
     } catch (error) {
       console.error('Failed to load team members:', error);
@@ -342,11 +342,9 @@ export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = 
       });
     }
 
-    // Auto-close after showing success for 1.5 seconds
-    setTimeout(() => {
-      resetFormState();
-      onSave?.(savedDuty);
-    }, 1500);
+    // Close immediately after successful save
+    resetFormState();
+    onSave?.(savedDuty);
     
     return savedDuty;
   };
@@ -379,8 +377,8 @@ export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = 
     // Prepare duty data with session ID for duplicate prevention
     const dutyData = {
       ...sanitizedFormData,
-      start_date: new Date(sanitizedFormData.start_date).toISOString(),
-      end_date: new Date(sanitizedFormData.end_date).toISOString(),
+      start_date: sanitizedFormData.start_date, // Keep as YYYY-MM-DD format
+      end_date: sanitizedFormData.end_date, // Keep as YYYY-MM-DD format
       creation_session_id: submissionSessionId
     };
 
@@ -401,6 +399,12 @@ export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = 
       
     } catch (error) {
       console.error('Failed to check for duplicates or save duty:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        dutyData: dutyData
+      });
+      
       const errorInfo = handleApiError(error);
       
       if (error.message?.includes('Duplicate duty detected') || error.message?.includes('already exists')) {
@@ -436,8 +440,8 @@ export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = 
     setNetworkError(null);
     await retrySubmission(() => performDutySubmission({
       ...formData,
-      start_date: new Date(formData.start_date).toISOString(),
-      end_date: new Date(formData.end_date).toISOString(),
+      start_date: formData.start_date, // Keep as YYYY-MM-DD format
+      end_date: formData.end_date, // Keep as YYYY-MM-DD format
       creation_session_id: submissionSessionId
     }));
   };
@@ -445,17 +449,19 @@ export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = 
 
 
   return (
-    <Card className="w-full max-w-2xl">
-      <CardHeader>
-        <CardTitle>
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-xl font-semibold">
           {duty ? 'Edit Duty Assignment' : 'Create Duty Assignment'}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleFormSubmit} className="space-y-4">
+        <form onSubmit={handleFormSubmit} className="space-y-6">
           {/* Team Member Selection */}
           <div className="space-y-2">
-            <Label htmlFor="team_member_id">Team Member *</Label>
+            <Label htmlFor="team_member_id" className="text-sm font-medium">
+              Team Member <span className="text-red-500">*</span>
+            </Label>
             <Select
               value={formData.team_member_id}
               onValueChange={(value) => handleInputChange('team_member_id', value)}
@@ -463,9 +469,7 @@ export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = 
             >
               <SelectTrigger 
                 id="team_member_id" 
-                aria-label="Team Member"
-                className={getFieldValidationState('team_member_id') === 'error' ? 'border-red-500 focus:border-red-500' : 
-                          getFieldValidationState('team_member_id') === 'success' ? 'border-green-500' : ''}
+                className={`h-10 ${getFieldValidationState('team_member_id') === 'error' ? 'border-red-500 focus:border-red-500' : ''}`}
               >
                 <SelectValue placeholder="Select team member" />
               </SelectTrigger>
@@ -478,80 +482,124 @@ export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = 
               </SelectContent>
             </Select>
             {getFieldError('team_member_id') && (
-              <div className="flex items-center space-x-1 text-sm text-red-600">
+              <p className="text-sm text-red-600 flex items-center gap-1">
                 <AlertCircle className="h-4 w-4" />
-                <span>{getFieldError('team_member_id')}</span>
-              </div>
+                {getFieldError('team_member_id')}
+              </p>
             )}
           </div>
 
-          {/* Duty Type */}
-          <div className="space-y-2">
-            <Label htmlFor="type">Duty Type *</Label>
-            <Select
-              value={formData.type}
-              onValueChange={(value) => handleInputChange('type', value)}
-              name="type"
-            >
-              <SelectTrigger 
-                id="type" 
-                aria-label="Duty Type"
-                className={getFieldValidationState('type') === 'error' ? 'border-red-500 focus:border-red-500' : 
-                          getFieldValidationState('type') === 'success' ? 'border-green-500' : ''}
+          {/* Duty Type and Title Row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="type" className="text-sm font-medium">
+                Duty Type <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.type}
+                onValueChange={(value) => handleInputChange('type', value)}
+                name="type"
               >
-                <SelectValue placeholder="Select duty type" />
-              </SelectTrigger>
-              <SelectContent>
-                {DUTY_TYPES.map(type => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {getFieldError('type') && (
-              <div className="flex items-center space-x-1 text-sm text-red-600">
-                <AlertCircle className="h-4 w-4" />
-                <span>{getFieldError('type')}</span>
-              </div>
-            )}
+                <SelectTrigger 
+                  id="type" 
+                  className={`h-10 ${getFieldValidationState('type') === 'error' ? 'border-red-500 focus:border-red-500' : ''}`}
+                >
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DUTY_TYPES.map(type => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {getFieldError('type') && (
+                <p className="text-sm text-red-600 flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  {getFieldError('type')}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="title" className="text-sm font-medium">
+                Title <span className="text-red-500">*</span>
+              </Label>
+              <Select
+                value={formData.title}
+                onValueChange={(value) => handleInputChange('title', value)}
+                name="title"
+              >
+                <SelectTrigger 
+                  id="title" 
+                  className={`h-10 ${getFieldValidationState('title') === 'error' ? 'border-red-500 focus:border-red-500' : ''}`}
+                >
+                  <SelectValue placeholder="Select title" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DUTY_TITLES.map(title => (
+                    <SelectItem key={title.value} value={title.value}>
+                      {title.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {getFieldError('title') && (
+                <p className="text-sm text-red-600 flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  {getFieldError('title')}
+                </p>
+              )}
+            </div>
           </div>
 
-          {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title">Title *</Label>
-            <Select
-              value={formData.title}
-              onValueChange={(value) => handleInputChange('title', value)}
-              name="title"
-            >
-              <SelectTrigger 
-                id="title" 
-                aria-label="Title"
-                className={getFieldValidationState('title') === 'error' ? 'border-red-500 focus:border-red-500' : 
-                          getFieldValidationState('title') === 'success' ? 'border-green-500' : ''}
-              >
-                <SelectValue placeholder="Select duty title" />
-              </SelectTrigger>
-              <SelectContent>
-                {DUTY_TITLES.map(title => (
-                  <SelectItem key={title.value} value={title.value}>
-                    {title.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {getFieldError('title') && (
-              <div className="flex items-center space-x-1 text-sm text-red-600">
-                <AlertCircle className="h-4 w-4" />
-                <span>{getFieldError('title')}</span>
-              </div>
-            )}
+          {/* Date Range */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="start_date" className="text-sm font-medium">
+                Start Date <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="start_date"
+                type="date"
+                value={formData.start_date}
+                onChange={(e) => handleInputChange('start_date', e.target.value)}
+                onBlur={() => handleFieldBlur('start_date')}
+                className={`h-10 ${getFieldValidationState('start_date') === 'error' ? 'border-red-500 focus:border-red-500' : ''}`}
+              />
+              {getFieldError('start_date') && (
+                <p className="text-sm text-red-600 flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  {getFieldError('start_date')}
+                </p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="end_date" className="text-sm font-medium">
+                End Date <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="end_date"
+                type="date"
+                value={formData.end_date}
+                onChange={(e) => handleInputChange('end_date', e.target.value)}
+                onBlur={() => handleFieldBlur('end_date')}
+                className={`h-10 ${getFieldValidationState('end_date') === 'error' ? 'border-red-500 focus:border-red-500' : ''}`}
+              />
+              {getFieldError('end_date') && (
+                <p className="text-sm text-red-600 flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  {getFieldError('end_date')}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description" className="text-sm font-medium">Description</Label>
             <Textarea
               id="description"
               value={formData.description}
@@ -559,126 +607,22 @@ export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = 
               onBlur={() => handleFieldBlur('description')}
               placeholder="Enter duty description (optional)"
               rows={3}
-              className={getFieldValidationState('description') === 'error' ? 'border-red-500 focus:border-red-500' : ''}
+              className={`resize-none ${getFieldValidationState('description') === 'error' ? 'border-red-500 focus:border-red-500' : ''}`}
             />
             {getFieldError('description') && (
-              <div className="flex items-center space-x-1 text-sm text-red-600">
+              <p className="text-sm text-red-600 flex items-center gap-1">
                 <AlertCircle className="h-4 w-4" />
-                <span>{getFieldError('description')}</span>
-              </div>
+                {getFieldError('description')}
+              </p>
             )}
           </div>
 
-          {/* Date Range */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="start_date">Start Date *</Label>
-              <Input
-                id="start_date"
-                type="date"
-                value={formData.start_date}
-                onChange={(e) => handleInputChange('start_date', e.target.value)}
-                onBlur={() => handleFieldBlur('start_date')}
-                className={getFieldValidationState('start_date') === 'error' ? 'border-red-500 focus:border-red-500' : 
-                          getFieldValidationState('start_date') === 'success' ? 'border-green-500' : ''}
-              />
-              {getFieldError('start_date') && (
-                <div className="flex items-center space-x-1 text-sm text-red-600">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>{getFieldError('start_date')}</span>
-                </div>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="end_date">End Date *</Label>
-              <Input
-                id="end_date"
-                type="date"
-                value={formData.end_date}
-                onChange={(e) => handleInputChange('end_date', e.target.value)}
-                onBlur={() => handleFieldBlur('end_date')}
-                className={getFieldValidationState('end_date') === 'error' ? 'border-red-500 focus:border-red-500' : 
-                          getFieldValidationState('end_date') === 'success' ? 'border-green-500' : ''}
-              />
-              {getFieldError('end_date') && (
-                <div className="flex items-center space-x-1 text-sm text-red-600">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>{getFieldError('end_date')}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Validation Status Indicator */}
-          {(isValidating || validationStatus || submitSuccess) && (
-            <div className="space-y-3">
-              {isValidating && (
-                <Alert className="border-blue-200 bg-blue-50">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <AlertDescription className="text-blue-800">
-                    Validating duty assignment...
-                  </AlertDescription>
-                </Alert>
-              )}
-              
-              {submitSuccess && (
-                <Alert className="border-green-200 bg-green-50">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-green-800">
-                    <strong>Success!</strong> Duty assignment has been {duty ? 'updated' : 'created'} successfully. 
-                    <br />
-                    <span className="text-sm">This dialog will close automatically...</span>
-                  </AlertDescription>
-                </Alert>
-              )}
-              
-              {validationStatus === 'success' && !isValidating && conflicts.length === 0 && !submitSuccess && (
-                <Alert className="border-green-200 bg-green-50">
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription className="text-green-800">
-                    <strong>Validation successful!</strong> No conflicts detected with existing duties.
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
-          )}
-
-          {/* Duplicate Error */}
-          {duplicateError && (
-            <Alert className="border-red-200 bg-red-50">
-              <XCircle className="h-4 w-4" />
-              <AlertDescription>
-                <div className="text-red-800">
-                  <strong>Duplicate Duty Detected</strong>
-                  <p className="mt-2">{duplicateError}</p>
-                  <div className="mt-3 p-3 bg-red-100 rounded-lg">
-                    <p className="text-sm font-medium">What you can do:</p>
-                    <ul className="mt-1 text-sm list-disc list-inside space-y-1">
-                      <li>Change the duty title to make it unique</li>
-                      <li>Adjust the start or end dates</li>
-                      <li>Select a different team member</li>
-                      <li>Check if you meant to edit an existing duty instead</li>
-                    </ul>
-                  </div>
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Rotation Errors */}
-          {rotationErrors.length > 0 && (
-            <Alert className="border-red-200 bg-red-50">
-              <XCircle className="h-4 w-4" />
-              <AlertDescription>
-                <div className="text-red-800">
-                  <strong>Rotation Configuration Error</strong>
-                  <ul className="mt-2 space-y-1">
-                    {rotationErrors.map((error, index) => (
-                      <li key={index} className="text-sm">• {error}</li>
-                    ))}
-                  </ul>
-                </div>
+          {/* Status Messages */}
+          {submitSuccess && (
+            <Alert className="border-green-200 bg-green-50">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800">
+                <strong>Success!</strong> Duty assignment has been {duty ? 'updated' : 'created'} successfully.
               </AlertDescription>
             </Alert>
           )}
@@ -691,7 +635,7 @@ export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = 
                 <div className="text-orange-800">
                   <strong>Duty Conflicts Detected</strong>
                   <p className="mt-2 text-sm">
-                    This duty assignment overlaps with existing duties for the same team member:
+                    This duty overlaps with existing duties for the same team member:
                   </p>
                   <div className="mt-3 space-y-2">
                     {conflicts.map(conflict => (
@@ -711,69 +655,45 @@ export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = 
                       </div>
                     ))}
                   </div>
-                  <Separator className="my-3" />
-                  <div className="bg-orange-100 p-3 rounded-lg">
-                    <p className="text-sm font-medium">Resolution required:</p>
-                    <ul className="mt-1 text-sm list-disc list-inside space-y-1">
-                      <li>Adjust the start or end dates to avoid overlap</li>
-                      <li>Choose a different team member</li>
-                      <li>Consider if this duty should replace an existing one</li>
-                    </ul>
+                  <div className="mt-3 p-2 bg-orange-100 rounded text-sm">
+                    <strong>To resolve:</strong> Adjust dates, choose different team member, or check if this should replace an existing duty.
                   </div>
                 </div>
               </AlertDescription>
             </Alert>
           )}
 
-          {/* Network/Submit Error with Retry */}
-          {(submitError || networkError) && (
+          {/* Error Messages */}
+          {(submitError || networkError || duplicateError) && (
             <Alert className="border-red-200 bg-red-50">
               <XCircle className="h-4 w-4" />
               <AlertDescription className="text-red-800">
-                <div className="space-y-3">
-                  <div>
-                    <strong>Save Failed</strong>
-                    <p className="mt-1">{submitError?.message || networkError?.message}</p>
-                  </div>
-                  
+                <div>
+                  <strong>Unable to Save Duty</strong>
+                  <p className="mt-1 text-sm">
+                    {submitError?.message || networkError?.message || duplicateError}
+                  </p>
                   {(submitError?.canRetry || networkError?.canRetry) && (
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRetrySubmission}
-                        disabled={isSubmitting}
-                        className="text-red-700 border-red-300 hover:bg-red-50"
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            Retrying...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="h-3 w-3 mr-1" />
-                            Retry
-                          </>
-                        )}
-                      </Button>
-                      <span className="text-xs text-red-600">
-                        This error may be temporary. Click retry to try again.
-                      </span>
-                    </div>
-                  )}
-                  
-                  {!submitError?.canRetry && !networkError?.canRetry && (
-                    <div className="bg-red-100 p-3 rounded-lg">
-                      <p className="text-sm font-medium">What you can do:</p>
-                      <ul className="mt-1 text-sm list-disc list-inside space-y-1">
-                        <li>Check your input data for errors</li>
-                        <li>Ensure all required fields are filled</li>
-                        <li>Try refreshing the page and starting over</li>
-                        <li>Contact support if the problem persists</li>
-                      </ul>
-                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRetrySubmission}
+                      disabled={isSubmitting}
+                      className="mt-2 text-red-700 border-red-300 hover:bg-red-50"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          Retrying...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          Try Again
+                        </>
+                      )}
+                    </Button>
                   )}
                 </div>
               </AlertDescription>

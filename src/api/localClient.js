@@ -9,18 +9,46 @@ function getData(key) {
   try {
     const data = localStorage.getItem(key);
     if (!data) return [];
-    return JSON.parse(data);
+    const parsed = JSON.parse(data);
+    
+    // Ensure the data is always an array
+    if (!Array.isArray(parsed)) {
+      console.warn(`Data for key "${key}" is not an array, resetting to empty array`);
+      localStorage.setItem(key, JSON.stringify([]));
+      return [];
+    }
+    
+    return parsed;
   } catch (error) {
     console.error(`Error reading data from localStorage key "${key}":`, error);
+    // Reset corrupted data to empty array
+    localStorage.setItem(key, JSON.stringify([]));
     return [];
   }
 }
 
 function setData(key, data) {
   try {
-    if (!validateInput.array(data)) {
-      throw new Error('Invalid data format - must be an array');
+    // Fix: Allow both arrays and single objects for calendar events
+    if (key === 'calendar_events') {
+      // For calendar events, ensure we have an array
+      if (!Array.isArray(data)) {
+        console.error(`setData validation failed for key "${key}": Expected array but got ${typeof data}`);
+        throw new Error('Invalid data format - calendar_events must be an array');
+      }
+    } else {
+      // For other keys, validate as array
+      if (!validateInput.array(data)) {
+        console.error(`setData validation failed for key "${key}":`, {
+          dataType: typeof data,
+          isArray: Array.isArray(data),
+          data: data,
+          stackTrace: new Error().stack
+        });
+        throw new Error('Invalid data format - must be an array');
+      }
     }
+    
     localStorage.setItem(key, JSON.stringify(data));
   } catch (error) {
     console.error(`Error saving data to localStorage key "${key}":`, error);
@@ -562,8 +590,10 @@ export const localClient = {
           };
         }
 
-        events.unshift(newEvent);
-        setData('calendar_events', events);
+        // Ensure events is an array before adding new event
+        const eventsArray = Array.isArray(events) ? events : [];
+        eventsArray.unshift(newEvent);
+        setData('calendar_events', eventsArray);
         return newEvent;
       },
       async update(id, updates) {
@@ -583,7 +613,7 @@ export const localClient = {
         return true;
       },
       // Helper methods for creating specific event types
-      async createDutyEvent(dutyId, teamMemberId, title, startDate, endDate, description = null) {
+      async createDutyEvent(dutyId, teamMemberId, title, startDate, endDate, description = null, styling = null) {
         // Check for existing events first to ensure idempotent behavior
         const existingEvents = await this.getByDutyId(dutyId);
         if (existingEvents.length > 0) {
@@ -591,7 +621,8 @@ export const localClient = {
           return existingEvents[0];
         }
 
-        return await this.create({
+        // Create the calendar event with proper data structure
+        const eventData = {
           title,
           description: description || `Duty assignment: ${title}`,
           start_date: startDate,
@@ -601,8 +632,16 @@ export const localClient = {
           duty_id: dutyId,
           team_member_id: teamMemberId,
           linked_entity_type: 'duty',
-          linked_entity_id: dutyId
-        });
+          linked_entity_id: dutyId,
+          // Add styling properties for calendar display
+          color: styling?.color || '#8B5CF6', // Default purple
+          backgroundColor: styling?.backgroundColor || '#F3E8FF', // Default light purple
+          icon: styling?.icon || '🛡️', // Default shield icon
+          dutyType: styling?.dutyType || 'other' // Default duty type
+        };
+
+        console.log('Creating duty calendar event with data:', eventData);
+        return await this.create(eventData);
       },
       async createBirthdayEvent(teamMemberId, teamMemberName, birthdayDate) {
         return await this.create({
@@ -1058,11 +1097,36 @@ export const localClient = {
         
         // Comprehensive server-side validation
         const validationResult = validateForm(sanitizedDuty);
-        if (Object.keys(validationResult.errors).length > 0) {
-          const errorMessages = Object.entries(validationResult.errors)
+        
+        // Separate actual errors from warnings
+        const actualErrors = {};
+        const warnings = [];
+        
+        Object.entries(validationResult.errors).forEach(([field, error]) => {
+          if (field === '_warnings') {
+            // Handle warnings array
+            if (Array.isArray(error)) {
+              warnings.push(...error);
+            } else {
+              warnings.push(error);
+            }
+          } else {
+            // These are actual validation errors
+            actualErrors[field] = error;
+          }
+        });
+        
+        // Only fail validation for actual errors, not warnings
+        if (Object.keys(actualErrors).length > 0) {
+          const errorMessages = Object.entries(actualErrors)
             .map(([field, error]) => `${field}: ${error}`)
             .join('; ');
           throw new Error(`Validation failed: ${errorMessages}`);
+        }
+        
+        // Log warnings but don't fail validation
+        if (warnings.length > 0) {
+          console.warn('Duty creation warnings:', warnings);
         }
         
         // Use sanitized data for further processing

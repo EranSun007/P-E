@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { InvokeLLM } from "@/api/integrations";
+import { ExtractTaskFromNaturalLanguage } from "@/api/integrations";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -193,56 +193,12 @@ export default function TaskCreationForm({ onCreateTask, initialTaskData = null 
     setProcessingInput(true);
     
     try {
-      const result = await InvokeLLM({
-        prompt: `Extract structured task information from this natural language input: "${taskInput}". 
-        Identify task title, description, type (meeting, metric, action, or generic), 
-        priority (low, medium, high, urgent), due date (in ISO format), 
-        stakeholders (as array of names), tags (as array), and whether it's strategic (true/false).
-        For meetings, extract participants and agenda items if mentioned.
-        For metrics, extract KPI name, current value, target value if mentioned.
-        For actions, extract expected outcome if mentioned.`,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            title: { type: "string" },
-            description: { type: "string" },
-            type: { type: "string", enum: ["meeting", "metric", "action", "generic"] },
-            priority: { type: "string", enum: ["low", "medium", "high", "urgent"] },
-            due_date: { type: "string" },
-            stakeholders: { type: "array", items: { type: "string" } },
-            tags: { type: "array", items: { type: "string" } },
-            strategic: { type: "boolean" },
-            metadata: {
-              type: "object",
-              properties: {
-                meeting: {
-                  type: "object",
-                  properties: {
-                    participants: { type: "array", items: { type: "string" } },
-                    agenda: { type: "array", items: { type: "string" } },
-                    location: { type: "string" }
-                  }
-                },
-                metric: {
-                  type: "object",
-                  properties: {
-                    kpi_name: { type: "string" },
-                    current_value: { type: "string" },
-                    target_value: { type: "string" }
-                  }
-                },
-                action: {
-                  type: "object",
-                  properties: {
-                    outcome: { type: "string" },
-                    dependencies: { type: "array", items: { type: "string" } }
-                  }
-                }
-              }
-            }
-          }
-        }
-      });
+      const result = await ExtractTaskFromNaturalLanguage(taskInput);
+      
+      // Check if this is a fallback response
+      if (result._fallback) {
+        console.log('🛡️ Using fallback task extraction result');
+      }
       
       // Ensure all arrays are properly initialized
       const safeResult = {
@@ -273,6 +229,7 @@ export default function TaskCreationForm({ onCreateTask, initialTaskData = null 
       setShowManualForm(true);
     } catch (error) {
       console.error("Error processing natural language input:", error);
+      console.error("🚨 Fallback mechanism failed - using basic manual fallback");
       // Fall back to manual input
       setTaskData({
         ...defaultTaskData,

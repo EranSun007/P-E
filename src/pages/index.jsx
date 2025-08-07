@@ -43,6 +43,7 @@ const ProjectDetails = lazy(() => retryImport(() => import(/* webpackChunkName: 
 const TeamMemberProfile = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-team-member-profile" */ "./TeamMemberProfile"), 3, 1000));
 const Peers = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-peers" */ "./Peers"), 3, 1000));
 const PeerProfile = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-peer-profile" */ "./PeerProfile"), 3, 1000));
+const AITest = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-ai-test" */ "./AITest"), 3, 1000));
 
 const PAGES = {
     
@@ -67,6 +68,8 @@ const PAGES = {
     Peers: Peers,
     
     PeerProfile: PeerProfile,
+    
+    AITest: AITest,
     
 }
 
@@ -128,6 +131,8 @@ function PagesContent() {
                         <Route path="/Peers" element={<Peers />} />
                         
                         <Route path="/PeerProfile" element={<PeerProfile />} />
+                        
+                        <Route path="/AITest" element={<AITest />} />
                         
                     </Routes>
                 </Suspense>

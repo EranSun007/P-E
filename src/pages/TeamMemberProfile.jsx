@@ -32,6 +32,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -1282,7 +1283,7 @@ export default function TeamMemberProfile() {
                     }).length > 0 && (
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <h4 className="font-medium text-sm text-blue-800 mb-3 flex items-center gap-2">
-                          <Calendar className="h-4 w-4" />
+                          <CalendarIcon className="h-4 w-4" />
                           Upcoming Duties
                           <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
                             {duties.filter(duty => {
@@ -2149,6 +2150,14 @@ export default function TeamMemberProfile() {
       {/* Duty Form Dialog */}
       <Dialog open={showDutyForm} onOpenChange={setShowDutyForm}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingDuty ? "Edit Duty" : "Assign New Duty"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingDuty ? "Modify the duty assignment details for this team member." : "Assign a new duty to this team member with specific dates and responsibilities."}
+            </DialogDescription>
+          </DialogHeader>
           <DutyForm
             duty={editingDuty}
             teamMembers={allTeamMembers}

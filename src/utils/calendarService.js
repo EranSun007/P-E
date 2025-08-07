@@ -37,6 +37,21 @@ export class DuplicateError extends CalendarServiceError {
   }
 }
 
+export class PastDateError extends CalendarServiceError {
+  constructor(message, providedDate = null, currentTime = null) {
+    super(message, 'PAST_DATE_ERROR');
+    this.providedDate = providedDate;
+    this.currentTime = currentTime;
+  }
+}
+
+export class DuplicateMeetingError extends CalendarServiceError {
+  constructor(message, existingMeeting = null) {
+    super(message, 'DUPLICATE_MEETING_ERROR');
+    this.existingMeeting = existingMeeting;
+  }
+}
+
 export class OperationError extends CalendarServiceError {
   constructor(message, operation = null, originalError = null) {
     super(message, 'OPERATION_ERROR', originalError);
@@ -135,6 +150,16 @@ export class CalendarService {
     
     // Never retry duplicate errors - they indicate data conflicts
     if (error instanceof DuplicateError) {
+      return false;
+    }
+    
+    // Never retry past date errors - they indicate invalid timing
+    if (error instanceof PastDateError) {
+      return false;
+    }
+    
+    // Never retry duplicate meeting errors - they indicate existing conflicts
+    if (error instanceof DuplicateMeetingError) {
       return false;
     }
     
@@ -260,9 +285,10 @@ export class CalendarService {
    * @param {string} fieldName - Name of the field for error reporting
    * @param {boolean} allowPast - Whether to allow past dates
    * @param {number} bufferMinutes - Buffer time in minutes for near-current dates (default: 5)
+   * @param {boolean} isBackgroundSync - Whether this is a background sync operation (more lenient validation)
    * @returns {Date} Parsed and validated date
    */
-  static _validateDateTime(dateTime, fieldName = 'dateTime', allowPast = false, bufferMinutes = 5) {
+  static _validateDateTime(dateTime, fieldName = 'dateTime', allowPast = false, bufferMinutes = 5, isBackgroundSync = false) {
     if (!dateTime) {
       throw new ValidationError(`${fieldName} is required`, fieldName);
     }
@@ -295,18 +321,36 @@ export class CalendarService {
 
     // Check if date is in the past (with configurable buffer)
     if (!allowPast) {
+      // For background sync operations, be more lenient with past dates
+      let effectiveBufferMinutes = bufferMinutes;
+      if (isBackgroundSync) {
+        // Allow up to 24 hours in the past for background sync operations
+        effectiveBufferMinutes = Math.max(bufferMinutes, 24 * 60); // 24 hours
+      }
+      
       // Use configurable buffer time to prevent edge case rejections
-      const bufferMs = Math.max(bufferMinutes, 1) * 60 * 1000; // Ensure minimum 1 minute buffer
+      const bufferMs = Math.max(effectiveBufferMinutes, 1) * 60 * 1000; // Ensure minimum 1 minute buffer
       const bufferTime = new Date(now.getTime() - bufferMs);
       
       if (parsedDate < bufferTime) {
         const timeDifferenceMs = now.getTime() - parsedDate.getTime();
         const timeDifferenceMinutes = Math.round(timeDifferenceMs / (60 * 1000));
+        const timeDifferenceHours = Math.round(timeDifferenceMinutes / 60);
         
-        throw new ValidationError(
-          `${fieldName} cannot be in the past. Provided date: ${parsedDate.toISOString()}, current time: ${now.toISOString()} (${timeDifferenceMinutes} minutes ago)`, 
-          fieldName
-        );
+        // For background sync, provide more informative error messages
+        if (isBackgroundSync && timeDifferenceHours > 24) {
+          throw new PastDateError(
+            `${fieldName} is too far in the past for background sync. Provided date: ${parsedDate.toISOString()}, current time: ${now.toISOString()} (${timeDifferenceHours} hours ago). Maximum allowed: 24 hours.`,
+            parsedDate.toISOString(),
+            now.toISOString()
+          );
+        } else {
+          throw new PastDateError(
+            `${fieldName} cannot be in the past. Provided date: ${parsedDate.toISOString()}, current time: ${now.toISOString()} (${timeDifferenceMinutes} minutes ago)`,
+            parsedDate.toISOString(),
+            now.toISOString()
+          );
+        }
       }
     }
 
@@ -380,16 +424,26 @@ export class CalendarService {
    * @param {string} teamMemberId - ID of the team member
    * @param {Date} date - Date to check for duplicates
    * @param {string} excludeEventId - Event ID to exclude from duplicate check
+   * @param {Object} options - Additional options for duplicate checking
    * @returns {Promise<Object|null>} Duplicate event if found, null otherwise
    */
-  static async _checkForDuplicateEvents(teamMemberId, date, excludeEventId = null) {
+  static async _checkForDuplicateEvents(teamMemberId, date, excludeEventId = null, options = {}) {
+    const { logResults = true, throwOnError = false } = options;
+    
     // Defensive parameter validation
     if (!teamMemberId || !date) {
+      if (logResults) {
+        console.log('_checkForDuplicateEvents: Missing required parameters', { teamMemberId, date });
+      }
       return null;
     }
 
     if (!(date instanceof Date) || isNaN(date.getTime())) {
-      console.warn('Invalid date provided to _checkForDuplicateEvents:', date);
+      const errorMsg = `Invalid date provided to _checkForDuplicateEvents: ${date}`;
+      console.warn(errorMsg);
+      if (throwOnError) {
+        throw new ValidationError(errorMsg, 'date');
+      }
       return null;
     }
 
@@ -398,41 +452,83 @@ export class CalendarService {
       
       // Defensive check: ensure existingEvents is an array
       if (!Array.isArray(existingEvents)) {
-        console.warn('getOneOnOneMeetingsForTeamMember returned non-array:', existingEvents);
+        const errorMsg = `getOneOnOneMeetingsForTeamMember returned non-array: ${typeof existingEvents}`;
+        console.warn(errorMsg);
+        if (throwOnError) {
+          throw new OperationError(errorMsg, '_checkForDuplicateEvents');
+        }
         return null;
       }
 
       const dateString = date.toDateString();
       
+      if (logResults) {
+        console.log(`Checking for duplicate events for team member ${teamMemberId} on ${dateString}`, {
+          totalEvents: existingEvents.length,
+          excludeEventId
+        });
+      }
+      
       const duplicateEvent = existingEvents.find(event => {
         // Defensive checks for event object
         if (!event || typeof event !== 'object') {
+          if (logResults) {
+            console.warn('Invalid event object found:', event);
+          }
           return false;
         }
         
         if (excludeEventId && event.id === excludeEventId) {
+          if (logResults) {
+            console.log(`Skipping excluded event: ${event.id}`);
+          }
           return false; // Skip the excluded event
         }
         
         if (!event.start_date) {
+          if (logResults) {
+            console.warn(`Event ${event.id} missing start_date`);
+          }
           return false;
         }
         
         try {
           const eventDate = new Date(event.start_date);
           if (isNaN(eventDate.getTime())) {
+            if (logResults) {
+              console.warn(`Event ${event.id} has invalid start_date: ${event.start_date}`);
+            }
             return false;
           }
-          return eventDate.toDateString() === dateString;
+          
+          const isMatch = eventDate.toDateString() === dateString;
+          if (isMatch && logResults) {
+            console.log(`Found duplicate event: ${event.id} on ${eventDate.toDateString()}`);
+          }
+          
+          return isMatch;
         } catch (error) {
-          console.warn('Error parsing event date:', event.start_date, error);
+          console.warn(`Error parsing event date for ${event.id}:`, event.start_date, error);
           return false;
         }
       });
       
+      if (logResults) {
+        console.log(`Duplicate check completed for ${teamMemberId} on ${dateString}:`, {
+          duplicateFound: !!duplicateEvent,
+          duplicateEventId: duplicateEvent?.id || null
+        });
+      }
+      
       return duplicateEvent || null;
     } catch (error) {
-      console.warn('Error checking for duplicate events:', error);
+      const errorMsg = `Error checking for duplicate events: ${error.message}`;
+      console.warn(errorMsg, error);
+      
+      if (throwOnError) {
+        throw new OperationError(errorMsg, '_checkForDuplicateEvents', error);
+      }
+      
       return null;
     }
   }
@@ -1088,6 +1184,91 @@ export class CalendarService {
       return updatedOneOnOne;
     } catch (error) {
       console.error('Error linking OneOnOne to CalendarEvent:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a calendar event and link it to a OneOnOne record (idempotent)
+   * This method will skip creation if a meeting already exists for the same date
+   * @param {string} oneOnOneId - ID of the OneOnOne record
+   * @param {string} teamMemberId - ID of the team member
+   * @param {string} dateTime - ISO string of the meeting date/time
+   * @param {number} durationMinutes - Duration in minutes (default: 30)
+   * @param {Object} options - Additional options
+   * @returns {Promise<Object>} Object containing both the calendar event and updated OneOnOne record
+   */
+  static async createAndLinkOneOnOneMeetingIdempotent(oneOnOneId, teamMemberId, dateTime, durationMinutes = 30, options = {}) {
+    const { skipIfExists = true, logResults = true } = options;
+    const operation = 'createAndLinkOneOnOneMeetingIdempotent';
+    
+    try {
+      // Enhanced validation using validation utilities
+      const oneOnOne = await this._validateOneOnOne(oneOnOneId);
+      const teamMember = await this._validateTeamMember(teamMemberId);
+      const validatedDate = this._validateDateTime(dateTime, 'dateTime', false, 5, true); // Allow background sync
+      const validatedDuration = this._validateDuration(durationMinutes);
+
+      // Ensure team member IDs match between OneOnOne and provided teamMemberId
+      if (oneOnOne.team_member_id !== teamMemberId) {
+        throw new ValidationError(
+          'Team member ID mismatch between OneOnOne record and provided team member ID',
+          'teamMemberId'
+        );
+      }
+
+      // Check for duplicate events with enhanced logging
+      const duplicateEvent = await this._checkForDuplicateEvents(
+        teamMemberId, 
+        validatedDate, 
+        null, 
+        { logResults, throwOnError: false }
+      );
+      
+      if (duplicateEvent) {
+        if (skipIfExists) {
+          if (logResults) {
+            console.log(`Idempotent creation: Meeting already exists for ${teamMember.name} on ${validatedDate.toDateString()}, skipping creation`);
+          }
+          
+          // Return the existing event and OneOnOne record
+          return {
+            calendarEvent: duplicateEvent,
+            oneOnOne: oneOnOne,
+            skipped: true,
+            reason: 'Meeting already exists'
+          };
+        } else {
+          throw new DuplicateMeetingError(
+            `A 1:1 meeting already exists for ${teamMember.name} on ${validatedDate.toDateString()}`,
+            duplicateEvent
+          );
+        }
+      }
+
+      // Create the calendar event
+      const calendarEvent = await this.createOneOnOneMeeting(
+        teamMemberId, 
+        teamMember.name, 
+        dateTime, 
+        validatedDuration
+      );
+
+      // Link the OneOnOne record to the calendar event
+      const updatedOneOnOne = await this.linkMeetingToCalendarEvent(oneOnOneId, calendarEvent.id);
+
+      if (logResults) {
+        console.log(`Successfully created and linked 1:1 meeting: ${teamMember.name} (${calendarEvent.id})`);
+      }
+      
+      return {
+        calendarEvent,
+        oneOnOne: updatedOneOnOne,
+        skipped: false,
+        created: true
+      };
+    } catch (error) {
+      console.error('Error in idempotent create and link 1:1 meeting:', error);
       throw error;
     }
   }
