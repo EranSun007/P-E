@@ -36,7 +36,7 @@ const DUTY_TITLES = [
   { value: 'DevOps', label: 'DevOps' }
 ];
 
-export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = [] }) {
+export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = [], preselectedTeamMemberId = null }) {
   // Refs for cleanup and memory management
   const isUnmountedRef = useRef(false);
   const conflictCheckTimeoutRef = useRef(null);
@@ -118,7 +118,7 @@ export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = 
     };
   }, [submissionSessionId]);
 
-  // Initialize form with existing duty data
+  // Initialize form with existing duty data or preselected team member
   useEffect(() => {
     if (duty) {
       const initialData = {
@@ -130,8 +130,11 @@ export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = 
         end_date: duty.end_date ? duty.end_date.split('T')[0] : ''
       };
       resetForm(initialData);
+    } else if (preselectedTeamMemberId && !formData.team_member_id) {
+      // Pre-select team member for new duty creation
+      handleFieldChange('team_member_id', preselectedTeamMemberId);
     }
-  }, [duty, resetForm]);
+  }, [duty, preselectedTeamMemberId, resetForm, handleFieldChange, formData.team_member_id]);
 
   const loadTeamMembers = async () => {
     try {
@@ -342,8 +345,7 @@ export default function DutyForm({ duty = null, onSave, onCancel, teamMembers = 
       });
     }
 
-    // Close immediately after successful save
-    resetFormState();
+    // Immediately call onSave to close dialog - this should happen synchronously
     onSave?.(savedDuty);
     
     return savedDuty;

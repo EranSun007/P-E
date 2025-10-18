@@ -138,7 +138,7 @@ vi.mock('../services/agendaIndicatorService.js', () => ({
 import { CalendarEventGenerationService } from '../services/calendarEventGenerationService.js';
 import { RecurringBirthdayService } from '../services/recurringBirthdayService.js';
 import { CalendarSynchronizationService } from '../services/calendarSynchronizationService.js';
-import { EventStylingService } from '../utils/eventStylingService.js';
+import { EventStylingService } from '../utils/eventStylingService.jsx';
 import { localClient } from '../api/localClient.js';
 import Calendar from '../pages/Calendar.jsx';
 import TeamMemberProfile from '../pages/TeamMemberProfile.jsx';

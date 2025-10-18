@@ -182,15 +182,15 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-import { CalendarEventGenerationService } from '@/services/calendarEventGenerationServicejs;
-import { RecurringBirthdayService } from '@/services/recurringBirthdayServicejs;
-import { CalendarSynchronizationService } from '@/services/calendarSynchronizationServicejs;
-import { EventStylingService } from '@/utils/eventStylingServicejs;
-import { CalendarService } from '@/utils/calendarServicejs;
-import { localClient } from '@/api/localClientjs;
-import Calendar from '@/pages/Calendarjsx;
-import TeamMemberProfile from '@/pages/TeamMemberProfilejsx;
-import WeeklyMeetingSidebar from '@/components/calendar/WeeklyMeetingSidebarjsx;
+import { CalendarEventGenerationService } from '@/services/calendarEventGenerationService.js';
+import { RecurringBirthdayService } from '@/services/recurringBirthdayService.js';
+import { CalendarSynchronizationService } from '@/services/calendarSynchronizationService.js';
+import { EventStylingService } from '@/utils/eventStylingService.jsx';
+import { CalendarService } from '@/utils/calendarService.js';
+import { localClient } from '@/api/localClient.js';
+import Calendar from '@/pages/Calendar.jsx';
+import TeamMemberProfile from '@/pages/TeamMemberProfile.jsx';
+import WeeklyMeetingSidebar from '@/components/calendar/WeeklyMeetingSidebar.jsx';
 
 // Test wrapper component
 const TestWrapper = ({ children }) => (

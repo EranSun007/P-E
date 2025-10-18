@@ -494,6 +494,7 @@ export default function TeamMemberProfile() {
         });
       }
       
+      // Force close dialog immediately
       setShowDutyForm(false);
       setEditingDuty(null);
       
@@ -505,6 +506,9 @@ export default function TeamMemberProfile() {
       await checkDutyConflicts();
     } catch (error) {
       console.error("Error saving duty:", error);
+      // Even if there's an error, we should close the dialog to prevent it from staying open
+      setShowDutyForm(false);
+      setEditingDuty(null);
     }
   };
 
@@ -2166,6 +2170,7 @@ export default function TeamMemberProfile() {
               setShowDutyForm(false);
               setEditingDuty(null);
             }}
+            preselectedTeamMemberId={!editingDuty ? memberId : null}
           />
         </DialogContent>
       </Dialog>

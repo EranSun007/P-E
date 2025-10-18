@@ -271,18 +271,49 @@ export class CalendarEventGenerationService {
         return [];
       }
 
+      // Get all team members to validate references
+      const teamMembers = await TeamMember.list();
+      const validTeamMemberIds = new Set(teamMembers.map(tm => tm.id));
+
       const dutyEvents = [];
+      const invalidRecords = [];
 
       for (const duty of duties) {
         // Defensive check: ensure duty is a valid object
         if (!duty || typeof duty !== 'object') {
           continue;
         }
+
+        // Check if the referenced team member still exists
+        if (!validTeamMemberIds.has(duty.team_member_id)) {
+          console.warn(`Duty record ${duty.id} references non-existent team member ${duty.team_member_id}. Marking for cleanup.`);
+          invalidRecords.push(duty);
+          continue;
+        }
+
         try {
           const dutyEvent = await this.convertDutyToCalendarEvent(duty);
           dutyEvents.push(dutyEvent);
         } catch (error) {
           console.error(`Error generating calendar event for duty ${duty.id}:`, error);
+          
+          // If the error is due to team member not found, mark for cleanup
+          if (error.message.includes('Team member not found')) {
+            invalidRecords.push(duty);
+          }
+        }
+      }
+
+      // Clean up invalid duty records
+      if (invalidRecords.length > 0) {
+        console.log(`Cleaning up ${invalidRecords.length} invalid duty records...`);
+        for (const invalidRecord of invalidRecords) {
+          try {
+            await Duty.delete(invalidRecord.id);
+            console.log(`Deleted invalid duty record ${invalidRecord.id}`);
+          } catch (cleanupError) {
+            console.error(`Error cleaning up invalid duty record ${invalidRecord.id}:`, cleanupError);
+          }
         }
       }
 
@@ -311,18 +342,49 @@ export class CalendarEventGenerationService {
         return [];
       }
 
+      // Get all team members to validate references
+      const teamMembers = await TeamMember.list();
+      const validTeamMemberIds = new Set(teamMembers.map(tm => tm.id));
+
       const oooEvents = [];
+      const invalidRecords = [];
 
       for (const outOfOffice of outOfOfficeRecords) {
         // Defensive check: ensure outOfOffice is a valid object
         if (!outOfOffice || typeof outOfOffice !== 'object') {
           continue;
         }
+
+        // Check if the referenced team member still exists
+        if (!validTeamMemberIds.has(outOfOffice.team_member_id)) {
+          console.warn(`Out-of-office record ${outOfOffice.id} references non-existent team member ${outOfOffice.team_member_id}. Marking for cleanup.`);
+          invalidRecords.push(outOfOffice);
+          continue;
+        }
+
         try {
           const oooEvent = await this.convertOutOfOfficeToCalendarEvent(outOfOffice);
           oooEvents.push(oooEvent);
         } catch (error) {
           console.error(`Error generating calendar event for out-of-office ${outOfOffice.id}:`, error);
+          
+          // If the error is due to team member not found, mark for cleanup
+          if (error.message.includes('Team member not found')) {
+            invalidRecords.push(outOfOffice);
+          }
+        }
+      }
+
+      // Clean up invalid out-of-office records
+      if (invalidRecords.length > 0) {
+        console.log(`Cleaning up ${invalidRecords.length} invalid out-of-office records...`);
+        for (const invalidRecord of invalidRecords) {
+          try {
+            await OutOfOffice.delete(invalidRecord.id);
+            console.log(`Deleted invalid out-of-office record ${invalidRecord.id}`);
+          } catch (cleanupError) {
+            console.error(`Error cleaning up invalid out-of-office record ${invalidRecord.id}:`, cleanupError);
+          }
         }
       }
 

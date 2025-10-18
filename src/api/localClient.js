@@ -1132,9 +1132,6 @@ export const localClient = {
         // Use sanitized data for further processing
         const validatedDuty = validationResult.sanitizedData;
         
-        // Additional server-side business rule validation
-        await this.validateBusinessRules(validatedDuty, duties);
-        
         // Validate date range (additional server-side check)
         const startDate = new Date(validatedDuty.start_date);
         const endDate = new Date(validatedDuty.end_date);
@@ -1146,6 +1143,9 @@ export const localClient = {
         if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
           throw new Error('Invalid date format provided');
         }
+
+        // Additional server-side business rule validation (BEFORE adding to array)
+        await this.validateBusinessRules(validatedDuty, duties);
 
         // Use enhanced duplicate detection with session awareness
         const duplicateWarnings = await this.checkForDuplicates(validatedDuty);

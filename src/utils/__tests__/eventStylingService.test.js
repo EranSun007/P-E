@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import EventStylingService from '../eventStylingService.js';
+import EventStylingService from '../eventStylingService.jsx';
 import { Calendar, User, UserX, Shield, Cake, CalendarDays } from 'lucide-react';
 
 describe('EventStylingService', () => {

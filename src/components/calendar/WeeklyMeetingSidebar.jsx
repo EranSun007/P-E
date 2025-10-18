@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { CalendarAgendaCount } from './CalendarAgendaIndicator';
-import { EventStylingService } from '@/utils/eventStylingService';
+import { EventStylingService } from '@/utils/eventStylingService.jsx';
 import { ErrorHandlingService } from '@/services/errorHandlingService';
 
 /**

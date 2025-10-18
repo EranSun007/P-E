@@ -1,3 +1,21 @@
 {
-    "javascript.autoClosingTags": false
+  "javascript.autoClosingTags": false,
+  "chat.mcp.autostart": "onlyNew",
+  "chat.mcp.servers": {
+    "finops-mcp-auth": {
+      "disabled": false,
+      "timeout": 30,
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://demoindustries-it-monitoring-btpresourceconsumption-srv.cfapps.sap.hana.ondemand.com/mcp",
+        "6274",
+        "--static-oauth-client-metadata",
+        "{ \"scope\": \"openid\" }",
+        "--static-oauth-client-info",
+        "{ \"client_id\": \"3765bd66-d11e-4050-9741-e6f5f314d35b\"}"
+      ]
+    }
+  }
 }

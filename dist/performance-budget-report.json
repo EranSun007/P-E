@@ -1,0 +1,39 @@
+{
+  "timestamp": "2025-10-18T11:27:50.604Z",
+  "totalSize": 1868286,
+  "totalSizeMB": "1.78",
+  "chunkCount": 51,
+  "largestChunk": {
+    "name": "chunk-DqPZamsx.js",
+    "size": 411230,
+    "type": "js",
+    "category": "async"
+  },
+  "categories": {
+    "app": {
+      "count": 19,
+      "size": 373670
+    },
+    "async": {
+      "count": 31,
+      "size": 1273902
+    },
+    "entry": {
+      "count": 1,
+      "size": 98881
+    },
+    "styles": {
+      "count": 1,
+      "size": 86000
+    },
+    "assets": {
+      "count": 1,
+      "size": 35833
+    }
+  },
+  "budgetStatus": {
+    "totalSize": "PASS",
+    "chunkCount": "FAIL",
+    "largestChunk": "PASS"
+  }
+}

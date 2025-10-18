@@ -185,7 +185,7 @@ vi.mock('react-router-dom', async () => {
 import { CalendarEventGenerationService } from '../services/calendarEventGenerationService.js';
 import { RecurringBirthdayService } from '../services/recurringBirthdayService.js';
 import { CalendarSynchronizationService } from '../services/calendarSynchronizationService.js';
-import { EventStylingService } from '../utils/eventStylingService.js';
+import { EventStylingService } from '../utils/eventStylingService.jsx';
 import { localClient } from '../api/localClient.js';
 
 // Test wrapper component

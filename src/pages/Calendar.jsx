@@ -30,7 +30,7 @@ const MeetingDetailView = lazy(() => retryImport(() => import("@/components/cale
 // Lazy load WeeklyMeetingSidebar for better performance with error handling
 const WeeklyMeetingSidebar = lazy(() => retryImport(() => import("@/components/calendar/WeeklyMeetingSidebar"), 3, 1000));
 import { useIsMobile } from "@/hooks/use-mobile";
-import { EventStylingService } from "@/utils/eventStylingService";
+import { EventStylingService } from "@/utils/eventStylingService.jsx";
 import { CalendarSyncStatusService } from "@/services/calendarSyncStatusService";
 import { ErrorHandlingService } from "@/services/errorHandlingService";
 import { useToast } from "@/components/ui/use-toast";
