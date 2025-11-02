@@ -19,6 +19,7 @@ import DutyCard from "@/components/duty/DutyCard";
 import TeamMemberRotationDisplay from "@/components/duty/TeamMemberRotationDisplay";
 import GoalsList from "@/components/goals/GoalsList";
 import GoalForm from "@/components/goals/GoalForm";
+import TeamMemberScheduleSection from "@/components/team/TeamMemberScheduleSection";
 import { createPageUrl } from "@/utils";
 import {
   Card,
@@ -1504,107 +1505,14 @@ export default function TeamMemberProfile() {
               onStatsChange={setOutOfOfficeStats}
             />
 
-            {/* Next 1:1 Meeting Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CalendarIcon className="h-5 w-5" />
-                  Next 1:1 Meeting
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {nextMeetingInfo ? (
-                  <div className="space-y-4">
-                    <div>
-                      <Label>Scheduled Date</Label>
-                      <p className="text-gray-900 font-medium">
-                        {format(parseISO(nextMeetingInfo.meetingDate), "PPP 'at' p")}
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <Label>Status</Label>
-                      <div className="flex items-center gap-2 mt-1">
-                        {nextMeetingInfo.hasCalendarEvent ? (
-                          <Badge variant="outline" className="text-green-700 border-green-200 bg-green-50">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Calendar Event Created
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-yellow-700 border-yellow-200 bg-yellow-50">
-                            <AlertCircle className="h-3 w-3 mr-1" />
-                            No Calendar Event
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    {nextMeetingInfo.calendarEvent && (
-                      <div>
-                        <Label>Calendar Event</Label>
-                        <p className="text-sm text-gray-600">
-                          {nextMeetingInfo.calendarEvent.title}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setRescheduleDate(nextMeetingInfo.meetingDate);
-                          setShowRescheduleDialog(true);
-                        }}
-                      >
-                        <Clock className="h-4 w-4 mr-1" />
-                        Reschedule
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCancelNextMeeting}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <XCircle className="h-4 w-4 mr-1" />
-                        Cancel
-                      </Button>
-                    </div>
-                    
-                    {/* Temporary cleanup button - remove after cleanup */}
-                    <div className="pt-2 border-t">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                          try {
-                            console.log('Starting duplicate cleanup...');
-                            const results = await CalendarService.cleanupAllDuplicateEvents();
-                            console.log('Cleanup results:', results);
-                            alert(`Cleanup completed! Removed ${results.totalCleaned} duplicate events.`);
-                            loadData(); // Refresh the data
-                          } catch (error) {
-                            console.error('Cleanup failed:', error);
-                            alert('Cleanup failed. Check console for details.');
-                          }
-                        }}
-                        className="text-blue-600 hover:text-blue-700"
-                      >
-                        🧹 Clean Duplicates
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <CalendarIcon className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">No upcoming 1:1 scheduled</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Schedule your next meeting from any 1:1 record
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* Recurring 1:1 Schedule Section */}
+            <TeamMemberScheduleSection
+              teamMemberId={memberId}
+              teamMemberName={member?.name}
+              onScheduleChange={() => {
+                loadData(); // Refresh all data when schedule changes
+              }}
+            />
 
             <Card>
               <CardHeader>
@@ -1688,7 +1596,7 @@ export default function TeamMemberProfile() {
                     <Label>Total 1:1s</Label>
                     <div className="flex items-center gap-2">
                       <p className="text-gray-600">{oneOnOnes.length}</p>
-                      {oneOnOnes.length > 0 && (
+                      {oneOnOnes.length > 0 && oneOnOnes[oneOnOnes.length - 1].date && (
                         <span className="text-xs text-gray-500">
                           (since {format(parseISO(oneOnOnes[oneOnOnes.length - 1].date), "MMM yyyy")})
                         </span>
@@ -1934,32 +1842,6 @@ export default function TeamMemberProfile() {
                   Add
                 </Button>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Next Meeting Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {meetingForm.next_meeting_date ?
-                      format(parseISO(meetingForm.next_meeting_date), "PPP") :
-                      "Schedule next meeting"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={meetingForm.next_meeting_date ? parseISO(meetingForm.next_meeting_date) : undefined}
-                    onSelect={(date) => setMeetingForm(prev => ({
-                      ...prev,
-                      next_meeting_date: date?.toISOString()
-                    }))}
-                  />
-                </PopoverContent>
-              </Popover>
             </div>
           </div>
           <DialogFooter>

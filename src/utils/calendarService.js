@@ -1329,4 +1329,212 @@ export class CalendarService {
       throw error;
     }
   }
+
+  /**
+   * Create a recurring 1:1 calendar event linked to a schedule
+   *
+   * @param {string} oneOnOneId - ID of the OneOnOne meeting
+   * @param {string} teamMemberId - ID of the team member
+   * @param {Object} schedule - Schedule configuration object
+   * @param {string} meetingDate - Date of the meeting (YYYY-MM-DD)
+   * @returns {Promise<Object>} Created calendar event and updated OneOnOne
+   */
+  static async createRecurringOneOnOneMeeting(oneOnOneId, teamMemberId, schedule, meetingDate) {
+    try {
+      console.log(`Creating recurring 1:1 meeting for schedule ${schedule.id}...`);
+
+      // Get team member details
+      const teamMembers = await TeamMember.list();
+      const teamMember = teamMembers.find(tm => tm.id === teamMemberId);
+      if (!teamMember) {
+        throw new NotFoundError(`Team member ${teamMemberId} not found`, 'TeamMember', teamMemberId);
+      }
+
+      // Combine date and time
+      const dateTime = `${meetingDate}T${schedule.time}:00`;
+
+      // Validate the date/time
+      const validatedDate = this._validateDateTime(dateTime);
+
+      // Use the schedule duration
+      const duration = schedule.duration_minutes || 60;
+
+      // Check for duplicate events
+      const duplicateEvent = await this._checkForDuplicateEvents(teamMemberId, validatedDate);
+      if (duplicateEvent) {
+        throw new DuplicateError(
+          `A 1:1 meeting already exists for ${teamMember.name} on ${validatedDate.toDateString()}`,
+          { existingEventId: duplicateEvent.id, date: validatedDate.toDateString() }
+        );
+      }
+
+      // Create the calendar event with schedule reference
+      const calendarEvent = await CalendarEvent.create({
+        event_type: 'one_on_one',
+        title: `1:1 with ${teamMember.name}`,
+        description: `Recurring ${schedule.frequency} 1:1 meeting`,
+        start_time: dateTime,
+        end_time: this._addMinutes(dateTime, duration),
+        team_member_id: teamMemberId,
+        one_on_one_id: oneOnOneId,
+        schedule_id: schedule.id, // Link to schedule
+        is_recurring: true,
+        location: null
+      });
+
+      // Link the OneOnOne record to the calendar event
+      const updatedOneOnOne = await this.linkMeetingToCalendarEvent(oneOnOneId, calendarEvent.id);
+
+      console.log(`Successfully created recurring 1:1 meeting: ${teamMember.name} (${calendarEvent.id})`);
+      return {
+        calendarEvent,
+        oneOnOne: updatedOneOnOne
+      };
+    } catch (error) {
+      console.error('Error creating recurring 1:1 meeting:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update calendar event for a recurring meeting
+   *
+   * @param {string} calendarEventId - ID of the calendar event
+   * @param {string} newDateTime - New date/time (YYYY-MM-DDTHH:mm)
+   * @param {number} duration - Duration in minutes
+   * @returns {Promise<Object>} Updated calendar event
+   */
+  static async updateRecurringOneOnOneMeeting(calendarEventId, newDateTime, duration = 60) {
+    try {
+      console.log(`Updating recurring 1:1 meeting ${calendarEventId}...`);
+
+      // Validate the new date/time
+      const validatedDate = this._validateDateTime(newDateTime);
+
+      // Get the existing event
+      const calendarEvents = await CalendarEvent.list();
+      const event = calendarEvents.find(e => e.id === calendarEventId);
+
+      if (!event) {
+        throw new NotFoundError(`Calendar event ${calendarEventId} not found`, 'CalendarEvent', calendarEventId);
+      }
+
+      // Update the calendar event
+      const updatedEvent = await CalendarEvent.update(calendarEventId, {
+        start_time: newDateTime,
+        end_time: this._addMinutes(newDateTime, duration)
+      });
+
+      console.log(`Successfully updated recurring 1:1 meeting: ${calendarEventId}`);
+      return updatedEvent;
+    } catch (error) {
+      console.error('Error updating recurring 1:1 meeting:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update all future calendar events in a recurring meeting series
+   *
+   * @param {string} scheduleId - ID of the schedule
+   * @param {Object} newSchedule - Updated schedule configuration
+   * @returns {Promise<Object>} Update results
+   */
+  static async updateRecurringMeetingSeries(scheduleId, newSchedule) {
+    try {
+      console.log(`Updating recurring meeting series for schedule ${scheduleId}...`);
+
+      // Get all future calendar events for this schedule
+      const calendarEvents = await CalendarEvent.list();
+      const futureEvents = calendarEvents.filter(event => {
+        if (event.schedule_id !== scheduleId) return false;
+
+        const eventDate = new Date(event.start_time);
+        const now = new Date();
+
+        return eventDate > now; // Only future events
+      });
+
+      let updatedCount = 0;
+      const errors = [];
+
+      for (const event of futureEvents) {
+        try {
+          // Calculate new date/time based on the day of week
+          const eventDate = new Date(event.start_time);
+          const newDateTime = `${eventDate.toISOString().split('T')[0]}T${newSchedule.time}:00`;
+
+          await this.updateRecurringOneOnOneMeeting(
+            event.id,
+            newDateTime,
+            newSchedule.duration_minutes
+          );
+          updatedCount++;
+        } catch (error) {
+          console.error(`Failed to update event ${event.id}:`, error);
+          errors.push({ eventId: event.id, error: error.message });
+        }
+      }
+
+      console.log(`Updated ${updatedCount}/${futureEvents.length} future calendar events`);
+
+      return {
+        success: errors.length === 0,
+        totalEvents: futureEvents.length,
+        updatedCount,
+        errors
+      };
+    } catch (error) {
+      console.error('Error updating recurring meeting series:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete all future calendar events for a schedule
+   *
+   * @param {string} scheduleId - ID of the schedule
+   * @returns {Promise<Object>} Deletion results
+   */
+  static async deleteRecurringMeetingSeries(scheduleId) {
+    try {
+      console.log(`Deleting recurring meeting series for schedule ${scheduleId}...`);
+
+      // Get all future calendar events for this schedule
+      const calendarEvents = await CalendarEvent.list();
+      const futureEvents = calendarEvents.filter(event => {
+        if (event.schedule_id !== scheduleId) return false;
+
+        const eventDate = new Date(event.start_time);
+        const now = new Date();
+
+        return eventDate > now; // Only future events
+      });
+
+      let deletedCount = 0;
+      const errors = [];
+
+      for (const event of futureEvents) {
+        try {
+          await CalendarEvent.delete(event.id);
+          deletedCount++;
+        } catch (error) {
+          console.error(`Failed to delete event ${event.id}:`, error);
+          errors.push({ eventId: event.id, error: error.message });
+        }
+      }
+
+      console.log(`Deleted ${deletedCount}/${futureEvents.length} future calendar events`);
+
+      return {
+        success: errors.length === 0,
+        totalEvents: futureEvents.length,
+        deletedCount,
+        errors
+      };
+    } catch (error) {
+      console.error('Error deleting recurring meeting series:', error);
+      throw error;
+    }
+  }
 }

@@ -307,9 +307,9 @@ export const localClient = {
       },
       async create(oneOnOne) {
         const oneOnOnes = getData('one_on_ones');
-        const newOneOnOne = { 
-          ...oneOnOne, 
-          id: generateId(), 
+        const newOneOnOne = {
+          ...oneOnOne,
+          id: generateId(),
           created_date: new Date().toISOString(),
           updated_date: new Date().toISOString(),
           // Initialize new fields with defaults
@@ -317,7 +317,11 @@ export const localClient = {
           status: oneOnOne.status || 'scheduled',
           location: oneOnOne.location || null,
           // Add calendar integration field
-          next_meeting_calendar_event_id: oneOnOne.next_meeting_calendar_event_id || null
+          next_meeting_calendar_event_id: oneOnOne.next_meeting_calendar_event_id || null,
+          // Add schedule-related fields
+          schedule_id: oneOnOne.schedule_id || null,
+          is_recurring: oneOnOne.is_recurring || false,
+          recurrence_instance: oneOnOne.recurrence_instance || null
         };
         // Remove old participant_id field if it exists
         delete newOneOnOne.participant_id;
@@ -459,6 +463,177 @@ export const localClient = {
         return true;
       }
     },
+    OneOnOneSchedule: {
+      async list() {
+        return getData('one_on_one_schedules');
+      },
+      async create(schedule) {
+        // Validate required fields
+        if (!schedule.team_member_id) {
+          throw new Error('team_member_id is required');
+        }
+        if (!schedule.frequency) {
+          throw new Error('frequency is required');
+        }
+        if (schedule.day_of_week === undefined || schedule.day_of_week === null) {
+          throw new Error('day_of_week is required');
+        }
+        if (!schedule.time) {
+          throw new Error('time is required');
+        }
+        if (!schedule.duration_minutes) {
+          throw new Error('duration_minutes is required');
+        }
+        if (!schedule.start_date) {
+          throw new Error('start_date is required');
+        }
+
+        // Validate frequency
+        const validFrequencies = ['weekly', 'biweekly', 'monthly', 'custom'];
+        if (!validFrequencies.includes(schedule.frequency)) {
+          throw new Error(`frequency must be one of: ${validFrequencies.join(', ')}`);
+        }
+
+        // Validate day_of_week
+        if (schedule.day_of_week < 0 || schedule.day_of_week > 6) {
+          throw new Error('day_of_week must be between 0 (Sunday) and 6 (Saturday)');
+        }
+
+        // Validate time format (HH:mm)
+        const timePattern = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+        if (!timePattern.test(schedule.time)) {
+          throw new Error('time must be in HH:mm format (24-hour)');
+        }
+
+        // Validate duration
+        if (schedule.duration_minutes < 15 || schedule.duration_minutes > 480) {
+          throw new Error('duration_minutes must be between 15 and 480 (8 hours)');
+        }
+
+        // Validate custom_interval_weeks if frequency is custom
+        if (schedule.frequency === 'custom') {
+          if (!schedule.custom_interval_weeks || schedule.custom_interval_weeks < 1) {
+            throw new Error('custom_interval_weeks is required for custom frequency and must be >= 1');
+          }
+        }
+
+        // Check if team member already has an active schedule
+        const schedules = getData('one_on_one_schedules');
+        const existingActive = schedules.find(
+          s => s.team_member_id === schedule.team_member_id && s.is_active
+        );
+        if (existingActive) {
+          throw new Error('Team member already has an active schedule. Please deactivate it first.');
+        }
+
+        const schedules_list = getData('one_on_one_schedules');
+        const newSchedule = {
+          ...schedule,
+          id: generateId(),
+          is_active: true,
+          last_meeting_date: null,
+          created_date: new Date().toISOString(),
+          updated_date: new Date().toISOString(),
+          created_by: getCurrentUser()
+        };
+        schedules_list.unshift(newSchedule);
+        setData('one_on_one_schedules', schedules_list);
+        return newSchedule;
+      },
+      async update(id, updates) {
+        const schedules = getData('one_on_one_schedules');
+        const idx = schedules.findIndex(s => s.id === id);
+        if (idx === -1) {
+          throw new Error('OneOnOneSchedule not found');
+        }
+
+        const currentSchedule = schedules[idx];
+
+        // Validate updates if provided
+        if (updates.frequency) {
+          const validFrequencies = ['weekly', 'biweekly', 'monthly', 'custom'];
+          if (!validFrequencies.includes(updates.frequency)) {
+            throw new Error(`frequency must be one of: ${validFrequencies.join(', ')}`);
+          }
+        }
+
+        if (updates.day_of_week !== undefined && updates.day_of_week !== null) {
+          if (updates.day_of_week < 0 || updates.day_of_week > 6) {
+            throw new Error('day_of_week must be between 0 (Sunday) and 6 (Saturday)');
+          }
+        }
+
+        if (updates.time) {
+          const timePattern = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+          if (!timePattern.test(updates.time)) {
+            throw new Error('time must be in HH:mm format (24-hour)');
+          }
+        }
+
+        if (updates.duration_minutes !== undefined) {
+          if (updates.duration_minutes < 15 || updates.duration_minutes > 480) {
+            throw new Error('duration_minutes must be between 15 and 480 (8 hours)');
+          }
+        }
+
+        const updatedSchedule = {
+          ...currentSchedule,
+          ...updates,
+          updated_date: new Date().toISOString()
+        };
+
+        schedules[idx] = updatedSchedule;
+        setData('one_on_one_schedules', schedules);
+        return updatedSchedule;
+      },
+      async delete(id) {
+        let schedules = getData('one_on_one_schedules');
+        const scheduleExists = schedules.some(s => s.id === id);
+        if (!scheduleExists) {
+          throw new Error('OneOnOneSchedule not found');
+        }
+
+        schedules = schedules.filter(s => s.id !== id);
+        setData('one_on_one_schedules', schedules);
+        return true;
+      },
+      async get(id) {
+        const schedules = getData('one_on_one_schedules');
+        return schedules.find(s => s.id === id) || null;
+      },
+      async getByTeamMember(teamMemberId) {
+        const schedules = getData('one_on_one_schedules');
+        return schedules.filter(s => s.team_member_id === teamMemberId);
+      },
+      async getActive() {
+        const schedules = getData('one_on_one_schedules');
+        return schedules.filter(s => s.is_active);
+      },
+      async getActiveByTeamMember(teamMemberId) {
+        const schedules = getData('one_on_one_schedules');
+        return schedules.find(s => s.team_member_id === teamMemberId && s.is_active) || null;
+      },
+      async deactivate(id) {
+        return await this.update(id, { is_active: false });
+      },
+      async activate(id) {
+        const schedule = await this.get(id);
+        if (!schedule) {
+          throw new Error('OneOnOneSchedule not found');
+        }
+
+        // Check if team member already has another active schedule
+        const schedules = getData('one_on_one_schedules');
+        const existingActive = schedules.find(
+          s => s.team_member_id === schedule.team_member_id && s.is_active && s.id !== id
+        );
+        if (existingActive) {
+          throw new Error('Team member already has an active schedule. Please deactivate it first.');
+        }
+
+        return await this.update(id, { is_active: true });
+      }
+    },
     TaskAttribute: {
       async list() {
         return getData('task_attributes');
@@ -579,7 +754,10 @@ export const localClient = {
           duty_id: event.duty_id || null,
           out_of_office_id: event.out_of_office_id || null,
           // Recurrence support for birthday events
-          recurrence: event.recurrence || null
+          recurrence: event.recurrence || null,
+          // Recurring schedule support
+          schedule_id: event.schedule_id || null,
+          is_recurring: event.is_recurring || false
         };
 
         // Handle birthday event recurrence - automatically set yearly recurrence
