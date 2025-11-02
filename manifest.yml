@@ -1,9 +1,15 @@
 ---
 applications:
-  - name: PEmanager
-    memory: 512M
+  - name: pe-manager
+    memory: 256M
+    disk_quota: 512M
+    instances: 1
     buildpacks:
-      - nodejs_buildpack
-    command: npm start
+      - staticfile_buildpack
+    path: dist
+    stack: cflinuxfs4
     env:
-      NODE_ENV: production
+      FORCE_HTTPS: true
+    # Uncomment and update with your actual route
+    # routes:
+    #   - route: pe-manager.cfapps.sap.hana.ondemand.com

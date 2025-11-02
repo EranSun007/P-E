@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Source files (we only deploy dist/)
+src/
+public/
+
+# Test files
+**/__tests__/
+*.test.js
+*.test.jsx
+vitest.config.js
+
+# Development files
+.env.local
+.env.development
+
+# Git
+.git/
+.gitignore
+
+# CI/CD
+.github/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build artifacts we don't need
+coverage/
+.cache/
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -22,7 +22,11 @@
     "ci:bundle-check": "node scripts/ci-bundle-check.js",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest"
+    "test": "vitest",
+    "predeploy": "npm run build",
+    "deploy": "cf push -f manifest.yml",
+    "deploy:check": "cf apps | grep pe-manager",
+    "deploy:logs": "cf logs pe-manager --recent"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.2",
