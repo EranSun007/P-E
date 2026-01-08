@@ -1,9 +1,31 @@
 ---
 applications:
-  - name: PEmanager
+  # Backend Application (Express.js API)
+  - name: pe-manager-backend
     memory: 512M
+    instances: 1
     buildpacks:
       - nodejs_buildpack
     command: npm start
+    path: .
     env:
       NODE_ENV: production
+      AUTH_MODE: xsuaa
+      PORT: 8080
+    services:
+      - pe-manager-db        # PostgreSQL service binding
+      - pe-manager-xsuaa     # XSUAA authentication service binding
+    routes:
+      - route: pe-manager-backend.cfapps.sap.hana.ondemand.com
+
+  # Frontend Application (React Static Files)
+  - name: pe-manager-frontend
+    memory: 128M
+    instances: 1
+    buildpacks:
+      - staticfile_buildpack
+    path: dist
+    env:
+      FORCE_HTTPS: true
+    routes:
+      - route: pe-manager.cfapps.sap.hana.ondemand.com

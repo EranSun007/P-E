@@ -2,6 +2,7 @@
 // Local storage-based API client for migration from Base44
 
 import { sanitizeInput, validateInput } from '../utils/validation.js';
+import { logger } from '../utils/logger.js';
 
 function getData(key) {
   try {
@@ -9,7 +10,7 @@ function getData(key) {
     if (!data) return [];
     return JSON.parse(data);
   } catch (error) {
-    console.error(`Error reading data from localStorage key "${key}":`, error);
+    logger.error('Error reading data from localStorage', { key, error: String(error) });
     return [];
   }
 }
@@ -21,7 +22,7 @@ function setData(key, data) {
     }
     localStorage.setItem(key, JSON.stringify(data));
   } catch (error) {
-    console.error(`Error saving data to localStorage key "${key}":`, error);
+    logger.error('Error saving data to localStorage', { key, error: String(error) });
     throw error;
   }
 }
@@ -192,6 +193,10 @@ export const localClient = {
           // Initialize new fields with defaults
           phone: member.phone || null,
           company: member.company || null,
+          // Leave period fields for vacations/maternity, stored as ISO/date strings
+          leave_from: member.leave_from || null,
+          leave_to: member.leave_to || null,
+          leave_title: member.leave_title || null,
           last_activity: null // Will be calculated dynamically
         };
         members.unshift(newMember);

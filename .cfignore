@@ -1,0 +1,89 @@
+# Development files
+.env.development
+.env.local
+*.local
+
+# Source files (not needed in production)
+src/
+public/
+
+# Build artifacts and cache
+node_modules/.cache/
+node_modules/.vite/
+.vite/
+
+# Testing
+*.test.js
+*.test.jsx
+*.test.ts
+*.test.tsx
+__tests__/
+coverage/
+vitest.setup.js
+
+# Documentation
+*.md
+!README.md
+CLAUDE.md
+MIGRATION_PROGRESS.md
+BACKEND_TEST_RESULTS.md
+INTEGRATION_TEST_REPORT.md
+SAP_BTP_DATABASE_SETUP.md
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Development tools
+.eslintrc.*
+.prettierrc
+tsconfig.json
+
+# Archives
+*.zip
+*.tar.gz
+
+# Claude Code
+.claude_settings.json
+.auto-claude-security.json
+.cursorindexignore
+.specstory/
+
+# Scripts (keep only if needed in production)
+scripts/
+
+# Auto-Claude worktrees
+.auto-claude/

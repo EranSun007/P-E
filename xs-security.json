@@ -1,0 +1,54 @@
+{
+  "xsappname": "pe-manager",
+  "tenant-mode": "dedicated",
+  "description": "Security configuration for P&E Manager application",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.User",
+      "description": "Standard user access to P&E Manager"
+    },
+    {
+      "name": "$XSAPPNAME.Admin",
+      "description": "Administrator access with full permissions"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "User",
+      "description": "P&E Manager User",
+      "scope-references": [
+        "$XSAPPNAME.User"
+      ]
+    },
+    {
+      "name": "Admin",
+      "description": "P&E Manager Administrator",
+      "scope-references": [
+        "$XSAPPNAME.User",
+        "$XSAPPNAME.Admin"
+      ]
+    }
+  ],
+  "role-collections": [
+    {
+      "name": "PE_Manager_User",
+      "description": "P&E Manager User Role Collection",
+      "role-template-references": [
+        "$XSAPPNAME.User"
+      ]
+    },
+    {
+      "name": "PE_Manager_Admin",
+      "description": "P&E Manager Administrator Role Collection",
+      "role-template-references": [
+        "$XSAPPNAME.Admin"
+      ]
+    }
+  ],
+  "oauth2-configuration": {
+    "redirect-uris": [
+      "https://*.cfapps.sap.hana.ondemand.com/**",
+      "https://*.hana.ondemand.com/**"
+    ]
+  }
+}
