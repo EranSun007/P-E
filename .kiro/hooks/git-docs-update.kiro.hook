@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "name": "Git Docs Updater",
+  "description": "Monitors git commits and pushes to automatically update all agent steering documentation with relevant changes based on newly implemented features",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      ".git/logs/HEAD",
+      ".git/refs/heads/*"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A git commit and push has been detected. Please analyze the recent code changes and update all relevant agent steering documentation in the .agent-os/ directory to reflect the new features that were implemented. Focus on updating:\n\n1. .agent-os/product/tech-stack.md - Update with any new dependencies, technologies, or architectural changes\n2. .agent-os/product/roadmap.md - Mark completed features and adjust timeline based on progress\n3. .agent-os/product/decisions.md - Document any significant technical or product decisions made\n4. .agent-os/product/mission.md - Update if new features change the product scope or capabilities\n\nReview the git commit messages and changed files to understand what was implemented, then update the documentation to keep it current with the actual state of the codebase."
+  }
+}

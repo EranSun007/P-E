@@ -30,6 +30,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import AgendaContextActions from "@/components/agenda/AgendaContextActions";
+import { TeamMember } from "@/api/entities";
 
 export default function TaskCard({ task, onEdit, onDelete, onStatusChange }) {
   // Ensure all task properties have safe defaults
@@ -48,6 +50,22 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange }) {
   // Ensure arrays are properly initialized
   const tags = Array.isArray(safeTask.tags) ? safeTask.tags : [];
   const stakeholders = Array.isArray(safeTask.stakeholders) ? safeTask.stakeholders : [];
+  
+  // State for team members (for context actions)
+  const [teamMembers, setTeamMembers] = React.useState([]);
+  
+  // Load team members for context actions
+  React.useEffect(() => {
+    const loadTeamMembers = async () => {
+      try {
+        const members = await TeamMember.list();
+        setTeamMembers(members);
+      } catch (error) {
+        console.error("Failed to load team members:", error);
+      }
+    };
+    loadTeamMembers();
+  }, []);
   
   const getStatusIcon = () => {
     switch (safeTask.status) {
@@ -268,6 +286,36 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange }) {
             <div className="flex items-center text-sm text-gray-500">
               <Users className="h-4 w-4 mr-1" />
               <span>Stakeholders: {stakeholders.join(", ")}</span>
+            </div>
+          )}
+
+          {/* Context Actions for Team Members */}
+          {stakeholders.length > 0 && teamMembers.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {stakeholders.map(stakeholderName => {
+                const teamMember = teamMembers.find(tm => tm.name === stakeholderName);
+                if (!teamMember) return null;
+                
+                return (
+                  <div key={teamMember.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                    <span className="text-sm font-medium">{teamMember.name}</span>
+                    <AgendaContextActions
+                      teamMemberId={teamMember.id}
+                      teamMemberName={teamMember.name}
+                      sourceItem={{
+                        title: safeTask.title,
+                        description: safeTask.description,
+                        type: 'task',
+                        id: safeTask.id,
+                        priority: safeTask.priority,
+                        status: safeTask.status
+                      }}
+                      variant="outline"
+                      size="sm"
+                    />
+                  </div>
+                );
+              })}
             </div>
           )}
         

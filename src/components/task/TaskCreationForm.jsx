@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { InvokeLLM } from "@/api/integrations";
 import { Button } from "@/components/ui/button";
@@ -14,7 +13,7 @@ import MetricMetadataForm from "./metadata/MetricMetadataForm";
 import ActionMetadataForm from "./metadata/ActionMetadataForm";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Project } from "@/api/entities";
-import { Stakeholder } from "@/api/entities";
+import { Stakeholder, TeamMember, Peer } from "@/api/entities";
 import TagInput from "../ui/tag-input";
 import { Label } from "@/components/ui/label";
 
@@ -114,6 +113,10 @@ export default function TaskCreationForm({ onCreateTask, initialTaskData = null 
   const [taskData, setTaskData] = useState(safeInitialData);
   const [projects, setProjects] = useState([]);
   const [stakeholders, setStakeholders] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [peers, setPeers] = useState([]);
+  const [assigneeType, setAssigneeType] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
 
   const [newSubtask, setNewSubtask] = useState("");
 
@@ -140,9 +143,35 @@ export default function TaskCreationForm({ onCreateTask, initialTaskData = null 
       }
     };
     
+    // Fetch team members and peers for assignee
+    const fetchEntities = async () => {
+      try {
+        const [teamMemberData, peerData] = await Promise.all([
+          TeamMember.list(),
+          Peer.list()
+        ]);
+        setTeamMembers(teamMemberData || []);
+        setPeers(peerData || []);
+      } catch (err) {
+        setTeamMembers([]);
+        setPeers([]);
+      }
+    };
+    
     loadProjects();
     loadStakeholders();
+    fetchEntities();
   }, []);
+
+  useEffect(() => {
+    if (initialTaskData && initialTaskData.assignee && typeof initialTaskData.assignee === "object") {
+      setAssigneeType(initialTaskData.assignee.type);
+      setAssigneeId(initialTaskData.assignee.id);
+    } else {
+      setAssigneeType("");
+      setAssigneeId("");
+    }
+  }, [initialTaskData]);
 
   const processNaturalLanguage = async () => {
     if (!taskInput.trim()) return;
@@ -576,12 +605,52 @@ export default function TaskCreationForm({ onCreateTask, initialTaskData = null 
                   </div>
                   
                   <div>
+                    <label className="block text-sm font-medium mb-1">Assignee Type</label>
+                    <Select
+                      value={assigneeType}
+                      onValueChange={val => {
+                        setAssigneeType(val);
+                        setAssigneeId("");
+                        // Optionally clear assignee in taskData
+                        updateTaskField("assignee", "");
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="stakeholder">Stakeholder</SelectItem>
+                        <SelectItem value="member">Team Member</SelectItem>
+                        <SelectItem value="peer">Peer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium mb-1">Assignee</label>
-                    <Input
-                      value={taskData.assignee || ""}
-                      onChange={(e) => updateTaskField("assignee", e.target.value)}
-                      placeholder="Who is responsible for this task?"
-                    />
+                    <Select
+                      value={assigneeId}
+                      onValueChange={val => {
+                        setAssigneeId(val);
+                        // Store as object in taskData
+                        updateTaskField("assignee", val ? { type: assigneeType, id: val } : "");
+                      }}
+                      disabled={!assigneeType}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={assigneeType ? "Select assignee" : "Select type first"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {assigneeType === "stakeholder" && stakeholders.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                        {assigneeType === "member" && teamMembers.map(m => (
+                          <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                        ))}
+                        {assigneeType === "peer" && peers.map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 

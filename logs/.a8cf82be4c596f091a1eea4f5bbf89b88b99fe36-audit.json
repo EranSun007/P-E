@@ -1,0 +1,50 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/.a8cf82be4c596f091a1eea4f5bbf89b88b99fe36-audit.json",
+    "files": [
+        {
+            "date": 1752778956799,
+            "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-07-17.log",
+            "hash": "a67de35052cc2f214a72a68cb9f9dfd39f8b044bda9bbb290d40ee2fb96bf915"
+        },
+        {
+            "date": 1752938181987,
+            "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-07-19.log",
+            "hash": "c6552332ccaf585b320e95612446cfdf6e50d797b8de73c037094ac19a8eb47c"
+        },
+        {
+            "date": 1753007166217,
+            "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-07-20.log",
+            "hash": "e00ad661855ab8d068067b21e778b0a15fcd060de45c8e1bb8d591d32ba5e4ea"
+        },
+        {
+            "date": 1753157751863,
+            "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-07-22.log",
+            "hash": "6f9554efcacd6caf60db2dcc5175de0679d6c2b4a3c5007d0de231bfd5ef47ca"
+        },
+        {
+            "date": 1753267620427,
+            "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-07-23.log",
+            "hash": "5b57d34a8964399a7cfc99908e2d78fbcf27b77317fc121cd30f5d4388137102"
+        },
+        {
+            "date": 1753361677382,
+            "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-07-24.log",
+            "hash": "721fcf844691137c9bf3f9646ea27e640937aca34fe1c0e218fc1d16c4c5df9f"
+        },
+        {
+            "date": 1753448598804,
+            "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-07-25.log",
+            "hash": "920085d195205ff3853cfa9118028b6c6030b4c0b666c6d54332e52e3965e8a9"
+        },
+        {
+            "date": 1753521435670,
+            "name": "/Users/i306072/Library/Mobile Documents/com~apple~CloudDocs/Git/P&E/logs/mcp-puppeteer-2025-07-26.log",
+            "hash": "f3f1e603cdf65ff030accb5d971eca0e2e6cb47a39202ff232bf54a5b13fdadc"
+        }
+    ],
+    "hashType": "sha256"
+}

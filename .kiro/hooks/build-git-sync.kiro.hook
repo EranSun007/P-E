@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "name": "Build Git Sync",
+  "description": "Automatically commits and pushes all updated files to git whenever npm run build is executed",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "dist/",
+      "package.json",
+      "package-lock.json"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "The user has run npm run build. Please commit all updated files to git with an appropriate commit message and push the changes to the remote repository. Include any build artifacts in the dist/ folder and any package file changes."
+  }
+}

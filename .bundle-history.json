@@ -1,0 +1,612 @@
+[
+  {
+    "timestamp": "2025-07-27T07:10:12.167Z",
+    "totalSize": 1589756,
+    "chunks": [
+      {
+        "name": "chunk-An1cF_3A.js",
+        "size": 411230,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-8WlaufA8.js",
+        "size": 285228,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-pjYta8vt.js",
+        "size": 174742,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-BQPSriyy.js",
+        "size": 112389,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "index-BK5E59O8.js",
+        "size": 82940,
+        "type": "js",
+        "category": "entry"
+      },
+      {
+        "name": "index-CO3VviEi.css",
+        "size": 82017,
+        "type": "css",
+        "category": "styles"
+      },
+      {
+        "name": "TeamMemberProfile-yctdmpTj.js",
+        "size": 77986,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "chunk-FXPmmNOU.js",
+        "size": 46273,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "favicon-B5IO22LY.ico",
+        "size": 35833,
+        "type": "asset",
+        "category": "assets"
+      },
+      {
+        "name": "PeerProfile-Cys9Wjf6.js",
+        "size": 28280,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "chunk-DTiRvVQj.js",
+        "size": 19581,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "Projects-B40Ne4Vf.js",
+        "size": 19495,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "TaskCreationForm-NRsPR7xV.js",
+        "size": 18496,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "calendarSynchronizationService-A8-_sGLl.js",
+        "size": 17038,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "calendarService-BLiLHtBa.js",
+        "size": 15987,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "Peers-BnE_j2M1.js",
+        "size": 14694,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "Team-CDRF78_7.js",
+        "size": 13049,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "Settings-DO0bOo4S.js",
+        "size": 12902,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "Tasks-BSYKFw1G.js",
+        "size": 12227,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "chunk-2Qq0zNiP.js",
+        "size": 11918,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "ProjectDetails-nmbXL_yi.js",
+        "size": 11415,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "Stakeholders-CTSP4UDG.js",
+        "size": 8169,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "chunk-cjCmUzJ1.js",
+        "size": 8113,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-dSH-ZfBJ.js",
+        "size": 8065,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-CJViCmxo.js",
+        "size": 7779,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "WeeklyMeetingSidebar-BS5JlWOt.js",
+        "size": 7395,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "MeetingDetailView-DYbFoxDx.js",
+        "size": 6451,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "TeamMemberDeletionDialog-BmXHMHA8.js",
+        "size": 5981,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "chunk-B6BcMUO9.js",
+        "size": 5970,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "Metrics-CnHKdtyk.js",
+        "size": 5489,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "chunk-DvQYMAQ6.js",
+        "size": 3598,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-DktN3Kjy.js",
+        "size": 3013,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-Cg2ZZDgQ.js",
+        "size": 2901,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-N38jzkpe.js",
+        "size": 2777,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-Bw8oe1_L.js",
+        "size": 1674,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-B-BuOqLK.js",
+        "size": 1628,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-UjCvYLMJ.js",
+        "size": 1397,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-Dm0CwYXu.js",
+        "size": 1315,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-BtUKRQ1H.js",
+        "size": 1133,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-kzSEtJwL.js",
+        "size": 1022,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-CkTSnDel.js",
+        "size": 838,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-DHsBTIyN.js",
+        "size": 653,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-DSRmHbBO.js",
+        "size": 516,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-KzYfAQy1.js",
+        "size": 98,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-BdHZTqfh.js",
+        "size": 61,
+        "type": "js",
+        "category": "async"
+      }
+    ],
+    "largestChunk": {
+      "name": "chunk-An1cF_3A.js",
+      "size": 411230,
+      "type": "js",
+      "category": "async"
+    },
+    "categories": {
+      "app": {
+        "count": 16,
+        "size": 275054
+      },
+      "async": {
+        "count": 26,
+        "size": 1113912
+      },
+      "entry": {
+        "count": 1,
+        "size": 82940
+      },
+      "styles": {
+        "count": 1,
+        "size": 82017
+      },
+      "assets": {
+        "count": 1,
+        "size": 35833
+      }
+    },
+    "chunkCount": 45
+  },
+  {
+    "timestamp": "2025-07-27T07:10:25.224Z",
+    "totalSize": 1589756,
+    "chunks": [
+      {
+        "name": "chunk-An1cF_3A.js",
+        "size": 411230,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-8WlaufA8.js",
+        "size": 285228,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-pjYta8vt.js",
+        "size": 174742,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-BQPSriyy.js",
+        "size": 112389,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "index-BK5E59O8.js",
+        "size": 82940,
+        "type": "js",
+        "category": "entry"
+      },
+      {
+        "name": "index-CO3VviEi.css",
+        "size": 82017,
+        "type": "css",
+        "category": "styles"
+      },
+      {
+        "name": "TeamMemberProfile-yctdmpTj.js",
+        "size": 77986,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "chunk-FXPmmNOU.js",
+        "size": 46273,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "favicon-B5IO22LY.ico",
+        "size": 35833,
+        "type": "asset",
+        "category": "assets"
+      },
+      {
+        "name": "PeerProfile-Cys9Wjf6.js",
+        "size": 28280,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "chunk-DTiRvVQj.js",
+        "size": 19581,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "Projects-B40Ne4Vf.js",
+        "size": 19495,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "TaskCreationForm-NRsPR7xV.js",
+        "size": 18496,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "calendarSynchronizationService-A8-_sGLl.js",
+        "size": 17038,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "calendarService-BLiLHtBa.js",
+        "size": 15987,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "Peers-BnE_j2M1.js",
+        "size": 14694,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "Team-CDRF78_7.js",
+        "size": 13049,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "Settings-DO0bOo4S.js",
+        "size": 12902,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "Tasks-BSYKFw1G.js",
+        "size": 12227,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "chunk-2Qq0zNiP.js",
+        "size": 11918,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "ProjectDetails-nmbXL_yi.js",
+        "size": 11415,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "Stakeholders-CTSP4UDG.js",
+        "size": 8169,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "chunk-cjCmUzJ1.js",
+        "size": 8113,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-dSH-ZfBJ.js",
+        "size": 8065,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-CJViCmxo.js",
+        "size": 7779,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "WeeklyMeetingSidebar-BS5JlWOt.js",
+        "size": 7395,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "MeetingDetailView-DYbFoxDx.js",
+        "size": 6451,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "TeamMemberDeletionDialog-BmXHMHA8.js",
+        "size": 5981,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "chunk-B6BcMUO9.js",
+        "size": 5970,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "Metrics-CnHKdtyk.js",
+        "size": 5489,
+        "type": "js",
+        "category": "app"
+      },
+      {
+        "name": "chunk-DvQYMAQ6.js",
+        "size": 3598,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-DktN3Kjy.js",
+        "size": 3013,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-Cg2ZZDgQ.js",
+        "size": 2901,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-N38jzkpe.js",
+        "size": 2777,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-Bw8oe1_L.js",
+        "size": 1674,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-B-BuOqLK.js",
+        "size": 1628,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-UjCvYLMJ.js",
+        "size": 1397,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-Dm0CwYXu.js",
+        "size": 1315,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-BtUKRQ1H.js",
+        "size": 1133,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-kzSEtJwL.js",
+        "size": 1022,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-CkTSnDel.js",
+        "size": 838,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-DHsBTIyN.js",
+        "size": 653,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-DSRmHbBO.js",
+        "size": 516,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-KzYfAQy1.js",
+        "size": 98,
+        "type": "js",
+        "category": "async"
+      },
+      {
+        "name": "chunk-BdHZTqfh.js",
+        "size": 61,
+        "type": "js",
+        "category": "async"
+      }
+    ],
+    "largestChunk": {
+      "name": "chunk-An1cF_3A.js",
+      "size": 411230,
+      "type": "js",
+      "category": "async"
+    },
+    "categories": {
+      "app": {
+        "count": 16,
+        "size": 275054
+      },
+      "async": {
+        "count": 26,
+        "size": 1113912
+      },
+      "entry": {
+        "count": 1,
+        "size": 82940
+      },
+      "styles": {
+        "count": 1,
+        "size": 82017
+      },
+      "assets": {
+        "count": 1,
+        "size": 35833
+      }
+    },
+    "chunkCount": 45
+  }
+]

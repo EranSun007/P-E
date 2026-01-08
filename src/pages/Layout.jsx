@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import {
@@ -15,30 +15,42 @@ import {
   Folders,
   UserPlus
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { User as UserEntity } from "@/api/entities";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/AuthContext.jsx";
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [userLoading, setUserLoading] = useState(true);
+  const { logout, isAuthenticated } = useAuth();
 
   useEffect(() => {
     const fetchUser = async () => {
+      if (!isAuthenticated) {
+        setUser(null);
+        setUserLoading(false);
+        return;
+      }
+
       try {
+        setUserLoading(true);
         const userData = await UserEntity.me();
         setUser(userData);
       } catch (error) {
         console.error("Error fetching user data:", error);
+        setUser(null);
+      } finally {
+        setUserLoading(false);
       }
     };
+    
     fetchUser();
-  }, []);
+  }, [isAuthenticated]);
 
-  const handleLogout = async () => {
-    await UserEntity.logout();
-    window.location.reload();
+  const handleLogout = () => {
+    logout();
   };
 
   const navigation = [
@@ -77,6 +89,12 @@ export default function Layout({ children, currentPageName }) {
       icon: Users,
       href: createPageUrl("Stakeholders"),
       current: currentPageName === "Stakeholders"
+    },
+    {
+      name: "Peers",
+      icon: Users,
+      href: createPageUrl("Peers"),
+      current: currentPageName === "Peers"
     }
   ];
 
@@ -135,7 +153,15 @@ export default function Layout({ children, currentPageName }) {
           </nav>
           
           <div className="p-4 border-t">
-            {user && (
+            {userLoading ? (
+              <div className="mb-4 px-4 py-3 flex items-center gap-3">
+                <div className="h-10 w-10 bg-gray-200 rounded-full animate-pulse"></div>
+                <div className="flex-1 min-w-0">
+                  <div className="h-4 bg-gray-200 rounded animate-pulse mb-1"></div>
+                  <div className="h-3 bg-gray-200 rounded animate-pulse w-2/3"></div>
+                </div>
+              </div>
+            ) : user ? (
               <div className="mb-4 px-4 py-3 flex items-center gap-3">
                 <Avatar className="h-10 w-10 bg-indigo-100">
                   <AvatarFallback className="text-indigo-700">
@@ -147,7 +173,23 @@ export default function Layout({ children, currentPageName }) {
                     {user.name || "User"}
                   </p>
                   <p className="text-xs text-gray-500 truncate">
-                    Local User
+                    @{user.username || "user"}
+                  </p>
+                </div>
+              </div>
+            ) : isAuthenticated && (
+              <div className="mb-4 px-4 py-3 flex items-center gap-3">
+                <Avatar className="h-10 w-10 bg-gray-100">
+                  <AvatarFallback className="text-gray-500">
+                    <User className="h-5 w-5" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    User
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    Authenticated
                   </p>
                 </div>
               </div>

@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { Project, Task, Stakeholder } from "@/api/entities";
+import { Project, Task, Stakeholder, TeamMember } from "@/api/entities";
 import { InvokeLLM } from "@/api/integrations";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,8 +31,11 @@ import {
   UserPlus
 } from "lucide-react";
 import TaskList from "../components/task/TaskList";
-import TaskCreationForm from "../components/task/TaskCreationForm";
+
+// Lazy load TaskCreationForm for better performance
+const TaskCreationForm = lazy(() => import("../components/task/TaskCreationForm"));
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import AgendaContextActions from "@/components/agenda/AgendaContextActions";
 
 export default function ProjectDetailsPage() {
   const [searchParams] = useSearchParams();
@@ -40,6 +43,7 @@ export default function ProjectDetailsPage() {
 
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showTaskDialog, setShowTaskDialog] = useState(false);
   const [stakeholders, setStakeholders] = useState([]);
@@ -67,9 +71,13 @@ export default function ProjectDetailsPage() {
       const projectTasks = allTasks.filter(task => task.project === projectData.name);
       setTasks(projectTasks);
 
-      // Load stakeholders
-      const stakeholderData = await Stakeholder.list();
+      // Load stakeholders and team members
+      const [stakeholderData, teamMemberData] = await Promise.all([
+        Stakeholder.list(),
+        TeamMember.list()
+      ]);
       setStakeholders(stakeholderData);
+      setTeamMembers(teamMemberData);
 
       // Set selected stakeholders
       if (projectData.stakeholders) {
@@ -252,6 +260,38 @@ export default function ProjectDetailsPage() {
                     <h3 className="text-sm font-medium text-gray-500">Owner</h3>
                     <p className="mt-1">{project.owner || "No owner assigned"}</p>
                   </div>
+                  
+                  {/* Context Actions for Team Members */}
+                  {teamMembers.length > 0 && (
+                    <div className="pt-3 border-t border-gray-200">
+                      <h3 className="text-sm font-medium text-gray-500 mb-2">Add to team member agendas:</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {teamMembers.slice(0, 3).map(teamMember => (
+                          <AgendaContextActions
+                            key={teamMember.id}
+                            teamMemberId={teamMember.id}
+                            teamMemberName={teamMember.name}
+                            sourceItem={{
+                              title: `Project: ${project.name}`,
+                              description: `${project.description || ''} | Status: ${project.status}${project.owner ? ` | Owner: ${project.owner}` : ''}`,
+                              type: 'project',
+                              id: project.id,
+                              status: project.status,
+                              start_date: project.start_date,
+                              end_date: project.end_date
+                            }}
+                            variant="outline"
+                            size="sm"
+                            showAgendaAction={true}
+                            showPersonalFileAction={true}
+                          />
+                        ))}
+                        {teamMembers.length > 3 && (
+                          <span className="text-xs text-gray-400 self-center">+{teamMembers.length - 3} more</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <h3 className="text-sm font-medium text-gray-500">Dates</h3>
                     <div className="flex items-center gap-2 mt-1">
@@ -422,13 +462,20 @@ export default function ProjectDetailsPage() {
             <DialogHeader>
               <DialogTitle>Add New Task</DialogTitle>
             </DialogHeader>
-            <TaskCreationForm 
-              onCreateTask={handleCreateTask}
-              initialTaskData={{
-                project: project.name,
-                status: "todo"
-              }}
-            />
+            <Suspense fallback={
+              <div className="flex items-center justify-center p-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <span className="ml-2 text-sm text-gray-600">Loading task form...</span>
+              </div>
+            }>
+              <TaskCreationForm 
+                onCreateTask={handleCreateTask}
+                initialTaskData={{
+                  project: project.name,
+                  status: "todo"
+                }}
+              />
+            </Suspense>
           </DialogContent>
         </Dialog>
 

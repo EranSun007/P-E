@@ -1,6 +1,6 @@
 // Switch between localStorage (localClient) and PostgreSQL (apiClient)
 // Controlled by environment variable for gradual migration
-import { localClient } from './localClient';
+import { localClient } from './localClient.js';
 import { apiClient } from './apiClient';
 
 // Use API_MODE=local to keep using localStorage during testing
@@ -21,6 +21,40 @@ export const CalendarEvent = client.entities.CalendarEvent;
 export const Notification = client.entities.Notification;
 export const Reminder = client.entities.Reminder;
 export const Comment = client.entities.Comment;
+export const OutOfOffice = client.entities.OutOfOffice;
+export const Peer = client.entities.Peer;
+export const Duty = client.entities.Duty;
+export const AgendaItem = client.entities.AgendaItem;
+export const PersonalFileItem = client.entities.PersonalFileItem;
 
-// Auth - use apiClient for authentication
-export const User = USE_API ? apiClient.auth : localClient.auth;
+// User entity that works with both authentication systems
+export const User = USE_API ? apiClient.auth : {
+  me: async () => {
+    // Import AuthService to get current user from token
+    const AuthService = (await import('../services/authService.js')).default;
+    const token = AuthService.getStoredToken();
+
+    if (!token) {
+      throw new Error('No authenticated user found');
+    }
+
+    // Create user display name based on username
+    const displayName = token.username === 'admin'
+      ? 'Administrator'
+      : token.username.charAt(0).toUpperCase() + token.username.slice(1);
+
+    return {
+      id: 'local-user',
+      name: displayName,
+      username: token.username,
+      isAuthenticated: true,
+      loginTime: new Date(token.timestamp).toISOString()
+    };
+  },
+  logout: async () => {
+    // Import AuthService to handle logout
+    const AuthService = (await import('../services/authService.js')).default;
+    AuthService.clearAuthData();
+    return true;
+  }
+};
