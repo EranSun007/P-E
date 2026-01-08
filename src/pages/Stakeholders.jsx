@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { Stakeholder } from "@/api/entities";
+import { AppContext } from "@/contexts/AppContext.jsx";
+import { logger } from "@/utils/logger";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,8 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Plus, Search } from "lucide-react";
 
 export default function StakeholdersPage() {
+  const { stakeholders: ctxStakeholders, loading, refreshAll } = useContext(AppContext);
   const [stakeholders, setStakeholders] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState(null);
@@ -31,30 +33,16 @@ export default function StakeholdersPage() {
   });
 
   useEffect(() => {
-    loadStakeholders();
-  }, []);
+    setStakeholders(Array.isArray(ctxStakeholders) ? ctxStakeholders : []);
+  }, [ctxStakeholders]);
 
   const loadStakeholders = async () => {
-    setLoading(true);
     setError(null);
     try {
-      const response = await Stakeholder.list();
-      console.log("Stakeholder response:", response); // Debug log
-
-      // Ensure we have a valid array
-      if (!response) {
-        setStakeholders([]);
-        return;
-      }
-
-      const data = Array.isArray(response) ? response : [];
-      setStakeholders(data);
+      await refreshAll();
     } catch (err) {
-      console.error("Failed to load stakeholders:", err);
+      logger.error("Failed to refresh stakeholders", { error: String(err) });
       setError("Failed to load stakeholders");
-      setStakeholders([]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -102,7 +90,7 @@ export default function StakeholdersPage() {
       setShowDialog(false);
       loadStakeholders();
     } catch (err) {
-      console.error(`Failed to ${editingStakeholder ? 'update' : 'create'} stakeholder:`, err);
+      logger.error(`Failed to ${editingStakeholder ? 'update' : 'create'} stakeholder`, { error: String(err) });
       setError(`Failed to ${editingStakeholder ? 'update' : 'create'} stakeholder`);
     }
   };

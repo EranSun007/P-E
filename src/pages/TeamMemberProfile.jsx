@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { format, parseISO } from "date-fns";
-import { TeamMember, OneOnOne, Task, Project, Stakeholder } from "@/api/entities";
+import { TeamMember, OneOnOne } from "@/api/entities";
 import { createPageUrl } from "@/utils";
+import { AppContext } from "@/contexts/AppContext.jsx";
+import { logger } from "@/utils/logger";
 import {
   Card,
   CardContent,
@@ -60,10 +62,7 @@ export default function TeamMemberProfile() {
 
   const [member, setMember] = useState(null);
   const [oneOnOnes, setOneOnOnes] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [projects, setProjects] = useState([]);
-  const [allTeamMembers, setAllTeamMembers] = useState([]);
-  const [allStakeholders, setAllStakeholders] = useState([]);
+  const { tasks, projects, teamMembers: allTeamMembers, stakeholders: allStakeholders, oneOnOnes: ctxOneOnOnes, refreshAll } = useContext(AppContext);
   const [loading, setLoading] = useState(true);
   const [showNewMeetingDialog, setShowNewMeetingDialog] = useState(false);
   const [showActionItemDialog, setShowActionItemDialog] = useState(false);
@@ -112,26 +111,13 @@ export default function TeamMemberProfile() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Load team member details
       const memberData = await TeamMember.get(memberId);
       setMember(memberData);
-
-      // Load 1:1s
-      const oneOnOneData = await OneOnOne.list();
-      const memberOneOnOnes = oneOnOneData.filter(o => o.team_member_id === memberId);
+      await refreshAll();
+      const memberOneOnOnes = (Array.isArray(ctxOneOnOnes) ? ctxOneOnOnes : []).filter(o => o.team_member_id === memberId);
       setOneOnOnes(memberOneOnOnes);
-
-      // Load tasks and projects for linking
-      const taskData = await Task.list();
-      const projectData = await Project.list();
-      setTasks(taskData);
-      setProjects(projectData);
-
-      // Load all team members and stakeholders for note tagging
-      setAllTeamMembers(await TeamMember.list());
-      setAllStakeholders(await Stakeholder.list());
     } catch (error) {
-      console.error("Error loading team member data:", error);
+      logger.error("Error loading team member data", { error: String(error) });
     } finally {
       setLoading(false);
     }
@@ -147,7 +133,7 @@ export default function TeamMemberProfile() {
       setShowNewMeetingDialog(false);
       loadData();
     } catch (error) {
-      console.error("Error creating 1:1 meeting:", error);
+      logger.error("Error creating 1:1 meeting", { error: String(error) });
     }
   };
 
@@ -167,7 +153,7 @@ export default function TeamMemberProfile() {
       setShowActionItemDialog(false);
       loadData();
     } catch (error) {
-      console.error("Error adding action item:", error);
+      logger.error("Error adding action item", { error: String(error) });
     }
   };
 
@@ -210,7 +196,7 @@ export default function TeamMemberProfile() {
       });
       loadData();
     } catch (error) {
-      console.error("Error updating action item status:", error);
+      logger.error("Error updating action item status", { error: String(error) });
     }
   };
 
@@ -224,7 +210,7 @@ export default function TeamMemberProfile() {
       await OneOnOne.delete(meetingId);
       loadData();
     } catch (error) {
-      console.error("Error deleting meeting:", error);
+      logger.error("Error deleting meeting", { error: String(error) });
     }
   };
 

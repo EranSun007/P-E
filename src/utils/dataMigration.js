@@ -1,6 +1,8 @@
 // Data migration utility for P&E Manager
 // Handles migration from old schema to new schema with additional fields
 
+import { logger } from './logger.js';
+
 export class DataMigration {
   static MIGRATION_VERSION = '1.0.0';
   static MIGRATION_KEY = 'pe_manager_migration_version';
@@ -9,7 +11,7 @@ export class DataMigration {
     const currentVersion = localStorage.getItem(this.MIGRATION_KEY);
     
     if (currentVersion !== this.MIGRATION_VERSION) {
-      console.log('Running data migrations...');
+      logger.info('Running data migrations...');
       
       await this.migrateTasksSchema();
       await this.migrateProjectsSchema();
@@ -19,7 +21,7 @@ export class DataMigration {
       await this.migrateTaskAttributesSchema();
       
       localStorage.setItem(this.MIGRATION_KEY, this.MIGRATION_VERSION);
-      console.log('Data migration completed successfully');
+      logger.info('Data migration completed successfully');
     }
   }
 
@@ -38,7 +40,7 @@ export class DataMigration {
     }));
 
     this.setData('tasks', migratedTasks);
-    console.log(`Migrated ${migratedTasks.length} tasks`);
+    logger.info('Migrated tasks', { count: migratedTasks.length });
   }
 
   static async migrateProjectsSchema() {
@@ -56,7 +58,7 @@ export class DataMigration {
     }));
 
     this.setData('projects', migratedProjects);
-    console.log(`Migrated ${migratedProjects.length} projects`);
+    logger.info('Migrated projects', { count: migratedProjects.length });
   }
 
   static async migrateStakeholdersSchema() {
@@ -79,7 +81,7 @@ export class DataMigration {
     });
 
     this.setData('stakeholders', migratedStakeholders);
-    console.log(`Migrated ${migratedStakeholders.length} stakeholders`);
+    logger.info('Migrated stakeholders', { count: migratedStakeholders.length });
   }
 
   static async migrateTeamMembersSchema() {
@@ -91,11 +93,15 @@ export class DataMigration {
       // Add new fields with defaults if they don't exist
       phone: member.phone || null,
       company: member.company || null,
+      // Backfill leave fields for existing members
+      leave_from: member.leave_from || null,
+      leave_to: member.leave_to || null,
+      leave_title: member.leave_title || null,
       last_activity: member.last_activity || null
     }));
 
     this.setData('team_members', migratedMembers);
-    console.log(`Migrated ${migratedMembers.length} team members`);
+    logger.info('Migrated team members', { count: migratedMembers.length });
   }
 
   static async migrateOneOnOnesSchema() {
@@ -119,7 +125,7 @@ export class DataMigration {
     });
 
     this.setData('one_on_ones', migratedOneOnOnes);
-    console.log(`Migrated ${migratedOneOnOnes.length} one-on-ones`);
+    logger.info('Migrated one-on-ones', { count: migratedOneOnOnes.length });
   }
 
   static async migrateTaskAttributesSchema() {
@@ -133,7 +139,7 @@ export class DataMigration {
     }));
 
     this.setData('task_attributes', migratedAttributes);
-    console.log(`Migrated ${migratedAttributes.length} task attributes`);
+    logger.info('Migrated task attributes', { count: migratedAttributes.length });
   }
 
   // Helper methods
@@ -142,7 +148,7 @@ export class DataMigration {
       const data = localStorage.getItem(key);
       return data ? JSON.parse(data) : [];
     } catch (error) {
-      console.error(`Error reading data from localStorage key "${key}":`, error);
+      logger.error('Error reading data from localStorage', { key, error: String(error) });
       return [];
     }
   }
@@ -151,7 +157,7 @@ export class DataMigration {
     try {
       localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
-      console.error(`Error saving data to localStorage key "${key}":`, error);
+      logger.error('Error saving data to localStorage', { key, error: String(error) });
       throw error;
     }
   }
@@ -193,6 +199,6 @@ export class DataMigration {
     });
     
     this.setData('team_members', updatedMembers);
-    console.log('Updated last_activity for all team members');
+    logger.info('Updated last_activity for all team members');
   }
 }

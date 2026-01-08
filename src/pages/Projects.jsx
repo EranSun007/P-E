@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { Project, Task } from "@/api/entities";
 import { InvokeLLM } from "@/api/integrations";
 import { Button } from "@/components/ui/button";
@@ -33,12 +33,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import TagInput from "../components/ui/tag-input";
 import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { logger } from "@/utils/logger";
+import { AppContext } from "@/contexts/AppContext.jsx";
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState([]);
+  const { projects, tasks, loading, refreshAll } = useContext(AppContext);
   const [projectTasks, setProjectTasks] = useState({});
-  const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [error, setError] = useState(null);
   const [editingProject, setEditingProject] = useState(null);
@@ -62,8 +63,14 @@ export default function ProjectsPage() {
   const [analyzingProject, setAnalyzingProject] = useState(null);
 
   useEffect(() => {
-    loadProjects();
-  }, []);
+    // Build tasks by project when projects or tasks change
+    const allTasks = Array.isArray(tasks) ? tasks : [];
+    const tasksByProject = {};
+    (Array.isArray(projects) ? projects : []).forEach(project => {
+      tasksByProject[project.id] = allTasks.filter(task => task.project === project.name);
+    });
+    setProjectTasks(tasksByProject);
+  }, [projects, tasks]);
 
   function getRandomColor() {
     const colors = [
@@ -80,28 +87,12 @@ export default function ProjectsPage() {
   }
 
   const loadProjects = async () => {
-    setLoading(true);
     setError(null);
     try {
-      const projectData = await Project.list("-created_date");
-      setProjects(projectData);
-      
-      // Load tasks for each project
-      const allTasks = await Task.list();
-      const tasksByProject = {};
-      
-      projectData.forEach(project => {
-        tasksByProject[project.id] = allTasks.filter(task => 
-          task.project === project.name
-        );
-      });
-      
-      setProjectTasks(tasksByProject);
+      await refreshAll();
     } catch (err) {
-      console.error("Failed to load projects:", err);
+      logger.error("Failed to refresh projects", { error: String(err) });
       setError("Failed to load projects. Please try again.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -171,7 +162,7 @@ export default function ProjectsPage() {
       setShowDialog(false);
       await loadProjects();
     } catch (err) {
-      console.error("Failed to save project:", err);
+      logger.error("Failed to save project", { error: String(err) });
       setError("Failed to save project. Please try again.");
     }
   };
@@ -181,7 +172,7 @@ export default function ProjectsPage() {
       await Project.delete(projectId);
       await loadProjects();
     } catch (err) {
-      console.error("Failed to delete project:", err);
+      logger.error("Failed to delete project", { error: String(err) });
       setError("Failed to delete project. Please try again.");
     }
   };
@@ -300,7 +291,7 @@ export default function ProjectsPage() {
       await loadProjects();
 
     } catch (error) {
-      console.error(`Failed to analyze project ${project.name}:`, error);
+      logger.error('Failed to analyze project', { project: project?.name, error: String(error) });
     } finally {
       setAnalyzingProject(null);
     }

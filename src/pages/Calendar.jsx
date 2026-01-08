@@ -1,7 +1,9 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { Task } from "@/api/entities";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, addDays, isSameMonth, isSameDay, addMonths, subMonths, parseISO } from "date-fns";
+import { AppContext } from "@/contexts/AppContext.jsx";
+import { logger } from "@/utils/logger";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, addDays, isSameMonth, isSameDay, addMonths, subMonths, parseISO, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
@@ -10,22 +12,27 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { cn } from "@/lib/utils";
 
 export default function CalendarPage() {
+  const { tasks: ctxTasks, teamMembers: ctxMembers, refreshAll } = useContext(AppContext);
   const [tasks, setTasks] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTask, setSelectedTask] = useState(null);
   const [showTaskCreation, setShowTaskCreation] = useState(false);
 
   useEffect(() => {
-    loadTasks();
-  }, []);
+    setTasks(Array.isArray(ctxTasks) ? ctxTasks : []);
+  }, [ctxTasks]);
+
+  useEffect(() => {
+    setTeamMembers(Array.isArray(ctxMembers) ? ctxMembers : []);
+  }, [ctxMembers]);
 
   const loadTasks = async () => {
     try {
-      const taskData = await Task.list();
-      setTasks(taskData);
+      await refreshAll();
     } catch (err) {
-      console.error("Failed to load tasks:", err);
+      logger.error("Failed to refresh tasks (calendar)", { error: String(err) });
     }
   };
 
@@ -43,7 +50,7 @@ export default function CalendarPage() {
       await loadTasks();
       setShowTaskCreation(false);
     } catch (err) {
-      console.error("Failed to create task:", err);
+      logger.error("Failed to create task (calendar)", { error: String(err) });
     }
   };
 
@@ -120,6 +127,17 @@ export default function CalendarPage() {
           task.due_date && isSameDay(parseISO(task.due_date), day)
         );
 
+        const leavesForDay = teamMembers.filter(member => {
+          if (!member?.leave_from || !member?.leave_to) return false;
+          try {
+            const start = startOfDay(parseISO(member.leave_from));
+            const end = endOfDay(parseISO(member.leave_to));
+            return isWithinInterval(day, { start, end });
+          } catch (_) {
+            return false;
+          }
+        });
+
         days.push(
           <div
             key={day.toString()}
@@ -151,6 +169,18 @@ export default function CalendarPage() {
                   {task.title}
                 </div>
               ))}
+              {leavesForDay.length > 0 && (
+                <div className="pt-1 space-y-1">
+                  {leavesForDay.slice(0, 2).map(m => (
+                    <div key={m.id} className="text-[10px] px-1 py-0.5 rounded bg-red-100 text-red-800 truncate">
+                      {(m.leave_title || 'Leave')}: {m.name}
+                    </div>
+                  ))}
+                  {leavesForDay.length > 2 && (
+                    <div className="text-[10px] px-1 py-0.5 rounded bg-red-50 text-red-700">+{leavesForDay.length - 2} more</div>
+                  )}
+                </div>
+              )}
             </div>
             {isSameDay(day, new Date()) && (
               <Badge className="absolute top-1 left-1 bg-red-500">Today</Badge>
@@ -173,8 +203,18 @@ export default function CalendarPage() {
     const tasksForSelectedDate = tasks.filter(task => 
       task.due_date && isSameDay(parseISO(task.due_date), selectedDate)
     );
+    const leavesForSelectedDate = teamMembers.filter(member => {
+      if (!member?.leave_from || !member?.leave_to) return false;
+      try {
+        const start = startOfDay(parseISO(member.leave_from));
+        const end = endOfDay(parseISO(member.leave_to));
+        return isWithinInterval(selectedDate, { start, end });
+      } catch (_) {
+        return false;
+      }
+    });
 
-    if (tasksForSelectedDate.length === 0) {
+    if (tasksForSelectedDate.length === 0 && leavesForSelectedDate.length === 0) {
       return (
         <div className="text-center p-6">
           <p className="text-gray-500">No tasks scheduled for this date</p>
@@ -192,6 +232,19 @@ export default function CalendarPage() {
 
     return (
       <div className="space-y-2">
+        {leavesForSelectedDate.length > 0 && (
+          <div className="p-3 border rounded-md bg-red-50">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium text-red-800 text-sm">Team Leave</h3>
+              <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200">{leavesForSelectedDate.length}</Badge>
+            </div>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {leavesForSelectedDate.map(m => (
+                <Badge key={m.id} variant="outline" className="text-xs border-red-200 text-red-800">{(m.leave_title || 'Leave')}: {m.name}</Badge>
+              ))}
+            </div>
+          </div>
+        )}
         {tasksForSelectedDate.map(task => (
           <div 
             key={task.id}

@@ -4,12 +4,13 @@ import { Toaster } from "@/components/ui/toaster"
 import ErrorBoundary from "@/components/ErrorBoundary.jsx"
 import { useEffect } from 'react'
 import { DataMigration } from '@/utils/dataMigration'
+import { logger } from '@/utils/logger'
 
 function App() {
   useEffect(() => {
     // Run data migrations on app startup
     DataMigration.runMigrations().catch(error => {
-      console.error('Data migration failed:', error);
+      logger.error('Data migration failed', { error: String(error) });
     });
   }, []);
 

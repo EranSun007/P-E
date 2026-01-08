@@ -1,6 +1,8 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { Task } from "@/api/entities";
+import { AppContext } from "@/contexts/AppContext.jsx";
+import { logger } from "@/utils/logger";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, BarChart2, ArrowUpRight, ArrowDownRight, ArrowRight } from "lucide-react";
@@ -11,23 +13,23 @@ import TaskCreationForm from "../components/task/TaskCreationForm";
 import { Badge } from "@/components/ui/badge";
 
 export default function MetricsPage() {
+  const { tasks: ctxTasks, refreshAll } = useContext(AppContext);
   const [tasks, setTasks] = useState([]);
   const [metricTasks, setMetricTasks] = useState([]);
   const [showTaskCreation, setShowTaskCreation] = useState(false);
 
   useEffect(() => {
-    loadTasks();
-  }, []);
+    const taskData = Array.isArray(ctxTasks) ? ctxTasks : [];
+    setTasks(taskData);
+    const metrics = taskData.filter(task => task.type === "metric");
+    setMetricTasks(metrics);
+  }, [ctxTasks]);
 
   const loadTasks = async () => {
     try {
-      const taskData = await Task.list();
-      setTasks(taskData);
-      
-      const metrics = taskData.filter(task => task.type === "metric");
-      setMetricTasks(metrics);
+      await refreshAll();
     } catch (err) {
-      console.error("Failed to load tasks:", err);
+      logger.error("Failed to refresh tasks (metrics)", { error: String(err) });
     }
   };
 
@@ -45,7 +47,7 @@ export default function MetricsPage() {
       await loadTasks();
       setShowTaskCreation(false);
     } catch (err) {
-      console.error("Failed to create metric:", err);
+      logger.error("Failed to create metric", { error: String(err) });
     }
   };
 

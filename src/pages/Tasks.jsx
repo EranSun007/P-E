@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { Task } from "@/api/entities";
 import { Plus, CheckSquare, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,10 +21,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { logger } from "@/utils/logger";
+import { AppContext } from "@/contexts/AppContext.jsx";
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { tasks, loading, refreshAll } = useContext(AppContext);
+  const [localTasks, setLocalTasks] = useState([]);
   const [showCreationForm, setShowCreationForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [error, setError] = useState(null);
@@ -41,30 +43,35 @@ export default function TasksPage() {
   const [availableTags, setAvailableTags] = useState([]);
 
   useEffect(() => {
-    loadTasks();
-  }, []);
+    setLocalTasks(Array.isArray(tasks) ? tasks : []);
+  }, [tasks]);
+
+  // Recompute available tags whenever local tasks change
+  useEffect(() => {
+    const allTags = new Set();
+    (Array.isArray(localTasks) ? localTasks : []).forEach(task => {
+      if (Array.isArray(task?.tags)) {
+        task.tags.forEach(tag => allTags.add(tag));
+      }
+    });
+    setAvailableTags(Array.from(allTags));
+  }, [localTasks]);
 
   const loadTasks = async () => {
-    setLoading(true);
     setError(null);
     try {
-      const taskData = await Task.list("-created_date");
-      setTasks(taskData || []);
-      
-      // Extract all unique tags
+      await refreshAll();
+      const taskData = Array.isArray(tasks) ? tasks : [];
       const allTags = new Set();
-      (taskData || []).forEach(task => {
+      taskData.forEach(task => {
         if (Array.isArray(task.tags)) {
           task.tags.forEach(tag => allTags.add(tag));
         }
       });
       setAvailableTags(Array.from(allTags));
-      
     } catch (err) {
-      console.error("Failed to load tasks:", err);
+      logger.error("Failed to refresh tasks", { error: String(err) });
       setError("Failed to load tasks. Please try again.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -85,7 +92,7 @@ export default function TasksPage() {
       setShowCreationForm(false);
       setEditingTask(null);
     } catch (err) {
-      console.error("Failed to save task:", err);
+      logger.error("Failed to save task", { error: String(err) });
       setError("Failed to save task. Please try again.");
     }
   };
@@ -95,7 +102,7 @@ export default function TasksPage() {
       await Task.delete(task.id);
       await loadTasks();
     } catch (err) {
-      console.error("Failed to delete task:", err);
+      logger.error("Failed to delete task", { error: String(err) });
       setError("Failed to delete task. Please try again.");
     }
   };
@@ -110,7 +117,7 @@ export default function TasksPage() {
       await Task.update(task.id, { ...task, status: newStatus });
       await loadTasks();
     } catch (err) {
-      console.error("Failed to update task status:", err);
+      logger.error("Failed to update task status", { error: String(err) });
       setError("Failed to update task status. Please try again.");
     }
   };
@@ -171,7 +178,7 @@ export default function TasksPage() {
     });
   };
 
-  const filteredTasks = filterTasks(tasks);
+  const filteredTasks = filterTasks(localTasks);
   const activeTasks = filteredTasks.filter(task => task?.status !== "done");
   const completedTasks = filteredTasks.filter(task => task?.status === "done");
 
