@@ -1,7 +1,6 @@
 
-import React, { useState, useEffect } from "react";
-import { Task } from "@/api/entities";
-import { TeamMember } from "@/api/entities";
+import React, { useState, useEffect, useContext } from "react";
+import { Task, TeamMember } from "@/api/entities";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Video, FileText, CheckSquare, BarChart2, Search, Clock, Plus, Edit, Trash2, MoreHorizontal, Mail, BriefcaseBusiness, Code } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -17,15 +16,17 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import TagInput from "../components/ui/tag-input";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { AppContext } from "@/contexts/AppContext.jsx";
+import { logger } from "@/utils/logger";
 
 export default function TeamPage() {
   const navigate = useNavigate();
+  const { tasks: ctxTasks, teamMembers: ctxMembers, loading, refreshAll } = useContext(AppContext);
   const [tasks, setTasks] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const [formData, setFormData] = useState({
@@ -38,53 +39,47 @@ export default function TeamPage() {
     availability: "full_time",
     skills: [], // Initialize with empty array
     notes: "",
-    avatar: ""
+    avatar: "",
+    // Leave period fields for vacations/maternity leave
+    leave_from: "",
+    leave_to: "",
+    leave_title: ""
   });
 
   useEffect(() => {
-    loadData();
-  }, []);
+    setTasks(Array.isArray(ctxTasks) ? ctxTasks : []);
+  }, [ctxTasks]);
+
+  useEffect(() => {
+    // Recompute enhanced members when context members or tasks change
+    const memberData = Array.isArray(ctxMembers) ? ctxMembers : [];
+    const taskData = Array.isArray(ctxTasks) ? ctxTasks : [];
+    const enhancedMembers = memberData.map(member => {
+      const relatedTasks = taskData.filter(task => (task.metadata?.meeting?.participants || []).includes(member.name));
+      let lastActivity = null;
+      if (relatedTasks.length > 0) {
+        lastActivity = relatedTasks.reduce((latest, task) => {
+          const taskDate = new Date(task.created_date);
+          return !latest || taskDate > latest ? taskDate : latest;
+        }, null);
+      }
+      return {
+        ...member,
+        tasks: relatedTasks,
+        taskCount: relatedTasks.length,
+        lastActivity: lastActivity ? lastActivity.toISOString() : null
+      };
+    });
+    setTeamMembers(enhancedMembers);
+  }, [ctxMembers, ctxTasks]);
 
   const loadData = async () => {
-    setLoading(true);
     setError(null);
     try {
-      // Load team members
-      const memberData = await TeamMember.list().catch(() => []);
-      
-      // Load tasks to associate with team members
-      const taskData = await Task.list().catch(() => []);
-      setTasks(taskData || []);
-      
-      // Attach task data to team member records
-      const enhancedMembers = (memberData || []).map(member => {
-        const relatedTasks = (taskData || []).filter(task => 
-          (task.metadata?.meeting?.participants || []).includes(member.name)
-        );
-        
-        let lastActivity = null;
-        if (relatedTasks.length > 0) {
-          // Find most recent task
-          lastActivity = relatedTasks.reduce((latest, task) => {
-            const taskDate = new Date(task.created_date);
-            return !latest || taskDate > latest ? taskDate : latest;
-          }, null);
-        }
-        
-        return {
-          ...member,
-          tasks: relatedTasks,
-          taskCount: relatedTasks.length,
-          lastActivity: lastActivity ? lastActivity.toISOString() : null
-        };
-      });
-      
-      setTeamMembers(enhancedMembers);
+      await refreshAll();
     } catch (err) {
-      console.error("Failed to load team members:", err);
+      logger.error("Failed to refresh team members", { error: String(err) });
       setError("Failed to load team members. Please try again.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -99,7 +94,10 @@ export default function TeamPage() {
       availability: "full_time",
       skills: [],
       notes: "",
-      avatar: ""
+      avatar: "",
+      leave_from: "",
+      leave_to: "",
+      leave_title: ""
     });
     setEditingMember(null);
     setShowDialog(true);
@@ -118,7 +116,10 @@ export default function TeamPage() {
       availability: member.availability || "full_time",
       skills: Array.isArray(member.skills) ? member.skills : [],
       notes: member.notes || "",
-      avatar: member.avatar || ""
+      avatar: member.avatar || "",
+      leave_from: member.leave_from || "",
+      leave_to: member.leave_to || "",
+      leave_title: member.leave_title || ""
     });
     setEditingMember(member);
     setShowDialog(true);
@@ -142,15 +143,29 @@ export default function TeamPage() {
 
   const handleSubmit = async () => {
     try {
+      // Clean up formData - convert empty strings to null for database compatibility
+      // and remove fields that don't exist in the database schema
+      const cleanedData = {
+        name: formData.name,
+        email: formData.email || null,
+        role: formData.role || null,
+        skills: Array.isArray(formData.skills) ? formData.skills : [],
+        phone: formData.phone || null,
+        company: formData.company || null,
+        leave_from: formData.leave_from || null,
+        leave_to: formData.leave_to || null,
+        leave_title: formData.leave_title || null
+      };
+
       if (editingMember) {
-        await TeamMember.update(editingMember.id, formData);
+        await TeamMember.update(editingMember.id, cleanedData);
       } else {
-        await TeamMember.create(formData);
+        await TeamMember.create(cleanedData);
       }
       setShowDialog(false);
       await loadData();
     } catch (err) {
-      console.error("Failed to save team member:", err);
+      logger.error("Failed to save team member", { error: String(err) });
       setError("Failed to save team member. Please try again.");
     }
   };
@@ -160,7 +175,7 @@ export default function TeamPage() {
       await TeamMember.delete(memberId);
       await loadData();
     } catch (err) {
-      console.error("Failed to delete team member:", err);
+      logger.error("Failed to delete team member", { error: String(err) });
       setError("Failed to delete team member. Please try again.");
     }
   };
@@ -369,6 +384,14 @@ export default function TeamPage() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {member.leave_from && member.leave_to && (
+                      <div className="text-xs">
+                        <Badge variant="secondary" className="mb-1">{member.leave_title || 'On leave'}</Badge>
+                        <div className="text-gray-600">
+                          {new Date(member.leave_from).toLocaleDateString()} - {new Date(member.leave_to).toLocaleDateString()}
+                        </div>
+                      </div>
+                    )}
                     {Array.isArray(member.skills) && member.skills.length > 0 && (
                       <div>
                         <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-1">
@@ -442,11 +465,16 @@ export default function TeamPage() {
 
       {/* Team Member Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-[60vw] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingMember ? "Edit Team Member" : "Add Team Member"}
             </DialogTitle>
+            <DialogDescription>
+              {editingMember
+                ? "Update team member information. Required fields are marked with an asterisk."
+                : "Add a new team member to your team. Fill in the details below."}
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
@@ -564,6 +592,37 @@ export default function TeamPage() {
                 rows={3}
               />
             </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="leave_from">Leave From</Label>
+              <Input
+                id="leave_from"
+                type="date"
+                value={formData.leave_from || ""}
+                onChange={(e) => handleInputChange("leave_from", e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="leave_to">Leave To</Label>
+              <Input
+                id="leave_to"
+                type="date"
+                value={formData.leave_to || ""}
+                onChange={(e) => handleInputChange("leave_to", e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="leave_title">Leave Title</Label>
+            <Input
+              id="leave_title"
+              value={formData.leave_title}
+              onChange={(e) => handleInputChange("leave_title", e.target.value)}
+              placeholder="Vacation, Maternity Leave, PTO, etc."
+            />
+          </div>
           </div>
           
           <DialogFooter>
