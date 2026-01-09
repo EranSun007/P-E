@@ -13,21 +13,27 @@ function getDatabaseConfig() {
   // For SAP BTP, read from VCAP_SERVICES
   if (process.env.VCAP_SERVICES) {
     try {
-      const xsenv = require('@sap/xsenv');
-      const services = xsenv.getServices({ postgres: { tag: 'postgresql' } });
-      const dbConfig = services.postgres.credentials;
+      const vcapServices = JSON.parse(process.env.VCAP_SERVICES);
+      const postgresService = vcapServices['postgresql-db'] && vcapServices['postgresql-db'][0];
+      if (!postgresService) {
+        throw new Error('PostgreSQL service not found in VCAP_SERVICES');
+      }
+      const dbConfig = postgresService.credentials;
+
+      console.log(`📊 Using database from VCAP_SERVICES: ${dbConfig.dbname}`);
 
       return {
         host: dbConfig.hostname,
         port: dbConfig.port,
-        // Allow override via DB_NAME env variable, otherwise use from credentials
-        database: process.env.DB_NAME || dbConfig.dbname,
+        // Use database name from VCAP_SERVICES credentials
+        database: dbConfig.dbname,
         user: dbConfig.username,
         password: dbConfig.password,
-        ssl: dbConfig.sslrootcert ? {
+        // BTP PostgreSQL requires SSL - always enable with or without certificate
+        ssl: {
           rejectUnauthorized: false,
-          ca: dbConfig.sslrootcert
-        } : false,
+          ca: dbConfig.sslrootcert || undefined
+        },
         max: 20,
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 10000,

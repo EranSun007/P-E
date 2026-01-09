@@ -1,0 +1,25 @@
+---
+applications:
+  # Backend Application (Express.js API)
+  - name: pe-manager-backend
+    memory: 512M
+    instances: 1
+    buildpacks:
+      - nodejs_buildpack
+    command: npm start
+    path: .
+    env:
+      NODE_ENV: production
+      AUTH_MODE: development
+    services:
+      - pe-manager           # Bind to PostgreSQL service
+
+  # Frontend Application (React Static Files)
+  - name: pe-manager-frontend
+    memory: 128M
+    instances: 1
+    buildpacks:
+      - staticfile_buildpack
+    env:
+      FORCE_HTTPS: true
+      VITE_AUTH_MODE: development

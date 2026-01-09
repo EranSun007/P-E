@@ -23,11 +23,22 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
+// CORS configuration with debugging
+const corsOrigin = process.env.NODE_ENV === 'production'
+  ? process.env.FRONTEND_URL || 'https://pe-manager-frontend.cfapps.eu01-canary.hana.ondemand.com'
+  : ['http://localhost:5173', 'http://localhost:3000'];
+
+console.log('🔧 CORS Configuration:', {
+  nodeEnv: process.env.NODE_ENV,
+  frontendUrl: process.env.FRONTEND_URL,
+  corsOrigin: corsOrigin
+});
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? process.env.FRONTEND_URL
-    : ['http://localhost:5173', 'http://localhost:3000'],
-  credentials: true
+  origin: corsOrigin,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json({ limit: '10mb' }));
