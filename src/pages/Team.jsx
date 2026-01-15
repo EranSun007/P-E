@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useContext } from "react";
-import { Task, TeamMember } from "@/api/entities";
+import { TeamMember } from "@/api/entities";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Video, FileText, CheckSquare, BarChart2, Search, Clock, Plus, Edit, Trash2, MoreHorizontal, Mail, BriefcaseBusiness, Code, Users, CalendarOff, List } from "lucide-react";
+import { Video, Search, Clock, Plus, Edit, Trash2, MoreHorizontal, Mail, BriefcaseBusiness, Code, Users, CalendarOff, List } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import TagInput from "../components/ui/tag-input";
@@ -23,7 +23,6 @@ import { logger } from "@/utils/logger";
 export default function TeamPage() {
   const navigate = useNavigate();
   const { tasks: ctxTasks, teamMembers: ctxMembers, loading, refreshAll } = useContext(AppContext);
-  const [tasks, setTasks] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showDialog, setShowDialog] = useState(false);
@@ -47,10 +46,6 @@ export default function TeamPage() {
     leave_to: "",
     leave_title: ""
   });
-
-  useEffect(() => {
-    setTasks(Array.isArray(ctxTasks) ? ctxTasks : []);
-  }, [ctxTasks]);
 
   useEffect(() => {
     // Recompute enhanced members when context members or tasks change
@@ -273,15 +268,6 @@ export default function TeamPage() {
     // Use name to create a deterministic color assignment
     const index = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
     return colors[index];
-  };
-
-  const getTaskTypeIcon = (type) => {
-    switch (type) {
-      case "meeting": return <Video className="h-3 w-3" />;
-      case "metric": return <BarChart2 className="h-3 w-3" />;
-      case "action": return <CheckSquare className="h-3 w-3" />;
-      default: return <FileText className="h-3 w-3" />;
-    }
   };
 
   const getRelativeTime = (dateString) => {
