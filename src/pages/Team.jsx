@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Video, FileText, CheckSquare, BarChart2, Search, Clock, Plus, Edit, Trash2, MoreHorizontal, Mail, BriefcaseBusiness, Code } from "lucide-react";
+import { Video, FileText, CheckSquare, BarChart2, Search, Clock, Plus, Edit, Trash2, MoreHorizontal, Mail, BriefcaseBusiness, Code, Users, CalendarOff, List } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import TagInput from "../components/ui/tag-input";
@@ -28,6 +28,7 @@ export default function TeamPage() {
   const [showDialog, setShowDialog] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [error, setError] = useState(null);
+  const [viewMode, setViewMode] = useState("flat"); // "flat" | "team" | "leave"
 
   const [formData, setFormData] = useState({
     name: "",
@@ -293,6 +294,38 @@ export default function TeamPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
           />
+        </div>
+
+        {/* View Mode Switcher */}
+        <div className="flex items-center gap-2 mb-6">
+          <span className="text-sm text-gray-500 mr-2">View:</span>
+          <Button
+            variant={viewMode === "flat" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("flat")}
+            className="flex items-center gap-2"
+          >
+            <List className="h-4 w-4" />
+            All Members
+          </Button>
+          <Button
+            variant={viewMode === "team" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("team")}
+            className="flex items-center gap-2"
+          >
+            <Users className="h-4 w-4" />
+            Group by Team
+          </Button>
+          <Button
+            variant={viewMode === "leave" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("leave")}
+            className="flex items-center gap-2"
+          >
+            <CalendarOff className="h-4 w-4" />
+            Group by Leave Status
+          </Button>
         </div>
 
         {loading ? (
