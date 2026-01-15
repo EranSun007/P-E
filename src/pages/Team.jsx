@@ -447,139 +447,145 @@ export default function TeamPage() {
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
-                    {group.members.map(member => {
-                      const colorClass = getRandomColor(member.name);
+                  {group.members.length === 0 ? (
+                    <div className="text-center py-6 text-gray-500">
+                      No team members in this department
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
+                      {group.members.map(member => {
+                        const colorClass = getRandomColor(member.name);
 
-                      return (
-                        <Card key={member.id} className="overflow-hidden">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-start justify-between">
-                              <div
-                                className="flex items-start space-x-4 cursor-pointer group"
-                                onClick={() => goToMemberProfile(member.id)}
-                              >
-                                <Avatar className={`h-12 w-12 ${member.avatar ? "" : colorClass} ring-2 ring-white transition-transform group-hover:scale-105`}>
-                                  {member.avatar ? (
-                                    <AvatarImage src={member.avatar} alt={member.name} />
-                                  ) : null}
-                                  <AvatarFallback>
-                                    {getInitials(member.name)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <CardTitle className="group-hover:text-indigo-600 transition-colors">
-                                    {member.name}
-                                  </CardTitle>
-                                  {member.role && (
-                                    <CardDescription className="mt-1">
-                                      {member.role}
-                                    </CardDescription>
-                                  )}
+                        return (
+                          <Card key={member.id} className="overflow-hidden">
+                            <CardHeader className="pb-3">
+                              <div className="flex items-start justify-between">
+                                <div
+                                  className="flex items-start space-x-4 cursor-pointer group"
+                                  onClick={() => goToMemberProfile(member.id)}
+                                >
+                                  <Avatar className={`h-12 w-12 ${member.avatar ? "" : colorClass} ring-2 ring-white transition-transform group-hover:scale-105`}>
+                                    {member.avatar ? (
+                                      <AvatarImage src={member.avatar} alt={member.name} />
+                                    ) : null}
+                                    <AvatarFallback>
+                                      {getInitials(member.name)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <CardTitle className="group-hover:text-indigo-600 transition-colors">
+                                      {member.name}
+                                    </CardTitle>
+                                    {member.role && (
+                                      <CardDescription className="mt-1">
+                                        {member.role}
+                                      </CardDescription>
+                                    )}
+                                  </div>
                                 </div>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => openEditDialog(member)}>
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleDelete(member.id)}
+                                      className="text-red-600"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => openEditDialog(member)}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleDelete(member.id)}
-                                    className="text-red-600"
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                            <div className="flex items-center gap-2 mt-2 flex-wrap">
-                              {member.availability && getAvailabilityBadge(member.availability)}
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-4">
-                            {member.leave_from && member.leave_to && (
-                              <div className="text-xs">
-                                <Badge variant="secondary" className="mb-1">{member.leave_title || 'On leave'}</Badge>
-                                <div className="text-gray-600">
-                                  {new Date(member.leave_from).toLocaleDateString()} - {new Date(member.leave_to).toLocaleDateString()}
+                              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                {member.availability && getAvailabilityBadge(member.availability)}
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              {member.leave_from && member.leave_to && (
+                                <div className="text-xs">
+                                  <Badge variant="secondary" className="mb-1">{member.leave_title || 'On leave'}</Badge>
+                                  <div className="text-gray-600">
+                                    {new Date(member.leave_from).toLocaleDateString()} - {new Date(member.leave_to).toLocaleDateString()}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                            {Array.isArray(member.skills) && member.skills.length > 0 && (
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-1">
-                                  <Code className="h-3.5 w-3.5" />
-                                  Skills
-                                </h4>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {Array.isArray(member.skills) && member.skills.map((skill, i) => (
-                                    <Badge key={i} variant="outline" className="text-xs">
-                                      {skill}
-                                    </Badge>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            {member.notes && (
-                              <p className="text-sm text-gray-600">{member.notes}</p>
-                            )}
-
-                            {Array.isArray(member.tasks) && member.tasks.length > 0 && (
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-500 mb-2">Recent Meetings</h4>
-                                <div className="space-y-2">
-                                  {member.tasks
-                                    .filter(task => task.type === "meeting")
-                                    .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
-                                    .slice(0, 2)
-                                    .map(task => (
-                                      <div key={task.id} className="p-2 bg-gray-50 rounded-md text-sm">
-                                        <div className="flex items-center justify-between">
-                                          <div className="truncate">{task.title}</div>
-                                          <Badge variant="outline" className="ml-2 flex items-center gap-1 whitespace-nowrap">
-                                            <Video className="h-3 w-3" />
-                                            {task.status}
-                                          </Badge>
-                                        </div>
-                                      </div>
-                                    ))}
-                                </div>
-                              </div>
-                            )}
-
-                            <div className="flex justify-between items-center text-xs text-gray-500">
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {getRelativeTime(member.lastActivity)}
-                              </span>
-                              {member.taskCount > 0 && (
-                                <span>{member.taskCount} meetings</span>
                               )}
-                            </div>
-                          </CardContent>
-                          {member.email && (
-                            <CardFooter className="border-t pt-4">
-                              <a
-                                href={`mailto:${member.email}`}
-                                className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-                              >
-                                <Mail className="h-3.5 w-3.5" />
-                                {member.email}
-                              </a>
-                            </CardFooter>
-                          )}
-                        </Card>
-                      );
-                    })}
-                  </div>
+                              {Array.isArray(member.skills) && member.skills.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-1">
+                                    <Code className="h-3.5 w-3.5" />
+                                    Skills
+                                  </h4>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {Array.isArray(member.skills) && member.skills.map((skill, i) => (
+                                      <Badge key={i} variant="outline" className="text-xs">
+                                        {skill}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {member.notes && (
+                                <p className="text-sm text-gray-600">{member.notes}</p>
+                              )}
+
+                              {Array.isArray(member.tasks) && member.tasks.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-medium text-gray-500 mb-2">Recent Meetings</h4>
+                                  <div className="space-y-2">
+                                    {member.tasks
+                                      .filter(task => task.type === "meeting")
+                                      .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
+                                      .slice(0, 2)
+                                      .map(task => (
+                                        <div key={task.id} className="p-2 bg-gray-50 rounded-md text-sm">
+                                          <div className="flex items-center justify-between">
+                                            <div className="truncate">{task.title}</div>
+                                            <Badge variant="outline" className="ml-2 flex items-center gap-1 whitespace-nowrap">
+                                              <Video className="h-3 w-3" />
+                                              {task.status}
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="flex justify-between items-center text-xs text-gray-500">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {getRelativeTime(member.lastActivity)}
+                                </span>
+                                {member.taskCount > 0 && (
+                                  <span>{member.taskCount} meetings</span>
+                                )}
+                              </div>
+                            </CardContent>
+                            {member.email && (
+                              <CardFooter className="border-t pt-4">
+                                <a
+                                  href={`mailto:${member.email}`}
+                                  className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                                >
+                                  <Mail className="h-3.5 w-3.5" />
+                                  {member.email}
+                                </a>
+                              </CardFooter>
+                            )}
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
                 </AccordionContent>
               </AccordionItem>
             ))}
