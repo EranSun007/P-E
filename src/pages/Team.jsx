@@ -266,18 +266,36 @@ export default function TeamPage() {
 
   const getRelativeTime = (dateString) => {
     if (!dateString) return "No recent activity";
-    
+
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now - date;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 0) return "Today";
     if (diffDays === 1) return "Yesterday";
     if (diffDays < 7) return `${diffDays} days ago`;
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
     if (diffDays < 365) return `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) > 1 ? 's' : ''} ago`;
     return `${Math.floor(diffDays / 365)} year${Math.floor(diffDays / 365) > 1 ? 's' : ''} ago`;
+  };
+
+  // Check if a member is currently on leave as of today
+  // Returns true if today falls within the member's leave period (inclusive)
+  // Both leave_from and leave_to must be set for a member to be considered on leave
+  const isOnLeaveToday = (member) => {
+    if (!member.leave_from || !member.leave_to) return false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to start of day
+
+    const leaveStart = new Date(member.leave_from);
+    leaveStart.setHours(0, 0, 0, 0);
+
+    const leaveEnd = new Date(member.leave_to);
+    leaveEnd.setHours(0, 0, 0, 0);
+
+    return today >= leaveStart && today <= leaveEnd;
   };
 
   const getAvailabilityBadge = (availability) => {
