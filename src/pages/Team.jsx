@@ -181,16 +181,52 @@ export default function TeamPage() {
     }
   };
 
-  const filteredMembers = searchQuery 
-    ? teamMembers.filter(member => 
+  const filteredMembers = searchQuery
+    ? teamMembers.filter(member =>
         member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (member.role || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (member.department || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (Array.isArray(member.skills) && member.skills.some(skill => 
+        (Array.isArray(member.skills) && member.skills.some(skill =>
           skill.toLowerCase().includes(searchQuery.toLowerCase())
         ))
       )
     : teamMembers;
+
+  // Group members by department field
+  // Returns an object with department names as keys and arrays of members as values
+  // Members without a department are grouped under "Unassigned"
+  const groupMembersByDepartment = (members) => {
+    const groups = {};
+
+    members.forEach(member => {
+      const department = member.department?.trim() || "Unassigned";
+      if (!groups[department]) {
+        groups[department] = [];
+      }
+      groups[department].push(member);
+    });
+
+    return groups;
+  };
+
+  // Computed grouped members for team view
+  // Sorts departments alphabetically with "Unassigned" at the end
+  const membersByDepartment = React.useMemo(() => {
+    const groups = groupMembersByDepartment(filteredMembers);
+
+    // Sort department keys: alphabetically, with "Unassigned" at the end
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+      if (a === "Unassigned") return 1;
+      if (b === "Unassigned") return -1;
+      return a.localeCompare(b);
+    });
+
+    // Return as sorted array of [department, members] pairs for easier iteration
+    return sortedKeys.map(dept => ({
+      department: dept,
+      members: groups[dept]
+    }));
+  }, [filteredMembers]);
 
   const getInitials = (name) => {
     return name
