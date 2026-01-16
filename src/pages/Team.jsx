@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useContext } from "react";
-import { Task, TeamMember } from "@/api/entities";
+import { TeamMember } from "@/api/entities";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Video, FileText, CheckSquare, BarChart2, Search, Clock, Plus, Edit, Trash2, MoreHorizontal, Mail, BriefcaseBusiness, Code } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Video, Search, Clock, Plus, Edit, Trash2, MoreHorizontal, Mail, BriefcaseBusiness, Code, Users, CalendarOff, List } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import TagInput from "../components/ui/tag-input";
@@ -22,12 +23,12 @@ import { logger } from "@/utils/logger";
 export default function TeamPage() {
   const navigate = useNavigate();
   const { tasks: ctxTasks, teamMembers: ctxMembers, loading, refreshAll } = useContext(AppContext);
-  const [tasks, setTasks] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [error, setError] = useState(null);
+  const [viewMode, setViewMode] = useState("flat"); // "flat" | "team" | "leave"
 
   const [formData, setFormData] = useState({
     name: "",
@@ -45,10 +46,6 @@ export default function TeamPage() {
     leave_to: "",
     leave_title: ""
   });
-
-  useEffect(() => {
-    setTasks(Array.isArray(ctxTasks) ? ctxTasks : []);
-  }, [ctxTasks]);
 
   useEffect(() => {
     // Recompute enhanced members when context members or tasks change
@@ -180,16 +177,72 @@ export default function TeamPage() {
     }
   };
 
-  const filteredMembers = searchQuery 
-    ? teamMembers.filter(member => 
+  const filteredMembers = searchQuery
+    ? teamMembers.filter(member =>
         member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (member.role || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (member.department || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (Array.isArray(member.skills) && member.skills.some(skill => 
+        (Array.isArray(member.skills) && member.skills.some(skill =>
           skill.toLowerCase().includes(searchQuery.toLowerCase())
         ))
       )
     : teamMembers;
+
+  // Group members by department field
+  // Returns an object with department names as keys and arrays of members as values
+  // Members without a department are grouped under "Unassigned"
+  const groupMembersByDepartment = (members) => {
+    const groups = {};
+
+    members.forEach(member => {
+      const department = member.department?.trim() || "Unassigned";
+      if (!groups[department]) {
+        groups[department] = [];
+      }
+      groups[department].push(member);
+    });
+
+    return groups;
+  };
+
+  // Computed grouped members for team view
+  // Sorts departments alphabetically with "Unassigned" at the end
+  const membersByDepartment = React.useMemo(() => {
+    const groups = groupMembersByDepartment(filteredMembers);
+
+    // Sort department keys: alphabetically, with "Unassigned" at the end
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+      if (a === "Unassigned") return 1;
+      if (b === "Unassigned") return -1;
+      return a.localeCompare(b);
+    });
+
+    // Return as sorted array of [department, members] pairs for easier iteration
+    return sortedKeys.map(dept => ({
+      department: dept,
+      members: groups[dept]
+    }));
+  }, [filteredMembers]);
+
+  // Computed grouped members for leave status view
+  // Groups members into "On Leave" and "Not on Leave" sections
+  const membersByLeaveStatus = React.useMemo(() => {
+    const onLeave = [];
+    const notOnLeave = [];
+
+    filteredMembers.forEach(member => {
+      if (isOnLeaveToday(member)) {
+        onLeave.push(member);
+      } else {
+        notOnLeave.push(member);
+      }
+    });
+
+    return [
+      { status: "On Leave", members: onLeave },
+      { status: "Not on Leave", members: notOnLeave }
+    ];
+  }, [filteredMembers]);
 
   const getInitials = (name) => {
     return name
@@ -217,29 +270,38 @@ export default function TeamPage() {
     return colors[index];
   };
 
-  const getTaskTypeIcon = (type) => {
-    switch (type) {
-      case "meeting": return <Video className="h-3 w-3" />;
-      case "metric": return <BarChart2 className="h-3 w-3" />;
-      case "action": return <CheckSquare className="h-3 w-3" />;
-      default: return <FileText className="h-3 w-3" />;
-    }
-  };
-
   const getRelativeTime = (dateString) => {
     if (!dateString) return "No recent activity";
-    
+
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now - date;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 0) return "Today";
     if (diffDays === 1) return "Yesterday";
     if (diffDays < 7) return `${diffDays} days ago`;
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
     if (diffDays < 365) return `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) > 1 ? 's' : ''} ago`;
     return `${Math.floor(diffDays / 365)} year${Math.floor(diffDays / 365) > 1 ? 's' : ''} ago`;
+  };
+
+  // Check if a member is currently on leave as of today
+  // Returns true if today falls within the member's leave period (inclusive)
+  // Both leave_from and leave_to must be set for a member to be considered on leave
+  const isOnLeaveToday = (member) => {
+    if (!member.leave_from || !member.leave_to) return false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to start of day
+
+    const leaveStart = new Date(member.leave_from);
+    leaveStart.setHours(0, 0, 0, 0);
+
+    const leaveEnd = new Date(member.leave_to);
+    leaveEnd.setHours(0, 0, 0, 0);
+
+    return today >= leaveStart && today <= leaveEnd;
   };
 
   const getAvailabilityBadge = (availability) => {
@@ -295,6 +357,38 @@ export default function TeamPage() {
           />
         </div>
 
+        {/* View Mode Switcher */}
+        <div className="flex items-center gap-2 mb-6">
+          <span className="text-sm text-gray-500 mr-2">View:</span>
+          <Button
+            variant={viewMode === "flat" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("flat")}
+            className="flex items-center gap-2"
+          >
+            <List className="h-4 w-4" />
+            All Members
+          </Button>
+          <Button
+            variant={viewMode === "team" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("team")}
+            className="flex items-center gap-2"
+          >
+            <Users className="h-4 w-4" />
+            Group by Team
+          </Button>
+          <Button
+            variant={viewMode === "leave" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("leave")}
+            className="flex items-center gap-2"
+          >
+            <CalendarOff className="h-4 w-4" />
+            Group by Leave Status
+          </Button>
+        </div>
+
         {loading ? (
           <div className="text-center p-12">
             <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto"></div>
@@ -320,16 +414,350 @@ export default function TeamPage() {
               </>
             )}
           </div>
+        ) : viewMode === "team" ? (
+          /* Team View - Grouped by Department with Accordion */
+          <Accordion
+            type="multiple"
+            defaultValue={membersByDepartment.map(group => group.department)}
+            className="w-full"
+          >
+            {membersByDepartment.map(group => (
+              <AccordionItem key={group.department} value={group.department}>
+                <AccordionTrigger className="text-lg font-semibold">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-muted-foreground" />
+                    {group.department}
+                    <Badge variant="secondary" className="ml-2">
+                      {group.members.length}
+                    </Badge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  {group.members.length === 0 ? (
+                    <div className="text-center py-6 text-gray-500">
+                      No team members in this department
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
+                      {group.members.map(member => {
+                        const colorClass = getRandomColor(member.name);
+
+                        return (
+                          <Card key={member.id} className="overflow-hidden">
+                            <CardHeader className="pb-3">
+                              <div className="flex items-start justify-between">
+                                <div
+                                  className="flex items-start space-x-4 cursor-pointer group"
+                                  onClick={() => goToMemberProfile(member.id)}
+                                >
+                                  <Avatar className={`h-12 w-12 ${member.avatar ? "" : colorClass} ring-2 ring-white transition-transform group-hover:scale-105`}>
+                                    {member.avatar ? (
+                                      <AvatarImage src={member.avatar} alt={member.name} />
+                                    ) : null}
+                                    <AvatarFallback>
+                                      {getInitials(member.name)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <CardTitle className="group-hover:text-indigo-600 transition-colors">
+                                      {member.name}
+                                    </CardTitle>
+                                    {member.role && (
+                                      <CardDescription className="mt-1">
+                                        {member.role}
+                                      </CardDescription>
+                                    )}
+                                  </div>
+                                </div>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => openEditDialog(member)}>
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleDelete(member.id)}
+                                      className="text-red-600"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                {member.availability && getAvailabilityBadge(member.availability)}
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              {member.leave_from && member.leave_to && (
+                                <div className="text-xs">
+                                  <Badge variant="secondary" className="mb-1">{member.leave_title || 'On leave'}</Badge>
+                                  <div className="text-gray-600">
+                                    {new Date(member.leave_from).toLocaleDateString()} - {new Date(member.leave_to).toLocaleDateString()}
+                                  </div>
+                                </div>
+                              )}
+                              {Array.isArray(member.skills) && member.skills.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-1">
+                                    <Code className="h-3.5 w-3.5" />
+                                    Skills
+                                  </h4>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {Array.isArray(member.skills) && member.skills.map((skill, i) => (
+                                      <Badge key={i} variant="outline" className="text-xs">
+                                        {skill}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {member.notes && (
+                                <p className="text-sm text-gray-600">{member.notes}</p>
+                              )}
+
+                              {Array.isArray(member.tasks) && member.tasks.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-medium text-gray-500 mb-2">Recent Meetings</h4>
+                                  <div className="space-y-2">
+                                    {member.tasks
+                                      .filter(task => task.type === "meeting")
+                                      .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
+                                      .slice(0, 2)
+                                      .map(task => (
+                                        <div key={task.id} className="p-2 bg-gray-50 rounded-md text-sm">
+                                          <div className="flex items-center justify-between">
+                                            <div className="truncate">{task.title}</div>
+                                            <Badge variant="outline" className="ml-2 flex items-center gap-1 whitespace-nowrap">
+                                              <Video className="h-3 w-3" />
+                                              {task.status}
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="flex justify-between items-center text-xs text-gray-500">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {getRelativeTime(member.lastActivity)}
+                                </span>
+                                {member.taskCount > 0 && (
+                                  <span>{member.taskCount} meetings</span>
+                                )}
+                              </div>
+                            </CardContent>
+                            {member.email && (
+                              <CardFooter className="border-t pt-4">
+                                <a
+                                  href={`mailto:${member.email}`}
+                                  className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                                >
+                                  <Mail className="h-3.5 w-3.5" />
+                                  {member.email}
+                                </a>
+                              </CardFooter>
+                            )}
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        ) : viewMode === "leave" ? (
+          /* Leave Status View - Grouped by On Leave / Not on Leave with Accordion */
+          <Accordion
+            type="multiple"
+            defaultValue={membersByLeaveStatus.map(group => group.status)}
+            className="w-full"
+          >
+            {membersByLeaveStatus.map(group => (
+              <AccordionItem key={group.status} value={group.status}>
+                <AccordionTrigger className="text-lg font-semibold">
+                  <div className="flex items-center gap-2">
+                    <CalendarOff className="h-5 w-5 text-muted-foreground" />
+                    {group.status}
+                    <Badge variant="secondary" className="ml-2">
+                      {group.members.length}
+                    </Badge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  {group.members.length === 0 ? (
+                    <div className="text-center py-6 text-gray-500">
+                      No team members {group.status === "On Leave" ? "currently on leave" : "available"}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
+                      {group.members.map(member => {
+                        const colorClass = getRandomColor(member.name);
+                        const isOnLeave = group.status === "On Leave";
+
+                        return (
+                          <Card key={member.id} className="overflow-hidden">
+                            <CardHeader className="pb-3">
+                              <div className="flex items-start justify-between">
+                                <div
+                                  className="flex items-start space-x-4 cursor-pointer group"
+                                  onClick={() => goToMemberProfile(member.id)}
+                                >
+                                  <Avatar className={`h-12 w-12 ${member.avatar ? "" : colorClass} ring-2 ring-white transition-transform group-hover:scale-105`}>
+                                    {member.avatar ? (
+                                      <AvatarImage src={member.avatar} alt={member.name} />
+                                    ) : null}
+                                    <AvatarFallback>
+                                      {getInitials(member.name)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <CardTitle className="group-hover:text-indigo-600 transition-colors">
+                                      {isOnLeave && member.leave_title
+                                        ? `${member.name} (${member.leave_title})`
+                                        : member.name}
+                                    </CardTitle>
+                                    {member.role && (
+                                      <CardDescription className="mt-1">
+                                        {member.role}
+                                      </CardDescription>
+                                    )}
+                                  </div>
+                                </div>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => openEditDialog(member)}>
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleDelete(member.id)}
+                                      className="text-red-600"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                {member.department && (
+                                  <Badge variant="outline" className="flex items-center gap-1">
+                                    <BriefcaseBusiness className="h-3 w-3" />
+                                    {member.department}
+                                  </Badge>
+                                )}
+                                {member.availability && getAvailabilityBadge(member.availability)}
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              {member.leave_from && member.leave_to && (
+                                <div className="text-xs">
+                                  <Badge variant="secondary" className="mb-1">{member.leave_title || 'On leave'}</Badge>
+                                  <div className="text-gray-600">
+                                    {new Date(member.leave_from).toLocaleDateString()} - {new Date(member.leave_to).toLocaleDateString()}
+                                  </div>
+                                </div>
+                              )}
+                              {Array.isArray(member.skills) && member.skills.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-1">
+                                    <Code className="h-3.5 w-3.5" />
+                                    Skills
+                                  </h4>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {Array.isArray(member.skills) && member.skills.map((skill, i) => (
+                                      <Badge key={i} variant="outline" className="text-xs">
+                                        {skill}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {member.notes && (
+                                <p className="text-sm text-gray-600">{member.notes}</p>
+                              )}
+
+                              {Array.isArray(member.tasks) && member.tasks.length > 0 && (
+                                <div>
+                                  <h4 className="text-sm font-medium text-gray-500 mb-2">Recent Meetings</h4>
+                                  <div className="space-y-2">
+                                    {member.tasks
+                                      .filter(task => task.type === "meeting")
+                                      .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
+                                      .slice(0, 2)
+                                      .map(task => (
+                                        <div key={task.id} className="p-2 bg-gray-50 rounded-md text-sm">
+                                          <div className="flex items-center justify-between">
+                                            <div className="truncate">{task.title}</div>
+                                            <Badge variant="outline" className="ml-2 flex items-center gap-1 whitespace-nowrap">
+                                              <Video className="h-3 w-3" />
+                                              {task.status}
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="flex justify-between items-center text-xs text-gray-500">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {getRelativeTime(member.lastActivity)}
+                                </span>
+                                {member.taskCount > 0 && (
+                                  <span>{member.taskCount} meetings</span>
+                                )}
+                              </div>
+                            </CardContent>
+                            {member.email && (
+                              <CardFooter className="border-t pt-4">
+                                <a
+                                  href={`mailto:${member.email}`}
+                                  className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                                >
+                                  <Mail className="h-3.5 w-3.5" />
+                                  {member.email}
+                                </a>
+                              </CardFooter>
+                            )}
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
         ) : (
+          /* Flat View - All Members */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredMembers.map(member => {
               const colorClass = getRandomColor(member.name);
-              
+
               return (
                 <Card key={member.id} className="overflow-hidden">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
-                      <div 
+                      <div
                         className="flex items-start space-x-4 cursor-pointer group"
                         onClick={() => goToMemberProfile(member.id)}
                       >
@@ -363,7 +791,7 @@ export default function TeamPage() {
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={() => handleDelete(member.id)}
                             className="text-red-600"
                           >
@@ -407,17 +835,17 @@ export default function TeamPage() {
                         </div>
                       </div>
                     )}
-                    
+
                     {member.notes && (
                       <p className="text-sm text-gray-600">{member.notes}</p>
                     )}
-                    
+
                     {Array.isArray(member.tasks) && member.tasks.length > 0 && (
                       <div>
                         <h4 className="text-sm font-medium text-gray-500 mb-2">Recent Meetings</h4>
                         <div className="space-y-2">
                           {member.tasks
-                            .filter(task => task.type === "meeting") 
+                            .filter(task => task.type === "meeting")
                             .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))
                             .slice(0, 2)
                             .map(task => (
@@ -434,7 +862,7 @@ export default function TeamPage() {
                         </div>
                       </div>
                     )}
-                    
+
                     <div className="flex justify-between items-center text-xs text-gray-500">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
@@ -447,8 +875,8 @@ export default function TeamPage() {
                   </CardContent>
                   {member.email && (
                     <CardFooter className="border-t pt-4">
-                      <a 
-                        href={`mailto:${member.email}`} 
+                      <a
+                        href={`mailto:${member.email}`}
                         className="text-sm text-blue-600 hover:underline flex items-center gap-1"
                       >
                         <Mail className="h-3.5 w-3.5" />
