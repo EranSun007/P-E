@@ -2,7 +2,7 @@
 applications:
   # Backend Application (Express.js API)
   - name: pe-manager-backend
-    memory: 512M
+    memory: 256M
     instances: 1
     buildpacks:
       - nodejs_buildpack
@@ -10,9 +10,11 @@ applications:
     path: .
     env:
       NODE_ENV: production
-      AUTH_MODE: development
+      AUTH_MODE: production
+      JWT_SECRET: pe-manager-jwt-secret-key-2024-secure
+      JWT_EXPIRES_IN: 7d
     services:
-      - pe-manager           # Bind to PostgreSQL service
+      - pe-manager-db3
 
   # Frontend Application (React Static Files)
   - name: pe-manager-frontend

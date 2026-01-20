@@ -11,6 +11,71 @@ const MIGRATIONS = [
     version: '001_initial_schema',
     name: 'Initial database schema',
     file: 'schema.sql'
+  },
+  {
+    version: '002_work_items',
+    name: 'Create work_items table for team member work tracking',
+    file: '002_work_items.sql'
+  },
+  {
+    version: '003_work_items_sprint',
+    name: 'Add sprint_name column to work_items',
+    file: '003_work_items_sprint.sql'
+  },
+  {
+    version: '004_developer_goals',
+    name: 'Create developer_goals table for annual objectives tracking',
+    file: '004_developer_goals.sql'
+  },
+  {
+    version: '005_performance_evaluations',
+    name: 'Create performance_evaluations table for yearly reviews',
+    file: '005_performance_evaluations.sql'
+  },
+  {
+    version: '006_add_self_ratings',
+    name: 'Add self-assessment ratings to performance evaluations',
+    file: '006_add_self_ratings.sql'
+  },
+  {
+    version: '007_one_on_ones_extended',
+    name: 'Add extended fields to one_on_ones (mood, topics, next meeting, action items)',
+    file: '007_one_on_ones_extended.sql'
+  },
+  {
+    version: '008_team_members_department_notes',
+    name: 'Add department and notes columns to team_members',
+    file: '008_team_members_department_notes.sql'
+  },
+  {
+    version: '009_stakeholder_enhancements',
+    name: 'Add influence, engagement, department, group to stakeholders and stakeholder_id to projects',
+    file: '009_stakeholder_enhancements.sql'
+  },
+  {
+    version: '010_users_table',
+    name: 'Create users table for authentication',
+    file: '010_users_table.sql'
+  },
+  {
+    version: '011_peers_table',
+    name: 'Create peers table for external collaborators',
+    file: '011_peers_table.sql'
+  },
+  {
+    version: '012_global_task_attributes',
+    name: 'Add global task attributes support (statuses, priorities, tags, types)',
+    file: '012_global_task_attributes.sql'
+  },
+  {
+    version: '013_devops_duties',
+    name: 'Create devops_duties table for tracking DevOps duty periods',
+    file: '013_devops_duties.sql'
+  },
+  {
+    version: '014_duty_schedule',
+    name: 'Create duty_schedule table for upcoming duty rotation assignments',
+    file: '014_duty_schedule.sql'
   }
 ];
 
@@ -52,14 +117,16 @@ async function getExecutedMigrations() {
   }
 }
 
-async function runMigrations() {
+async function runMigrations(exitOnComplete = true) {
   console.log('🚀 Starting database migrations...');
 
   // Check database connection
   const isConnected = await checkConnection();
   if (!isConnected) {
-    console.error('❌ Cannot connect to database. Please check your connection settings.');
-    process.exit(1);
+    const error = new Error('Cannot connect to database. Please check your connection settings.');
+    console.error('❌', error.message);
+    if (exitOnComplete) process.exit(1);
+    throw error;
   }
 
   console.log('✅ Database connection established');
@@ -87,10 +154,12 @@ async function runMigrations() {
     }
 
     console.log('🎉 Migration process completed!');
-    process.exit(0);
+    if (exitOnComplete) process.exit(0);
+    return { success: true, migrationsRan: ranCount };
   } catch (error) {
     console.error('❌ Migration process failed:', error);
-    process.exit(1);
+    if (exitOnComplete) process.exit(1);
+    throw error;
   }
 }
 

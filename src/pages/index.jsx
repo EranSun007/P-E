@@ -43,6 +43,7 @@ const ProjectDetails = lazy(() => retryImport(() => import(/* webpackChunkName: 
 const TeamMemberProfile = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-team-member-profile" */ "./TeamMemberProfile"), 3, 1000));
 const Peers = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-peers" */ "./Peers"), 3, 1000));
 const PeerProfile = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-peer-profile" */ "./PeerProfile"), 3, 1000));
+const Duties = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-duties" */ "./Duties"), 3, 1000));
 
 const PAGES = {
     
@@ -67,7 +68,9 @@ const PAGES = {
     Peers: Peers,
     
     PeerProfile: PeerProfile,
-    
+
+    Duties: Duties,
+
 }
 
 function _getCurrentPage(url) {
@@ -128,7 +131,9 @@ function PagesContent() {
                         <Route path="/Peers" element={<Peers />} />
                         
                         <Route path="/PeerProfile" element={<PeerProfile />} />
-                        
+
+                        <Route path="/Duties" element={<Duties />} />
+
                     </Routes>
                 </Suspense>
             </PageChunkErrorBoundary>

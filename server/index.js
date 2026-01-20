@@ -18,6 +18,14 @@ import notificationsRouter from './routes/notifications.js';
 import remindersRouter from './routes/reminders.js';
 import commentsRouter from './routes/comments.js';
 import taskAttributesRouter from './routes/taskAttributes.js';
+import workItemsRouter from './routes/workItems.js';
+import developerGoalsRouter from './routes/developerGoals.js';
+import performanceEvaluationsRouter from './routes/performanceEvaluations.js';
+import backupRouter from './routes/backup.js';
+import usersRouter from './routes/users.js';
+import peersRouter from './routes/peers.js';
+import devopsDutiesRouter from './routes/devopsDuties.js';
+import dutyScheduleRouter from './routes/dutySchedule.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -63,6 +71,19 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Migration endpoint - runs migrations via HTTP (useful when cf run-task fails)
+app.post('/api/admin/migrate', async (req, res) => {
+  try {
+    const { runMigrations } = await import('./db/migrate.js');
+    console.log('Starting HTTP-triggered migration...');
+    const result = await runMigrations(false); // false = don't exit process
+    res.json({ status: 'ok', message: 'Migrations completed successfully', ...result });
+  } catch (error) {
+    console.error('Migration error:', error);
+    res.status(500).json({ error: 'Migration failed', message: error.message });
+  }
+});
+
 // Mount API routes
 app.use('/api/auth', authRouter);
 app.use('/api/tasks', tasksRouter);
@@ -76,6 +97,14 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/reminders', remindersRouter);
 app.use('/api/comments', commentsRouter);
 app.use('/api/task-attributes', taskAttributesRouter);
+app.use('/api/work-items', workItemsRouter);
+app.use('/api/developer-goals', developerGoalsRouter);
+app.use('/api/performance-evaluations', performanceEvaluationsRouter);
+app.use('/api/backup', backupRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/peers', peersRouter);
+app.use('/api/devops-duties', devopsDutiesRouter);
+app.use('/api/duty-schedule', dutyScheduleRouter);
 
 // 404 handler
 app.use((req, res) => {

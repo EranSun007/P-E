@@ -1,0 +1,1 @@
+const i=(n,t,e="Person")=>n?`${e} ${t+1}`:`${e} ${t+1}`,a=n=>n?"●●●●●@●●●●●.com":"",o=n=>n?"[Private notes hidden]":"",s=(n,t="P")=>`${t.split(" ").map(r=>r[0]).join("").toUpperCase()}${n+1}`;export{i as a,a as b,o as c,s as g};

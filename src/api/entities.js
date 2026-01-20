@@ -21,11 +21,22 @@ export const CalendarEvent = client.entities.CalendarEvent;
 export const Notification = client.entities.Notification;
 export const Reminder = client.entities.Reminder;
 export const Comment = client.entities.Comment;
+export const WorkItem = client.entities.WorkItem;
 export const OutOfOffice = client.entities.OutOfOffice;
 export const Peer = client.entities.Peer;
 export const Duty = client.entities.Duty;
 export const AgendaItem = client.entities.AgendaItem;
 export const PersonalFileItem = client.entities.PersonalFileItem;
+export const DeveloperGoal = client.entities.DeveloperGoal;
+export const PerformanceEvaluation = client.entities.PerformanceEvaluation;
+export const DevOpsDuty = client.entities.DevOpsDuty;
+export const DutySchedule = client.entities.DutySchedule;
+
+// Export Backup API (only available with API mode)
+export const Backup = USE_API ? apiClient.backup : {
+  export: async () => { throw new Error('Backup not available in local mode'); },
+  import: async () => { throw new Error('Backup not available in local mode'); }
+};
 
 // User entity that works with both authentication systems
 export const User = USE_API ? apiClient.auth : {

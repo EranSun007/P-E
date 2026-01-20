@@ -1,26 +1,30 @@
-import { createRequire } from 'module';
+import jwt from 'jsonwebtoken';
+import UserService from '../services/UserService.js';
 
-const require = createRequire(import.meta.url);
+// JWT configuration
+const JWT_SECRET = process.env.JWT_SECRET || 'pe-manager-dev-secret-change-in-production';
 
 /**
  * Authentication middleware
+ * Validates JWT token and attaches user to request
+ *
  * Supports two modes:
- * 1. Development mode: Bypass XSUAA, use mock user
- * 2. Production mode: Validate JWT token from SAP BTP XSUAA
+ * 1. Development mode with DEV_SKIP_AUTH=true: Bypass authentication entirely
+ * 2. Normal mode: Validate JWT token from Authorization header
  */
-
-function authMiddleware(req, res, next) {
-  // Development mode: bypass authentication
-  if (process.env.NODE_ENV === 'development' || process.env.AUTH_MODE === 'development') {
+async function authMiddleware(req, res, next) {
+  // Development bypass mode (only when explicitly enabled)
+  if (process.env.DEV_SKIP_AUTH === 'true') {
     req.user = {
-      id: process.env.DEV_USER_ID || 'dev-user',
+      id: process.env.DEV_USER_ID || 'dev-user-001',
+      username: 'dev',
       name: process.env.DEV_USER_NAME || 'Development User',
-      email: process.env.DEV_USER_EMAIL || 'dev@example.com'
+      email: process.env.DEV_USER_EMAIL || 'dev@example.com',
+      role: 'admin'
     };
     return next();
   }
 
-  // Production mode: XSUAA authentication
   try {
     const authHeader = req.headers.authorization;
 
@@ -33,51 +37,52 @@ function authMiddleware(req, res, next) {
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
-    // Load XSUAA library
-    const xssec = require('@sap/xssec');
-    const xsenv = require('@sap/xsenv');
-
-    // Get XSUAA service credentials from VCAP_SERVICES
-    let xsuaaCredentials;
+    // Verify JWT token
+    let decoded;
     try {
-      const services = xsenv.getServices({ xsuaa: { tag: 'xsuaa' } });
-      xsuaaCredentials = services.xsuaa;
-    } catch (error) {
-      console.error('Failed to get XSUAA credentials:', error);
-      return res.status(500).json({
-        error: 'Configuration Error',
-        message: 'XSUAA service not configured'
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (jwtError) {
+      if (jwtError.name === 'TokenExpiredError') {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Token has expired'
+        });
+      }
+      if (jwtError.name === 'JsonWebTokenError') {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Invalid token'
+        });
+      }
+      throw jwtError;
+    }
+
+    // Look up user to verify they still exist and are active
+    const user = await UserService.findById(decoded.userId);
+    if (!user) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'User not found'
       });
     }
 
-    // Verify JWT token
-    xssec.createSecurityContext(token, xsuaaCredentials, (error, securityContext) => {
-      if (error) {
-        console.error('Token validation failed:', error);
-        return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'Invalid or expired token'
-        });
-      }
+    if (!user.is_active) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'User account is deactivated'
+      });
+    }
 
-      // Extract user information from security context
-      req.user = {
-        id: securityContext.getLogonName() || securityContext.getUniquePrincipalName(),
-        name: securityContext.getGivenName()
-          ? `${securityContext.getGivenName()} ${securityContext.getFamilyName()}`
-          : securityContext.getLogonName(),
-        email: securityContext.getEmail() || securityContext.getLogonName(),
-        scopes: securityContext.getScope()
-      };
+    // Attach user to request
+    req.user = {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      email: user.email,
+      role: user.role
+    };
 
-      // Optional: Check for required scopes
-      // if (!req.user.scopes.includes('pe-manager.read')) {
-      //   return res.status(403).json({ error: 'Forbidden', message: 'Insufficient permissions' });
-      // }
-
-      next();
-    });
-
+    next();
   } catch (error) {
     console.error('Authentication error:', error);
     return res.status(500).json({
@@ -88,23 +93,49 @@ function authMiddleware(req, res, next) {
 }
 
 /**
- * Optional middleware to check specific scopes
+ * Middleware to require admin role
  */
-function requireScope(scope) {
-  return (req, res, next) => {
-    if (process.env.NODE_ENV === 'development' || process.env.AUTH_MODE === 'development') {
-      return next(); // Skip scope check in development
-    }
-
-    if (!req.user || !req.user.scopes || !req.user.scopes.includes(scope)) {
-      return res.status(403).json({
-        error: 'Forbidden',
-        message: `Required scope: ${scope}`
-      });
-    }
-
-    next();
-  };
+function requireAdmin(req, res, next) {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({
+      error: 'Forbidden',
+      message: 'Admin access required'
+    });
+  }
+  next();
 }
 
-export { authMiddleware, requireScope };
+/**
+ * Optional authentication middleware
+ * Attaches user if token is present, but doesn't require it
+ */
+async function optionalAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // No token, continue without user
+    return next();
+  }
+
+  try {
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await UserService.findById(decoded.userId);
+
+    if (user && user.is_active) {
+      req.user = {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      };
+    }
+  } catch {
+    // Invalid token, continue without user
+  }
+
+  next();
+}
+
+export { authMiddleware, requireAdmin, optionalAuth };

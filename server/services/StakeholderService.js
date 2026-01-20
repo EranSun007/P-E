@@ -20,7 +20,13 @@ class StakeholderService {
         role = null,
         phone = null,
         contact_info = null,
-        company = null
+        company = null,
+        influence_level = 'medium',
+        engagement_level = 'active',
+        notes = null,
+        tags = [],
+        department = null,
+        stakeholder_group = null
       } = stakeholderData;
 
       if (!name) {
@@ -28,12 +34,18 @@ class StakeholderService {
       }
 
       const sql = `
-        INSERT INTO stakeholders (user_id, name, email, role, phone, contact_info, company)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO stakeholders (
+          user_id, name, email, role, phone, contact_info, company,
+          influence_level, engagement_level, notes, tags, department, stakeholder_group
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         RETURNING *
       `;
 
-      const values = [userId, name, email, role, phone, contact_info, company];
+      const values = [
+        userId, name, email, role, phone, contact_info, company,
+        influence_level, engagement_level, notes, tags, department, stakeholder_group
+      ];
       const result = await query(sql, values);
       return result.rows[0];
     } catch (error) {
@@ -53,7 +65,11 @@ class StakeholderService {
         throw new Error('Stakeholder not found or access denied');
       }
 
-      const allowedFields = ['name', 'email', 'role', 'phone', 'contact_info', 'company'];
+      const allowedFields = [
+        'name', 'email', 'role', 'phone', 'contact_info', 'company',
+        'influence_level', 'engagement_level', 'notes', 'tags',
+        'department', 'stakeholder_group'
+      ];
       const updateFields = [];
       const values = [];
       let paramIndex = 1;

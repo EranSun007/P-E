@@ -1,10 +1,12 @@
 import React from 'react';
 import { Project, Task, Stakeholder, TeamMember, OneOnOne } from '@/api/entities';
 import { logger } from '@/utils/logger';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 
 export const AppContext = React.createContext(null);
 
 export function AppProvider({ children }) {
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [projects, setProjects] = React.useState([]);
   const [tasks, setTasks] = React.useState([]);
   const [stakeholders, setStakeholders] = React.useState([]);
@@ -12,6 +14,7 @@ export function AppProvider({ children }) {
   const [oneOnOnes, setOneOnOnes] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
+  const [dataLoaded, setDataLoaded] = React.useState(false);
 
   const refreshProjects = React.useCallback(async () => {
     try {
@@ -79,9 +82,24 @@ export function AppProvider({ children }) {
     }
   }, [refreshProjects, refreshTasks, refreshStakeholders, refreshTeamMembers, refreshOneOnOnes]);
 
+  // Only load data when user is authenticated
+  // Reset dataLoaded when auth state changes
   React.useEffect(() => {
-    refreshAll();
-  }, [refreshAll]);
+    if (!authLoading && isAuthenticated && !dataLoaded) {
+      setDataLoaded(true);
+      refreshAll();
+    } else if (!isAuthenticated) {
+      // Reset state when user logs out
+      setDataLoaded(false);
+      setProjects([]);
+      setTasks([]);
+      setStakeholders([]);
+      setTeamMembers([]);
+      setOneOnOnes([]);
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, authLoading]);
 
   const value = React.useMemo(() => ({
     projects,

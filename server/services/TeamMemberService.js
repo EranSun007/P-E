@@ -34,9 +34,11 @@ class TeamMemberService {
         name,
         email = null,
         role = null,
+        department = null,
         skills = [],
         phone = null,
         company = null,
+        notes = null,
         leave_from = null,
         leave_to = null,
         leave_title = null
@@ -48,14 +50,14 @@ class TeamMemberService {
 
       const sql = `
         INSERT INTO team_members (
-          user_id, name, email, role, skills, phone, company,
-          leave_from, leave_to, leave_title
+          user_id, name, email, role, department, skills, phone, company,
+          notes, leave_from, leave_to, leave_title
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING *
       `;
 
-      const values = [userId, name, email, role, skills, phone, company, leave_from, leave_to, leave_title];
+      const values = [userId, name, email, role, department, skills, phone, company, notes, leave_from, leave_to, leave_title];
       const result = await query(sql, values);
       return result.rows[0];
     } catch (error) {
@@ -76,8 +78,8 @@ class TeamMemberService {
       }
 
       const allowedFields = [
-        'name', 'email', 'role', 'skills', 'phone', 'company',
-        'leave_from', 'leave_to', 'leave_title', 'last_activity'
+        'name', 'email', 'role', 'department', 'skills', 'phone', 'company',
+        'notes', 'leave_from', 'leave_to', 'leave_title', 'last_activity'
       ];
 
       const updateFields = [];

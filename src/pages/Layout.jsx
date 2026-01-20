@@ -4,6 +4,7 @@ import { createPageUrl } from "@/utils";
 import {
   CheckSquare,
   Calendar,
+  CalendarDays,
   BarChart2,
   Users,
   Menu,
@@ -13,18 +14,22 @@ import {
   Settings,
   Coffee,
   Folders,
-  UserPlus
+  UserPlus,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { User as UserEntity } from "@/api/entities";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext.jsx";
+import { useDisplayMode } from "@/contexts/DisplayModeContext.jsx";
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [userLoading, setUserLoading] = useState(true);
   const { logout, isAuthenticated } = useAuth();
+  const { isPresentationMode, togglePresentationMode } = useDisplayMode();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -65,6 +70,12 @@ export default function Layout({ children, currentPageName }) {
       icon: Calendar,
       href: createPageUrl("Calendar"),
       current: currentPageName === "Calendar"
+    },
+    {
+      name: "Duties",
+      icon: CalendarDays,
+      href: createPageUrl("Duties"),
+      current: currentPageName === "Duties"
     },
     {
       name: "Projects",
@@ -225,7 +236,10 @@ export default function Layout({ children, currentPageName }) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
         {/* Top navigation - now sticky */}
-        <header className="sticky top-0 bg-white shadow-sm z-10">
+        <header className={cn(
+          "sticky top-0 shadow-sm z-10 transition-colors",
+          isPresentationMode ? "bg-amber-50" : "bg-white"
+        )}>
           <div className="flex justify-between items-center h-16 px-4 sm:px-6">
             <div className="flex items-center">
               <button
@@ -234,10 +248,36 @@ export default function Layout({ children, currentPageName }) {
               >
                 <Menu className="h-6 w-6" />
               </button>
-              
+
               <div className="text-md font-medium text-gray-800">
                 P&E Manager {currentPageName && <span className="text-gray-500"> &gt; {currentPageName}</span>}
               </div>
+            </div>
+
+            {/* Presentation Mode Toggle */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={togglePresentationMode}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+                  isPresentationMode
+                    ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                )}
+                title={isPresentationMode ? "Switch to Working Mode" : "Switch to Presentation Mode"}
+              >
+                {isPresentationMode ? (
+                  <>
+                    <EyeOff className="h-4 w-4" />
+                    <span className="hidden sm:inline">Presenting</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-4 w-4" />
+                    <span className="hidden sm:inline">Working</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </header>

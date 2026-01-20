@@ -1,11 +1,10 @@
-
-import React, { useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, Save } from "lucide-react";
+import { AlertTriangle, Save, CheckCircle } from "lucide-react";
 import AuthService from "@/services/authService";
 
 export default function PasswordChangeForm() {
@@ -32,22 +31,24 @@ export default function PasswordChangeForm() {
       return;
     }
 
-    if (formData.newPassword.length < 8) {
-      setError("New password must be at least 8 characters long.");
+    if (formData.newPassword.length < 6) {
+      setError("New password must be at least 6 characters long.");
       return;
     }
 
     setLoading(true);
     try {
-      const user = AuthService.getStoredToken();
-      if (!user) {
-        setError("You must be logged in to change your password.");
-        setLoading(false);
+      const result = await AuthService.changePassword(
+        formData.currentPassword,
+        formData.newPassword
+      );
+
+      if (!result.success) {
+        setError(result.error || "Failed to change password.");
         return;
       }
 
-      await AuthService.changePassword(user.username, formData.currentPassword, formData.newPassword);
-      setSuccess("Password changed successfully.");
+      setSuccess("Password changed successfully!");
       setFormData({
         currentPassword: "",
         newPassword: "",
@@ -64,7 +65,9 @@ export default function PasswordChangeForm() {
     <Card>
       <CardHeader>
         <CardTitle>Change Password</CardTitle>
-        <CardDescription>Update your password here. After changing, you will be logged out and will need to log in again with the new password.</CardDescription>
+        <CardDescription>
+          Update your password here. Your new password must be at least 6 characters long.
+        </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
@@ -76,7 +79,8 @@ export default function PasswordChangeForm() {
             </Alert>
           )}
           {success && (
-            <Alert variant="default">
+            <Alert>
+              <CheckCircle className="h-4 w-4" />
               <AlertTitle>Success</AlertTitle>
               <AlertDescription>{success}</AlertDescription>
             </Alert>
@@ -99,6 +103,7 @@ export default function PasswordChangeForm() {
               value={formData.newPassword}
               onChange={(e) => handleInputChange("newPassword", e.target.value)}
               required
+              minLength={6}
             />
           </div>
           <div className="space-y-2">

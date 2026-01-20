@@ -17,22 +17,37 @@ class OneOnOneService {
       const {
         team_member_id,
         date,
-        notes = null,
+        notes = [],
         status = 'scheduled',
-        location = null
+        location = null,
+        mood = null,
+        topics_discussed = [],
+        next_meeting_date = null,
+        action_items = []
       } = oneOnOneData;
 
       if (!date) {
         throw new Error('Missing required field: date');
       }
 
+      // Ensure notes is properly formatted as JSON
+      const notesJson = Array.isArray(notes) ? JSON.stringify(notes) : JSON.stringify([]);
+      const actionItemsJson = Array.isArray(action_items) ? JSON.stringify(action_items) : JSON.stringify([]);
+      const topicsArray = Array.isArray(topics_discussed) ? topics_discussed : [];
+
       const sql = `
-        INSERT INTO one_on_ones (user_id, team_member_id, date, notes, status, location)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO one_on_ones (
+          user_id, team_member_id, date, notes, status, location,
+          mood, topics_discussed, next_meeting_date, action_items
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
       `;
 
-      const values = [userId, team_member_id, date, notes, status, location];
+      const values = [
+        userId, team_member_id, date, notesJson, status, location,
+        mood, topicsArray, next_meeting_date, actionItemsJson
+      ];
       const result = await query(sql, values);
       return result.rows[0];
     } catch (error) {
@@ -52,7 +67,10 @@ class OneOnOneService {
         throw new Error('One-on-one not found or access denied');
       }
 
-      const allowedFields = ['team_member_id', 'date', 'notes', 'status', 'location'];
+      const allowedFields = [
+        'team_member_id', 'date', 'notes', 'status', 'location',
+        'mood', 'topics_discussed', 'next_meeting_date', 'action_items'
+      ];
       const updateFields = [];
       const values = [];
       let paramIndex = 1;
@@ -60,7 +78,14 @@ class OneOnOneService {
       for (const [key, value] of Object.entries(updates)) {
         if (allowedFields.includes(key)) {
           updateFields.push(`${key} = $${paramIndex}`);
-          values.push(value);
+          // Handle JSON fields - stringify arrays/objects for notes and action_items
+          if (key === 'notes' || key === 'action_items') {
+            values.push(Array.isArray(value) ? JSON.stringify(value) : JSON.stringify([]));
+          } else if (key === 'topics_discussed') {
+            values.push(Array.isArray(value) ? value : []);
+          } else {
+            values.push(value);
+          }
           paramIndex++;
         }
       }

@@ -223,7 +223,7 @@ export default function MetricsPage() {
 
         {/* Metric Creation Dialog */}
         <Dialog open={showTaskCreation} onOpenChange={setShowTaskCreation}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Track New Metric</DialogTitle>
             </DialogHeader>

@@ -24,6 +24,23 @@ class ProjectService {
     }
   }
 
+  // Helper to convert empty strings to null for numeric fields
+  _toNumericOrNull(value) {
+    if (value === '' || value === null || value === undefined) {
+      return null;
+    }
+    const num = parseFloat(value);
+    return isNaN(num) ? null : num;
+  }
+
+  // Helper to convert empty strings to null for date fields
+  _toDateOrNull(value) {
+    if (value === '' || value === null || value === undefined) {
+      return null;
+    }
+    return value;
+  }
+
   async create(userId, projectData) {
     try {
       const {
@@ -36,25 +53,35 @@ class ProjectService {
         cost = null,
         priority_level = 'medium',
         progress_percentage = 0,
-        tags = []
+        tags = [],
+        stakeholder_id = null
       } = projectData;
 
       if (!name || !status) {
         throw new Error('Missing required fields: name, status');
       }
 
+      // Convert empty strings to null for numeric and date fields
+      const safeBudget = this._toNumericOrNull(budget);
+      const safeCost = this._toNumericOrNull(cost);
+      const safeProgress = this._toNumericOrNull(progress_percentage) || 0;
+      const safeStartDate = this._toDateOrNull(start_date);
+      const safeDeadline = this._toDateOrNull(deadline);
+      const safeStakeholderId = stakeholder_id || null;
+
       const sql = `
         INSERT INTO projects (
           user_id, name, description, status, start_date, deadline,
-          budget, cost, priority_level, progress_percentage, tags
+          budget, cost, priority_level, progress_percentage, tags, stakeholder_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING *
       `;
 
       const values = [
-        userId, name, description, status, start_date, deadline,
-        budget, cost, priority_level, progress_percentage, tags
+        userId, name, description || null, status, safeStartDate, safeDeadline,
+        safeBudget, safeCost, priority_level || 'medium', safeProgress, tags || [],
+        safeStakeholderId
       ];
 
       const result = await query(sql, values);
@@ -78,8 +105,14 @@ class ProjectService {
 
       const allowedFields = [
         'name', 'description', 'status', 'start_date', 'deadline',
-        'budget', 'cost', 'priority_level', 'progress_percentage', 'tags'
+        'budget', 'cost', 'priority_level', 'progress_percentage', 'tags',
+        'stakeholder_id'
       ];
+
+      // Fields that need numeric conversion
+      const numericFields = ['budget', 'cost', 'progress_percentage'];
+      // Fields that need date conversion
+      const dateFields = ['start_date', 'deadline'];
 
       const updateFields = [];
       const values = [];
@@ -88,7 +121,14 @@ class ProjectService {
       for (const [key, value] of Object.entries(updates)) {
         if (allowedFields.includes(key)) {
           updateFields.push(`${key} = $${paramIndex}`);
-          values.push(value);
+          // Convert empty strings to null for numeric and date fields
+          if (numericFields.includes(key)) {
+            values.push(this._toNumericOrNull(value));
+          } else if (dateFields.includes(key)) {
+            values.push(this._toDateOrNull(value));
+          } else {
+            values.push(value);
+          }
           paramIndex++;
         }
       }

@@ -4,7 +4,14 @@ import { format, parseISO } from "date-fns";
 import { TeamMember, OneOnOne } from "@/api/entities";
 import { createPageUrl } from "@/utils";
 import { AppContext } from "@/contexts/AppContext.jsx";
+import { useDisplayMode } from "@/contexts/DisplayModeContext.jsx";
 import { logger } from "@/utils/logger";
+import {
+  anonymizeName,
+  anonymizeEmail,
+  anonymizeNotes,
+  getAnonymizedInitials
+} from "@/utils/anonymize";
 import {
   Card,
   CardContent,
@@ -17,6 +24,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -54,16 +62,78 @@ import {
   AlertCircle,
   SmilePlus,
   Trash2,
+  Pencil,
 } from "lucide-react";
+import TagInput from "@/components/ui/tag-input";
+import CurrentWorkSection from "@/components/team/CurrentWorkSection";
+import DeveloperGoalsCard from "@/components/team/DeveloperGoalsCard";
+import PerformanceEvaluationCard from "@/components/team/PerformanceEvaluationCard";
 
 export default function TeamMemberProfile() {
   const [searchParams] = useSearchParams();
   const memberId = searchParams.get("id");
+  const { isPresentationMode } = useDisplayMode();
 
   const [member, setMember] = useState(null);
   const [oneOnOnes, setOneOnOnes] = useState([]);
   const { tasks, projects, teamMembers: allTeamMembers, stakeholders: allStakeholders, oneOnOnes: ctxOneOnOnes, refreshAll } = useContext(AppContext);
   const [loading, setLoading] = useState(true);
+
+  // Get the index of current member for consistent anonymization
+  const getMemberIndex = () => {
+    if (!member || !allTeamMembers) return 0;
+    return allTeamMembers.findIndex(m => m.id === member.id);
+  };
+
+  // Helper to get display name for the current member
+  const getDisplayName = () => {
+    if (!member) return '';
+    if (!isPresentationMode) return member.name;
+    return anonymizeName(member.name, getMemberIndex(), 'Team Member');
+  };
+
+  // Helper to get display email
+  const getDisplayEmail = () => {
+    if (!member) return '';
+    if (!isPresentationMode) return member.email;
+    return anonymizeEmail(member.email);
+  };
+
+  // Helper to get display notes
+  const getDisplayNotes = () => {
+    if (!member) return '';
+    if (!isPresentationMode) return member.notes;
+    return anonymizeNotes(member.notes);
+  };
+
+  // Helper to get initials for avatar
+  const getDisplayInitials = () => {
+    if (!member) return '';
+    if (isPresentationMode) {
+      return getAnonymizedInitials(getMemberIndex(), 'TM');
+    }
+    return member.name.split(' ').map(n => n[0]).join('');
+  };
+
+  // Helper to get anonymized name for any team member by ID
+  const getAnonymizedTeamMemberName = (tmId) => {
+    if (!isPresentationMode) {
+      const tm = allTeamMembers.find(m => String(m.id) === String(tmId));
+      return tm?.name || 'Unknown';
+    }
+    const index = allTeamMembers.findIndex(m => String(m.id) === String(tmId));
+    return anonymizeName('', index, 'Team Member');
+  };
+
+  // Helper to get anonymized name for stakeholder by ID
+  const getAnonymizedStakeholderName = (sId) => {
+    if (!isPresentationMode) {
+      const s = allStakeholders.find(st => String(st.id) === String(sId));
+      return s?.name || 'Unknown';
+    }
+    const index = allStakeholders.findIndex(st => String(st.id) === String(sId));
+    return anonymizeName('', index, 'Stakeholder');
+  };
   const [showNewMeetingDialog, setShowNewMeetingDialog] = useState(false);
   const [showActionItemDialog, setShowActionItemDialog] = useState(false);
   const [selectedMeeting, setSelectedMeeting] = useState(null);
@@ -102,6 +172,27 @@ export default function TeamMemberProfile() {
     }
   });
 
+  // Edit Team Member state
+  const [showEditMemberDialog, setShowEditMemberDialog] = useState(false);
+  const [editMemberForm, setEditMemberForm] = useState({
+    name: "",
+    role: "",
+    email: "",
+    phone: "",
+    department: "",
+    skills: [],
+    notes: "",
+  });
+
+  // Edit Meeting state
+  const [showEditMeetingDialog, setShowEditMeetingDialog] = useState(false);
+  const [editingMeeting, setEditingMeeting] = useState(null);
+  const [editMeetingForm, setEditMeetingForm] = useState({
+    date: "",
+    mood: "good",
+    next_meeting_date: "",
+  });
+
   useEffect(() => {
     if (memberId) {
       loadData();
@@ -114,7 +205,7 @@ export default function TeamMemberProfile() {
       const memberData = await TeamMember.get(memberId);
       setMember(memberData);
       await refreshAll();
-      const memberOneOnOnes = (Array.isArray(ctxOneOnOnes) ? ctxOneOnOnes : []).filter(o => o.team_member_id === memberId);
+      const memberOneOnOnes = (Array.isArray(ctxOneOnOnes) ? ctxOneOnOnes : []).filter(o => String(o.team_member_id) === String(memberId));
       setOneOnOnes(memberOneOnOnes);
     } catch (error) {
       logger.error("Error loading team member data", { error: String(error) });
@@ -214,6 +305,69 @@ export default function TeamMemberProfile() {
     }
   };
 
+  // Open edit member dialog
+  const openEditMemberDialog = () => {
+    if (!member) return;
+    setEditMemberForm({
+      name: member.name || "",
+      role: member.role || "",
+      email: member.email || "",
+      phone: member.phone || "",
+      department: member.department || "",
+      skills: Array.isArray(member.skills) ? member.skills : [],
+      notes: member.notes || "",
+    });
+    setShowEditMemberDialog(true);
+  };
+
+  // Handle update team member
+  const handleUpdateMember = async () => {
+    try {
+      await TeamMember.update(memberId, {
+        name: editMemberForm.name,
+        email: editMemberForm.email || null,
+        role: editMemberForm.role || null,
+        phone: editMemberForm.phone || null,
+        department: editMemberForm.department || null,
+        skills: Array.isArray(editMemberForm.skills) ? editMemberForm.skills : [],
+        notes: editMemberForm.notes || null,
+      });
+      setShowEditMemberDialog(false);
+      loadData();
+    } catch (error) {
+      logger.error("Error updating team member", { error: String(error) });
+    }
+  };
+
+  // Open edit meeting dialog
+  const openEditMeetingDialog = (meeting) => {
+    setEditingMeeting(meeting);
+    setEditMeetingForm({
+      date: meeting.date || "",
+      mood: meeting.mood || "good",
+      next_meeting_date: meeting.next_meeting_date || "",
+    });
+    setShowEditMeetingDialog(true);
+  };
+
+  // Handle update meeting
+  const handleUpdateMeeting = async () => {
+    if (!editingMeeting) return;
+    try {
+      await OneOnOne.update(editingMeeting.id, {
+        ...editingMeeting,
+        date: editMeetingForm.date,
+        mood: editMeetingForm.mood,
+        next_meeting_date: editMeetingForm.next_meeting_date || null,
+      });
+      setShowEditMeetingDialog(false);
+      setEditingMeeting(null);
+      loadData();
+    } catch (error) {
+      logger.error("Error updating meeting", { error: String(error) });
+    }
+  };
+
   if (loading) {
     return <div className="p-6">Loading...</div>;
   }
@@ -251,27 +405,31 @@ export default function TeamMemberProfile() {
               Back to Team
             </Button>
           </Link>
-          
+
           <div className="flex items-center gap-4">
             <Avatar className="h-16 w-16">
-              {member.avatar ? (
-                <AvatarImage src={member.avatar} alt={member.name} />
+              {member.avatar && !isPresentationMode ? (
+                <AvatarImage src={member.avatar} alt={getDisplayName()} />
               ) : (
                 <AvatarFallback>
-                  {member.name.split(" ").map(n => n[0]).join("")}
+                  {getDisplayInitials()}
                 </AvatarFallback>
               )}
             </Avatar>
             <div>
-              <h1 className="text-3xl font-bold">{member.name}</h1>
+              <h1 className="text-3xl font-bold">{getDisplayName()}</h1>
               <p className="text-gray-500">{member.role}</p>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content - 1:1s */}
+          {/* Main Content - Work Items and 1:1s */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Current Work Section */}
+            <CurrentWorkSection teamMemberId={memberId} />
+
+            {/* 1:1 Meetings Section */}
             <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
@@ -324,6 +482,14 @@ export default function TeamMemberProfile() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  onClick={() => openEditMeetingDialog(meeting)}
+                                  title="Edit meeting"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   onClick={() => handleDeleteMeeting(meeting.id)}
                                   title="Delete meeting"
                                 >
@@ -335,26 +501,30 @@ export default function TeamMemberProfile() {
                           <CardContent>
                             <div className="space-y-4">
                               {/* Show only notes that are untagged or tagged with someone else */}
-                              {Array.isArray(meeting.notes) && meeting.notes.filter(n => !n.referenced_entity || !n.referenced_entity.id || String(n.referenced_entity.id) !== String(memberId)).length > 0 && (
+                              {Array.isArray(meeting.notes) && meeting.notes.filter(n => n.text && n.text !== '{}' && (!n.referenced_entity || !n.referenced_entity.id || String(n.referenced_entity.id) !== String(memberId))).length > 0 && (
                                 <div>
                                   <h4 className="font-medium mb-2">Notes</h4>
-                                  <ul className="list-disc pl-5">
-                                    {meeting.notes.filter(n => !n.referenced_entity || !n.referenced_entity.id || String(n.referenced_entity.id) !== String(memberId)).map((n, i) => (
-                                      <li key={i} className="mb-1">
-                                        <span>{n.text}</span>
-                                        {n.referenced_entity?.id && (
-                                          <span className="ml-2 text-xs bg-gray-200 rounded px-2 py-0.5">
-                                            {n.referenced_entity.type === "team_member" &&
-                                              allTeamMembers.find(tm => String(tm.id) === String(n.referenced_entity.id))?.name}
-                                            {n.referenced_entity.type === "stakeholder" &&
-                                              allStakeholders.find(s => String(s.id) === String(n.referenced_entity.id))?.name}
-                                            {n.referenced_entity.type === "project" &&
-                                              projects.find(p => String(p.id) === String(n.referenced_entity.id))?.name}
-                                          </span>
-                                        )}
-                                      </li>
-                                    ))}
-                                  </ul>
+                                  {isPresentationMode ? (
+                                    <p className="text-gray-400 italic">[Meeting notes hidden]</p>
+                                  ) : (
+                                    <ul className="list-disc pl-5">
+                                      {meeting.notes.filter(n => n.text && n.text !== '{}' && (!n.referenced_entity || !n.referenced_entity.id || String(n.referenced_entity.id) !== String(memberId))).map((n, i) => (
+                                        <li key={i} className="mb-1">
+                                          <span>{n.text}</span>
+                                          {n.referenced_entity?.id && (
+                                            <span className="ml-2 text-xs bg-gray-200 rounded px-2 py-0.5">
+                                              {n.referenced_entity.type === "team_member" &&
+                                                getAnonymizedTeamMemberName(n.referenced_entity.id)}
+                                              {n.referenced_entity.type === "stakeholder" &&
+                                                getAnonymizedStakeholderName(n.referenced_entity.id)}
+                                              {n.referenced_entity.type === "project" &&
+                                                projects.find(p => String(p.id) === String(n.referenced_entity.id))?.name}
+                                            </span>
+                                          )}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
                                 </div>
                               )}
                               {/* Add Note form for this meeting */}
@@ -441,6 +611,9 @@ export default function TeamMemberProfile() {
                               {meeting.action_items?.length > 0 && (
                                 <div>
                                   <h4 className="font-medium mb-2">Action Items</h4>
+                                  {isPresentationMode ? (
+                                    <p className="text-gray-400 italic">[Action items hidden]</p>
+                                  ) : (
                                   <Table>
                                     <TableHeader>
                                       <TableRow>
@@ -507,6 +680,7 @@ export default function TeamMemberProfile() {
                                       ))}
                                     </TableBody>
                                   </Table>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -523,7 +697,17 @@ export default function TeamMemberProfile() {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Team Member Info</CardTitle>
+                <div className="flex justify-between items-center">
+                  <CardTitle>Team Member Info</CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={openEditMemberDialog}
+                  >
+                    <Pencil className="h-4 w-4 mr-1" />
+                    Edit
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -548,7 +732,7 @@ export default function TeamMemberProfile() {
                   {member.notes && (
                     <div>
                       <Label>Notes</Label>
-                      <p className="text-gray-600 whitespace-pre-wrap">{member.notes}</p>
+                      <p className="text-gray-600 whitespace-pre-wrap">{getDisplayNotes()}</p>
                     </div>
                   )}
                 </div>
@@ -564,7 +748,7 @@ export default function TeamMemberProfile() {
                   <div>
                     <Label>Last 1:1</Label>
                     <p className="text-gray-600">
-                      {oneOnOnes[0] ? 
+                      {oneOnOnes[0] ?
                         format(parseISO(oneOnOnes[0].date), "PPP") :
                         "No meetings yet"}
                     </p>
@@ -572,14 +756,20 @@ export default function TeamMemberProfile() {
                   <div>
                     <Label>Open Action Items</Label>
                     <p className="text-gray-600">
-                      {oneOnOnes.reduce((count, meeting) => 
-                        count + (meeting.action_items?.filter(item => item.status !== "completed").length || 0), 
+                      {oneOnOnes.reduce((count, meeting) =>
+                        count + (meeting.action_items?.filter(item => item.status !== "completed").length || 0),
                       0)}
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Developer Goals */}
+            <DeveloperGoalsCard teamMemberId={memberId} />
+
+            {/* Performance Evaluation */}
+            <PerformanceEvaluationCard teamMemberId={memberId} />
           </div>
         </div>
       </div>
@@ -589,6 +779,9 @@ export default function TeamMemberProfile() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>New 1:1 Meeting</DialogTitle>
+            <DialogDescription>
+              Record a new one-on-one meeting with {member?.name || 'this team member'}.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -792,6 +985,9 @@ export default function TeamMemberProfile() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Add Action Item</DialogTitle>
+            <DialogDescription>
+              Create a new action item to track follow-up tasks from this meeting.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -884,6 +1080,196 @@ export default function TeamMemberProfile() {
               Cancel
             </Button>
             <Button onClick={handleCreateActionItem}>Add Action Item</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Team Member Dialog */}
+      <Dialog open={showEditMemberDialog} onOpenChange={setShowEditMemberDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Team Member</DialogTitle>
+            <DialogDescription>
+              Update team member information.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Name</Label>
+              <Input
+                id="edit-name"
+                value={editMemberForm.name}
+                onChange={(e) => setEditMemberForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Full name"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-role">Role / Position</Label>
+                <Input
+                  id="edit-role"
+                  value={editMemberForm.role}
+                  onChange={(e) => setEditMemberForm(prev => ({ ...prev, role: e.target.value }))}
+                  placeholder="e.g. Product Manager"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-department">Department</Label>
+                <Input
+                  id="edit-department"
+                  value={editMemberForm.department}
+                  onChange={(e) => setEditMemberForm(prev => ({ ...prev, department: e.target.value }))}
+                  placeholder="e.g. Engineering"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Email</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editMemberForm.email}
+                  onChange={(e) => setEditMemberForm(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="Email address"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-phone">Phone</Label>
+                <Input
+                  id="edit-phone"
+                  type="tel"
+                  value={editMemberForm.phone}
+                  onChange={(e) => setEditMemberForm(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="Phone number"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-skills">Skills</Label>
+              <TagInput
+                value={editMemberForm.skills || []}
+                onChange={(skills) => setEditMemberForm(prev => ({ ...prev, skills }))}
+                placeholder="Enter skills, press Enter or comma to add"
+              />
+              <p className="text-xs text-gray-500">Press Enter or comma after each skill</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-notes">Notes</Label>
+              <Textarea
+                id="edit-notes"
+                value={editMemberForm.notes}
+                onChange={(e) => setEditMemberForm(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Additional information"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditMemberDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateMember}>Update</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Meeting Dialog */}
+      <Dialog open={showEditMeetingDialog} onOpenChange={setShowEditMeetingDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit 1:1 Meeting</DialogTitle>
+            <DialogDescription>
+              Update meeting details.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {editMeetingForm.date ?
+                      format(parseISO(editMeetingForm.date), "PPP") :
+                      "Select date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={editMeetingForm.date ? parseISO(editMeetingForm.date) : undefined}
+                    onSelect={(date) => setEditMeetingForm(prev => ({
+                      ...prev,
+                      date: date?.toISOString()
+                    }))}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Mood</Label>
+              <Select
+                value={editMeetingForm.mood}
+                onValueChange={(value) => setEditMeetingForm(prev => ({
+                  ...prev,
+                  mood: value
+                }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="great">Great 😄</SelectItem>
+                  <SelectItem value="good">Good 🙂</SelectItem>
+                  <SelectItem value="neutral">Neutral 😐</SelectItem>
+                  <SelectItem value="concerned">Concerned 😟</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Next Meeting Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {editMeetingForm.next_meeting_date ?
+                      format(parseISO(editMeetingForm.next_meeting_date), "PPP") :
+                      "Schedule next meeting"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={editMeetingForm.next_meeting_date ? parseISO(editMeetingForm.next_meeting_date) : undefined}
+                    onSelect={(date) => setEditMeetingForm(prev => ({
+                      ...prev,
+                      next_meeting_date: date?.toISOString()
+                    }))}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditMeetingDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateMeeting}>Update Meeting</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

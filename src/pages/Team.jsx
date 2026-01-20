@@ -18,17 +18,58 @@ import TagInput from "../components/ui/tag-input";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { AppContext } from "@/contexts/AppContext.jsx";
+import { useDisplayMode } from "@/contexts/DisplayModeContext.jsx";
 import { logger } from "@/utils/logger";
+import {
+  anonymizeName,
+  anonymizeEmail,
+  anonymizeNotes,
+  getAnonymizedInitials
+} from "@/utils/anonymize";
 
 export default function TeamPage() {
   const navigate = useNavigate();
   const { tasks: ctxTasks, teamMembers: ctxMembers, loading, refreshAll } = useContext(AppContext);
+  const { isPresentationMode } = useDisplayMode();
   const [teamMembers, setTeamMembers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showDialog, setShowDialog] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState("flat"); // "flat" | "team" | "leave"
+
+  // Helper to get display values based on presentation mode
+  const getDisplayValue = (member, field, index) => {
+    if (!isPresentationMode) return member[field];
+
+    switch (field) {
+      case 'name':
+        return anonymizeName(member.name, index, 'Team Member');
+      case 'email':
+        return anonymizeEmail(member.email);
+      case 'phone':
+        return member.phone ? '●●● ●●● ●●●●' : '';
+      case 'notes':
+        return anonymizeNotes(member.notes);
+      case 'leave_title':
+        return member.leave_title ? '[Leave]' : '';
+      default:
+        return member[field];
+    }
+  };
+
+  // Get initials for avatar in presentation mode
+  const getDisplayInitials = (member, index) => {
+    if (isPresentationMode) {
+      return getAnonymizedInitials(index, 'TM');
+    }
+    return member.name
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+  };
 
   const [formData, setFormData] = useState({
     name: "",
@@ -205,6 +246,24 @@ export default function TeamPage() {
     return groups;
   };
 
+  // Check if a member is currently on leave as of today
+  // Returns true if today falls within the member's leave period (inclusive)
+  // Both leave_from and leave_to must be set for a member to be considered on leave
+  const isOnLeaveToday = (member) => {
+    if (!member.leave_from || !member.leave_to) return false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to start of day
+
+    const leaveStart = new Date(member.leave_from);
+    leaveStart.setHours(0, 0, 0, 0);
+
+    const leaveEnd = new Date(member.leave_to);
+    leaveEnd.setHours(0, 0, 0, 0);
+
+    return today >= leaveStart && today <= leaveEnd;
+  };
+
   // Computed grouped members for team view
   // Sorts departments alphabetically with "Unassigned" at the end
   const membersByDepartment = React.useMemo(() => {
@@ -284,24 +343,6 @@ export default function TeamPage() {
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
     if (diffDays < 365) return `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) > 1 ? 's' : ''} ago`;
     return `${Math.floor(diffDays / 365)} year${Math.floor(diffDays / 365) > 1 ? 's' : ''} ago`;
-  };
-
-  // Check if a member is currently on leave as of today
-  // Returns true if today falls within the member's leave period (inclusive)
-  // Both leave_from and leave_to must be set for a member to be considered on leave
-  const isOnLeaveToday = (member) => {
-    if (!member.leave_from || !member.leave_to) return false;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize to start of day
-
-    const leaveStart = new Date(member.leave_from);
-    leaveStart.setHours(0, 0, 0, 0);
-
-    const leaveEnd = new Date(member.leave_to);
-    leaveEnd.setHours(0, 0, 0, 0);
-
-    return today >= leaveStart && today <= leaveEnd;
   };
 
   const getAvailabilityBadge = (availability) => {
@@ -441,6 +482,12 @@ export default function TeamPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
                       {group.members.map(member => {
                         const colorClass = getRandomColor(member.name);
+                        // Find original index for consistent anonymization
+                        const memberIndex = filteredMembers.findIndex(m => m.id === member.id);
+                        const displayName = getDisplayValue(member, 'name', memberIndex);
+                        const displayEmail = getDisplayValue(member, 'email', memberIndex);
+                        const displayNotes = getDisplayValue(member, 'notes', memberIndex);
+                        const displayLeaveTitle = getDisplayValue(member, 'leave_title', memberIndex);
 
                         return (
                           <Card key={member.id} className="overflow-hidden">
@@ -450,17 +497,17 @@ export default function TeamPage() {
                                   className="flex items-start space-x-4 cursor-pointer group"
                                   onClick={() => goToMemberProfile(member.id)}
                                 >
-                                  <Avatar className={`h-12 w-12 ${member.avatar ? "" : colorClass} ring-2 ring-white transition-transform group-hover:scale-105`}>
-                                    {member.avatar ? (
-                                      <AvatarImage src={member.avatar} alt={member.name} />
+                                  <Avatar className={`h-12 w-12 ${member.avatar && !isPresentationMode ? "" : colorClass} ring-2 ring-white transition-transform group-hover:scale-105`}>
+                                    {member.avatar && !isPresentationMode ? (
+                                      <AvatarImage src={member.avatar} alt={displayName} />
                                     ) : null}
                                     <AvatarFallback>
-                                      {getInitials(member.name)}
+                                      {getDisplayInitials(member, memberIndex)}
                                     </AvatarFallback>
                                   </Avatar>
                                   <div>
                                     <CardTitle className="group-hover:text-indigo-600 transition-colors">
-                                      {member.name}
+                                      {displayName}
                                     </CardTitle>
                                     {member.role && (
                                       <CardDescription className="mt-1">
@@ -497,7 +544,7 @@ export default function TeamPage() {
                             <CardContent className="space-y-4">
                               {member.leave_from && member.leave_to && (
                                 <div className="text-xs">
-                                  <Badge variant="secondary" className="mb-1">{member.leave_title || 'On leave'}</Badge>
+                                  <Badge variant="secondary" className="mb-1">{displayLeaveTitle || 'On leave'}</Badge>
                                   <div className="text-gray-600">
                                     {new Date(member.leave_from).toLocaleDateString()} - {new Date(member.leave_to).toLocaleDateString()}
                                   </div>
@@ -520,7 +567,7 @@ export default function TeamPage() {
                               )}
 
                               {member.notes && (
-                                <p className="text-sm text-gray-600">{member.notes}</p>
+                                <p className="text-sm text-gray-600">{displayNotes}</p>
                               )}
 
                               {Array.isArray(member.tasks) && member.tasks.length > 0 && (
@@ -558,13 +605,20 @@ export default function TeamPage() {
                             </CardContent>
                             {member.email && (
                               <CardFooter className="border-t pt-4">
-                                <a
-                                  href={`mailto:${member.email}`}
-                                  className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-                                >
-                                  <Mail className="h-3.5 w-3.5" />
-                                  {member.email}
-                                </a>
+                                {isPresentationMode ? (
+                                  <span className="text-sm text-gray-400 flex items-center gap-1">
+                                    <Mail className="h-3.5 w-3.5" />
+                                    {displayEmail}
+                                  </span>
+                                ) : (
+                                  <a
+                                    href={`mailto:${member.email}`}
+                                    className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                                  >
+                                    <Mail className="h-3.5 w-3.5" />
+                                    {member.email}
+                                  </a>
+                                )}
                               </CardFooter>
                             )}
                           </Card>
@@ -604,6 +658,12 @@ export default function TeamPage() {
                       {group.members.map(member => {
                         const colorClass = getRandomColor(member.name);
                         const isOnLeave = group.status === "On Leave";
+                        // Find original index for consistent anonymization
+                        const memberIndex = filteredMembers.findIndex(m => m.id === member.id);
+                        const displayName = getDisplayValue(member, 'name', memberIndex);
+                        const displayEmail = getDisplayValue(member, 'email', memberIndex);
+                        const displayNotes = getDisplayValue(member, 'notes', memberIndex);
+                        const displayLeaveTitle = getDisplayValue(member, 'leave_title', memberIndex);
 
                         return (
                           <Card key={member.id} className="overflow-hidden">
@@ -613,19 +673,19 @@ export default function TeamPage() {
                                   className="flex items-start space-x-4 cursor-pointer group"
                                   onClick={() => goToMemberProfile(member.id)}
                                 >
-                                  <Avatar className={`h-12 w-12 ${member.avatar ? "" : colorClass} ring-2 ring-white transition-transform group-hover:scale-105`}>
-                                    {member.avatar ? (
-                                      <AvatarImage src={member.avatar} alt={member.name} />
+                                  <Avatar className={`h-12 w-12 ${member.avatar && !isPresentationMode ? "" : colorClass} ring-2 ring-white transition-transform group-hover:scale-105`}>
+                                    {member.avatar && !isPresentationMode ? (
+                                      <AvatarImage src={member.avatar} alt={displayName} />
                                     ) : null}
                                     <AvatarFallback>
-                                      {getInitials(member.name)}
+                                      {getDisplayInitials(member, memberIndex)}
                                     </AvatarFallback>
                                   </Avatar>
                                   <div>
                                     <CardTitle className="group-hover:text-indigo-600 transition-colors">
-                                      {isOnLeave && member.leave_title
-                                        ? `${member.name} (${member.leave_title})`
-                                        : member.name}
+                                      {isOnLeave && (isPresentationMode ? displayLeaveTitle : member.leave_title)
+                                        ? `${displayName} (${isPresentationMode ? displayLeaveTitle : member.leave_title})`
+                                        : displayName}
                                     </CardTitle>
                                     {member.role && (
                                       <CardDescription className="mt-1">
@@ -668,7 +728,7 @@ export default function TeamPage() {
                             <CardContent className="space-y-4">
                               {member.leave_from && member.leave_to && (
                                 <div className="text-xs">
-                                  <Badge variant="secondary" className="mb-1">{member.leave_title || 'On leave'}</Badge>
+                                  <Badge variant="secondary" className="mb-1">{displayLeaveTitle || 'On leave'}</Badge>
                                   <div className="text-gray-600">
                                     {new Date(member.leave_from).toLocaleDateString()} - {new Date(member.leave_to).toLocaleDateString()}
                                   </div>
@@ -691,7 +751,7 @@ export default function TeamPage() {
                               )}
 
                               {member.notes && (
-                                <p className="text-sm text-gray-600">{member.notes}</p>
+                                <p className="text-sm text-gray-600">{displayNotes}</p>
                               )}
 
                               {Array.isArray(member.tasks) && member.tasks.length > 0 && (
@@ -729,13 +789,20 @@ export default function TeamPage() {
                             </CardContent>
                             {member.email && (
                               <CardFooter className="border-t pt-4">
-                                <a
-                                  href={`mailto:${member.email}`}
-                                  className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-                                >
-                                  <Mail className="h-3.5 w-3.5" />
-                                  {member.email}
-                                </a>
+                                {isPresentationMode ? (
+                                  <span className="text-sm text-gray-400 flex items-center gap-1">
+                                    <Mail className="h-3.5 w-3.5" />
+                                    {displayEmail}
+                                  </span>
+                                ) : (
+                                  <a
+                                    href={`mailto:${member.email}`}
+                                    className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                                  >
+                                    <Mail className="h-3.5 w-3.5" />
+                                    {member.email}
+                                  </a>
+                                )}
                               </CardFooter>
                             )}
                           </Card>
@@ -750,8 +817,12 @@ export default function TeamPage() {
         ) : (
           /* Flat View - All Members */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredMembers.map(member => {
+            {filteredMembers.map((member, memberIndex) => {
               const colorClass = getRandomColor(member.name);
+              const displayName = getDisplayValue(member, 'name', memberIndex);
+              const displayEmail = getDisplayValue(member, 'email', memberIndex);
+              const displayNotes = getDisplayValue(member, 'notes', memberIndex);
+              const displayLeaveTitle = getDisplayValue(member, 'leave_title', memberIndex);
 
               return (
                 <Card key={member.id} className="overflow-hidden">
@@ -761,17 +832,17 @@ export default function TeamPage() {
                         className="flex items-start space-x-4 cursor-pointer group"
                         onClick={() => goToMemberProfile(member.id)}
                       >
-                        <Avatar className={`h-12 w-12 ${member.avatar ? "" : colorClass} ring-2 ring-white transition-transform group-hover:scale-105`}>
-                          {member.avatar ? (
-                            <AvatarImage src={member.avatar} alt={member.name} />
+                        <Avatar className={`h-12 w-12 ${member.avatar && !isPresentationMode ? "" : colorClass} ring-2 ring-white transition-transform group-hover:scale-105`}>
+                          {member.avatar && !isPresentationMode ? (
+                            <AvatarImage src={member.avatar} alt={displayName} />
                           ) : null}
                           <AvatarFallback>
-                            {getInitials(member.name)}
+                            {getDisplayInitials(member, memberIndex)}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <CardTitle className="group-hover:text-indigo-600 transition-colors">
-                            {member.name}
+                            {displayName}
                           </CardTitle>
                           {member.role && (
                             <CardDescription className="mt-1">
@@ -814,7 +885,7 @@ export default function TeamPage() {
                   <CardContent className="space-y-4">
                     {member.leave_from && member.leave_to && (
                       <div className="text-xs">
-                        <Badge variant="secondary" className="mb-1">{member.leave_title || 'On leave'}</Badge>
+                        <Badge variant="secondary" className="mb-1">{displayLeaveTitle || 'On leave'}</Badge>
                         <div className="text-gray-600">
                           {new Date(member.leave_from).toLocaleDateString()} - {new Date(member.leave_to).toLocaleDateString()}
                         </div>
@@ -837,7 +908,7 @@ export default function TeamPage() {
                     )}
 
                     {member.notes && (
-                      <p className="text-sm text-gray-600">{member.notes}</p>
+                      <p className="text-sm text-gray-600">{displayNotes}</p>
                     )}
 
                     {Array.isArray(member.tasks) && member.tasks.length > 0 && (
@@ -875,13 +946,20 @@ export default function TeamPage() {
                   </CardContent>
                   {member.email && (
                     <CardFooter className="border-t pt-4">
-                      <a
-                        href={`mailto:${member.email}`}
-                        className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-                      >
-                        <Mail className="h-3.5 w-3.5" />
-                        {member.email}
-                      </a>
+                      {isPresentationMode ? (
+                        <span className="text-sm text-gray-400 flex items-center gap-1">
+                          <Mail className="h-3.5 w-3.5" />
+                          {displayEmail}
+                        </span>
+                      ) : (
+                        <a
+                          href={`mailto:${member.email}`}
+                          className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                        >
+                          <Mail className="h-3.5 w-3.5" />
+                          {member.email}
+                        </a>
+                      )}
                     </CardFooter>
                   )}
                 </Card>

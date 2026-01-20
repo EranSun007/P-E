@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect, useContext } from "react";
 import { Project, Task } from "@/api/entities";
-import { InvokeLLM } from "@/api/integrations";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import ProjectProgressSlider from "@/components/projects/ProjectProgressSlider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { format, parseISO } from "date-fns";
@@ -14,7 +14,7 @@ import {
   Users, Plus, Calendar as CalendarIcon, 
   MoreHorizontal, CheckSquare, Edit, Trash2,
   ArrowUpCircle, Circle, CheckCircle2,
-  Folders, Bot, AlertCircle
+  Folders
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -22,7 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -38,7 +38,7 @@ import { AppContext } from "@/contexts/AppContext.jsx";
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
-  const { projects, tasks, loading, refreshAll } = useContext(AppContext);
+  const { projects, tasks, stakeholders, loading, refreshAll } = useContext(AppContext);
   const [projectTasks, setProjectTasks] = useState({});
   const [showDialog, setShowDialog] = useState(false);
   const [error, setError] = useState(null);
@@ -55,12 +55,10 @@ export default function ProjectsPage() {
     cost: "",
     priority_level: "medium",
     color: getRandomColor(),
-    tags: []
+    tags: [],
+    stakeholder_id: ""
   });
   const [expandedProjects, setExpandedProjects] = useState({});
-  const [projectAnalysis, setProjectAnalysis] = useState({});
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analyzingProject, setAnalyzingProject] = useState(null);
 
   useEffect(() => {
     // Build tasks by project when projects or tasks change
@@ -125,7 +123,8 @@ export default function ProjectsPage() {
       cost: "",
       priority_level: "medium",
       color: getRandomColor(),
-      tags: []
+      tags: [],
+      stakeholder_id: ""
     });
     setEditingProject(null);
     setShowDialog(true);
@@ -133,7 +132,7 @@ export default function ProjectsPage() {
 
   const openEditDialog = (project) => {
     if (!project) return;
-    
+
     setFormData({
       name: project.name || "",
       description: project.description || "",
@@ -146,7 +145,8 @@ export default function ProjectsPage() {
       cost: project.cost || "",
       priority_level: project.priority_level || "medium",
       color: project.color || getRandomColor(),
-      tags: Array.isArray(project.tags) ? project.tags : []
+      tags: Array.isArray(project.tags) ? project.tags : [],
+      stakeholder_id: project.stakeholder_id || ""
     });
     setEditingProject(project);
     setShowDialog(true);
@@ -174,6 +174,15 @@ export default function ProjectsPage() {
     } catch (err) {
       logger.error("Failed to delete project", { error: String(err) });
       setError("Failed to delete project. Please try again.");
+    }
+  };
+
+  const handleProgressChange = async (projectId, newProgress) => {
+    try {
+      await Project.update(projectId, { progress_percentage: newProgress });
+      await loadProjects();
+    } catch (err) {
+      logger.error("Failed to update progress", { error: String(err) });
     }
   };
 
@@ -241,60 +250,6 @@ export default function ProjectsPage() {
     });
     
     return counts;
-  };
-
-  const analyzeProject = async (project) => {
-    setAnalyzingProject(project.id);
-    try {
-      const tasks = projectTasks[project.id] || [];
-      const completedTasks = tasks.filter(t => t.status === "done").length;
-      const totalTasks = tasks.length;
-      const recentUpdates = tasks
-        .flatMap(t => (t.updates || [])
-        .map(u => ({ ...u, taskTitle: t.title })))
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
-        .slice(0, 3);
-
-      const response = await InvokeLLM({
-        prompt: `Analyze this project's status and provide next steps:
-          Project: ${project.name}
-          Description: ${project.description || 'No description provided'}
-          Status: ${project.status}
-          Progress: ${completedTasks}/${totalTasks} tasks completed
-          Recent Updates: ${recentUpdates.map(u => u.text).join(", ") || 'No recent updates'}
-          
-          Provide a comprehensive analysis including current status, challenges, and recommended next steps.`,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            currentStatus: { type: "string" },
-            challenges: { type: "array", items: { type: "string" } },
-            nextSteps: { type: "array", items: { type: "string" } }
-          },
-          required: ["currentStatus", "challenges", "nextSteps"]
-        }
-      });
-
-      // Save analysis to project
-      const analyses = [...(project.analyses || [])];
-      analyses.push({
-        ...response,
-        date: new Date().toISOString()
-      });
-
-      await Project.update(project.id, {
-        ...project,
-        analyses
-      });
-
-      // Refresh projects to get the latest data
-      await loadProjects();
-
-    } catch (error) {
-      logger.error('Failed to analyze project', { project: project?.name, error: String(error) });
-    } finally {
-      setAnalyzingProject(null);
-    }
   };
 
   const toggleProjectExpansion = (projectId) => {
@@ -422,10 +377,9 @@ export default function ProjectsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map(project => {
               const isExpanded = expandedProjects[project.id] !== false;
-              const progress = calculateProgress(project.id);
+              const progress = project.progress_percentage ?? 0;
               const taskCounts = getTaskStatusCounts(project.id);
-              const analysis = projectAnalysis[project.id] || { currentStatus: "", nextSteps: [] };
-              
+
               return (
                 <Card key={project.id} className="relative overflow-hidden">
                   <div className={`absolute top-0 left-0 w-1.5 h-full ${getColorClass(project.color)}`}></div>
@@ -452,8 +406,14 @@ export default function ProjectsPage() {
                           >
                             {project.name}
                           </CardTitle>
-                          <div className="flex items-center mt-2">
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
                             {getStatusBadge(project.status)}
+                            {project.stakeholder_id && (
+                              <Badge variant="outline" className="text-xs">
+                                <Users className="h-3 w-3 mr-1" />
+                                {(stakeholders || []).find(s => s.id === project.stakeholder_id)?.name || 'Stakeholder'}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -514,55 +474,6 @@ export default function ProjectsPage() {
                           </Badge>
                         </div>
                       )}
-                      
-                      {/* AI Analysis Section */}
-                      <div className="mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium flex items-center gap-2">
-                            <Bot className="h-4 w-4" />
-                            AI Analysis
-                          </h4>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => analyzeProject(project)}
-                            disabled={analyzingProject === project.id}
-                          >
-                            {analyzingProject === project.id ? (
-                              <>
-                                <span className="animate-spin mr-2">⭮</span>
-                                Analyzing...
-                              </>
-                            ) : (
-                              "Run Analysis"
-                            )}
-                          </Button>
-                        </div>
-
-                        {project.analyses?.length > 0 ? (
-                          <div className="bg-blue-50 rounded-md p-3 space-y-2">
-                            <p className="text-sm text-blue-900">
-                              {project.analyses[project.analyses.length - 1].currentStatus}
-                            </p>
-                            <div className="text-sm text-blue-800">
-                              <strong className="block mb-1">Next Steps:</strong>
-                              <ul className="list-disc pl-4">
-                                {project.analyses[project.analyses.length - 1].nextSteps.map((step, i) => (
-                                  <li key={i}>{step}</li>
-                                ))}
-                              </ul>
-                            </div>
-                            <div className="text-xs text-blue-600 mt-2">
-                              Last analyzed: {format(parseISO(project.analyses[project.analyses.length - 1].date), "PPp")}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-center p-4 border border-dashed rounded-md">
-                            <AlertCircle className="h-5 w-5 mx-auto mb-2 text-gray-400" />
-                            <p className="text-sm text-gray-500">No analysis available yet</p>
-                          </div>
-                        )}
-                      </div>
 
                       {/* Project Updates */}
                       <div className="mb-4">
@@ -597,13 +508,10 @@ export default function ProjectsPage() {
                       </div>
 
                       {/* Project Progress */}
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Progress</span>
-                          <span>{progress}%</span>
-                        </div>
-                        <Progress value={progress} className="h-2" />
-                      </div>
+                      <ProjectProgressSlider
+                        value={progress}
+                        onCommit={(newProgress) => handleProgressChange(project.id, newProgress)}
+                      />
                       
                       {/* Task Status */}
                       <div className="mt-4 flex items-center justify-between">
@@ -640,6 +548,11 @@ export default function ProjectsPage() {
             <DialogTitle>
               {editingProject ? "Edit Project" : "Create New Project"}
             </DialogTitle>
+            <DialogDescription>
+              {editingProject
+                ? "Update the project details below."
+                : "Fill in the details to create a new project."}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
@@ -831,7 +744,25 @@ export default function ProjectsPage() {
                 Tags for service categorization (e.g., software, consulting, support)
               </p>
             </div>
-            
+
+            <div className="space-y-2">
+              <Label>Assigned Stakeholder</Label>
+              <Select
+                value={formData.stakeholder_id || "none"}
+                onValueChange={(value) => handleInputChange("stakeholder_id", value === "none" ? null : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select stakeholder" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No stakeholder assigned</SelectItem>
+                  {(stakeholders || []).map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}{s.company ? ` (${s.company})` : ''}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label>Color</Label>
               <div className="flex gap-2 flex-wrap">

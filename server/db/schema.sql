@@ -38,6 +38,30 @@ CREATE INDEX IF NOT EXISTS idx_tasks_priority ON tasks(priority);
 CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
 CREATE INDEX IF NOT EXISTS idx_tasks_created_date ON tasks(created_date);
 
+-- Stakeholders table (must be before projects due to FK reference)
+CREATE TABLE IF NOT EXISTS stakeholders (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  email VARCHAR(255),
+  role VARCHAR(100),
+  phone VARCHAR(50),
+  contact_info TEXT,
+  company VARCHAR(255),
+  influence_level VARCHAR(50) DEFAULT 'medium',
+  engagement_level VARCHAR(50) DEFAULT 'active',
+  notes TEXT,
+  tags TEXT[] DEFAULT '{}',
+  department VARCHAR(255),
+  stakeholder_group VARCHAR(255),
+  created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_stakeholders_user_id ON stakeholders(user_id);
+CREATE INDEX IF NOT EXISTS idx_stakeholders_email ON stakeholders(email);
+CREATE INDEX IF NOT EXISTS idx_stakeholders_department ON stakeholders(department);
+CREATE INDEX IF NOT EXISTS idx_stakeholders_group ON stakeholders(stakeholder_group);
+
 -- Projects table
 CREATE TABLE IF NOT EXISTS projects (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -52,6 +76,7 @@ CREATE TABLE IF NOT EXISTS projects (
   priority_level VARCHAR(100) DEFAULT 'medium',
   progress_percentage INTEGER DEFAULT 0 CHECK (progress_percentage >= 0 AND progress_percentage <= 100),
   tags TEXT[] DEFAULT '{}',
+  stakeholder_id UUID REFERENCES stakeholders(id) ON DELETE SET NULL,
   created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -59,22 +84,7 @@ CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
 CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
 CREATE INDEX IF NOT EXISTS idx_projects_deadline ON projects(deadline);
 CREATE INDEX IF NOT EXISTS idx_projects_created_date ON projects(created_date);
-
--- Stakeholders table
-CREATE TABLE IF NOT EXISTS stakeholders (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id VARCHAR(255) NOT NULL,
-  name VARCHAR(255) NOT NULL,
-  email VARCHAR(255),
-  role VARCHAR(100),
-  phone VARCHAR(50),
-  contact_info TEXT,
-  company VARCHAR(255),
-  created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_stakeholders_user_id ON stakeholders(user_id);
-CREATE INDEX IF NOT EXISTS idx_stakeholders_email ON stakeholders(email);
+CREATE INDEX IF NOT EXISTS idx_projects_stakeholder_id ON projects(stakeholder_id);
 
 -- Team Members table
 CREATE TABLE IF NOT EXISTS team_members (
@@ -83,9 +93,11 @@ CREATE TABLE IF NOT EXISTS team_members (
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255),
   role VARCHAR(100),
+  department VARCHAR(255),
   skills TEXT[] DEFAULT '{}',
   phone VARCHAR(50),
   company VARCHAR(255),
+  notes TEXT,
   leave_from TIMESTAMP,
   leave_to TIMESTAMP,
   leave_title VARCHAR(255),
@@ -206,6 +218,26 @@ CREATE TABLE IF NOT EXISTS task_attributes (
 CREATE INDEX IF NOT EXISTS idx_task_attributes_user_id ON task_attributes(user_id);
 CREATE INDEX IF NOT EXISTS idx_task_attributes_task_id ON task_attributes(task_id);
 
+-- Work Items table (BLIs/work tracking for team members)
+CREATE TABLE IF NOT EXISTS work_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id VARCHAR(255) NOT NULL,
+  team_member_id UUID NOT NULL REFERENCES team_members(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+  effort_estimation VARCHAR(100),
+  status VARCHAR(50) DEFAULT 'active',
+  insights JSONB DEFAULT '[]',
+  created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  completed_date TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_work_items_user_id ON work_items(user_id);
+CREATE INDEX IF NOT EXISTS idx_work_items_team_member_id ON work_items(team_member_id);
+CREATE INDEX IF NOT EXISTS idx_work_items_status ON work_items(status);
+CREATE INDEX IF NOT EXISTS idx_work_items_project_id ON work_items(project_id);
+
 -- Function to automatically update updated_date
 CREATE OR REPLACE FUNCTION update_updated_date_column()
 RETURNS TRIGGER AS $$
@@ -216,17 +248,26 @@ END;
 $$ language 'plpgsql';
 
 -- Triggers for auto-updating updated_date
+DROP TRIGGER IF EXISTS update_tasks_updated_date ON tasks;
 CREATE TRIGGER update_tasks_updated_date BEFORE UPDATE ON tasks
   FOR EACH ROW EXECUTE FUNCTION update_updated_date_column();
 
+DROP TRIGGER IF EXISTS update_one_on_ones_updated_date ON one_on_ones;
 CREATE TRIGGER update_one_on_ones_updated_date BEFORE UPDATE ON one_on_ones
   FOR EACH ROW EXECUTE FUNCTION update_updated_date_column();
 
+DROP TRIGGER IF EXISTS update_meetings_updated_date ON meetings;
 CREATE TRIGGER update_meetings_updated_date BEFORE UPDATE ON meetings
   FOR EACH ROW EXECUTE FUNCTION update_updated_date_column();
 
+DROP TRIGGER IF EXISTS update_comments_updated_date ON comments;
 CREATE TRIGGER update_comments_updated_date BEFORE UPDATE ON comments
   FOR EACH ROW EXECUTE FUNCTION update_updated_date_column();
 
+DROP TRIGGER IF EXISTS update_task_attributes_updated_date ON task_attributes;
 CREATE TRIGGER update_task_attributes_updated_date BEFORE UPDATE ON task_attributes
+  FOR EACH ROW EXECUTE FUNCTION update_updated_date_column();
+
+DROP TRIGGER IF EXISTS update_work_items_updated_date ON work_items;
+CREATE TRIGGER update_work_items_updated_date BEFORE UPDATE ON work_items
   FOR EACH ROW EXECUTE FUNCTION update_updated_date_column();

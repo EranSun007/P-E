@@ -1,19 +1,23 @@
-import React, { useState, useEffect } from "react";
-import { TaskAttribute } from "@/api/entities";
-import { 
-  Plus, 
-  Search, 
-  AlertTriangle, 
-  Tag, 
-  Flag, 
-  CheckSquare, 
+import { useState, useEffect, useRef } from "react";
+import { TaskAttribute, Backup } from "@/api/entities";
+import {
+  Plus,
+  Search,
+  AlertTriangle,
+  Tag,
+  Flag,
+  CheckSquare,
   Layers,
   Save,
   Trash2,
-  User
+  User,
+  Download,
+  Upload,
+  Database,
+  Loader2
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -41,9 +45,13 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import PasswordChangeForm from "@/components/auth/PasswordChangeForm";
+import UserManagement from "@/components/auth/UserManagement";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function SettingsPage() {
+  const { user } = useAuth();
   const [attributes, setAttributes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("priorities");
@@ -53,6 +61,14 @@ export default function SettingsPage() {
   const [error, setError] = useState(null);
   const [confirmDeleteDialog, setConfirmDeleteDialog] = useState(false);
   const [attributeToDelete, setAttributeToDelete] = useState(null);
+
+  // Backup state
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [backupMessage, setBackupMessage] = useState(null);
+  const [importMode, setImportMode] = useState("merge");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [confirmImportDialog, setConfirmImportDialog] = useState(false);
+  const fileInputRef = useRef(null);
 
   const [formData, setFormData] = useState({
     type: "priority",
@@ -246,13 +262,87 @@ export default function SettingsPage() {
     }
   };
 
+  // Only show users tab for admins
+  const isAdmin = user?.role === 'admin';
+
   const tabConfigs = [
     { id: "priorities", label: "Priorities", icon: Flag },
     { id: "taskTypes", label: "Task Types", icon: Layers },
     { id: "statuses", label: "Statuses", icon: CheckSquare },
     { id: "tags", label: "Tags", icon: Tag },
-    { id: "account", label: "Account", icon: User }
+    { id: "account", label: "Account", icon: User },
+    ...(isAdmin ? [{ id: "users", label: "Users", icon: User }] : []),
+    { id: "data", label: "Data", icon: Database }
   ];
+
+  // Backup functions
+  const handleExport = async () => {
+    setBackupLoading(true);
+    setBackupMessage(null);
+    try {
+      const data = await Backup.export();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const date = new Date().toISOString().split('T')[0];
+      a.href = url;
+      a.download = `pe-backup-${date}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setBackupMessage({ type: 'success', text: 'Backup downloaded successfully!' });
+    } catch (err) {
+      console.error('Export failed:', err);
+      setBackupMessage({ type: 'error', text: 'Failed to export data. Please try again.' });
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+      setBackupMessage(null);
+    }
+  };
+
+  const handleImportClick = () => {
+    if (!selectedFile) {
+      setBackupMessage({ type: 'error', text: 'Please select a backup file first.' });
+      return;
+    }
+    if (importMode === 'replace') {
+      setConfirmImportDialog(true);
+    } else {
+      performImport();
+    }
+  };
+
+  const performImport = async () => {
+    setBackupLoading(true);
+    setBackupMessage(null);
+    setConfirmImportDialog(false);
+    try {
+      const fileContent = await selectedFile.text();
+      const backupData = JSON.parse(fileContent);
+      const result = await Backup.import(backupData, importMode);
+      const { summary } = result;
+      const totalImported = Object.values(summary).reduce((a, b) => a + b, 0);
+      setBackupMessage({
+        type: 'success',
+        text: `Import completed! ${totalImported} records imported (${summary.tasks} tasks, ${summary.projects} projects, ${summary.teamMembers} team members, ${summary.stakeholders} stakeholders).`
+      });
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (err) {
+      console.error('Import failed:', err);
+      setBackupMessage({ type: 'error', text: `Import failed: ${err.message}` });
+    } finally {
+      setBackupLoading(false);
+    }
+  };
 
   const colorOptions = [
     { id: "blue", name: "Blue" },
@@ -312,7 +402,117 @@ export default function SettingsPage() {
           
           {tabConfigs.map(tab => (
             <TabsContent key={tab.id} value={tab.id} className="space-y-4">
-              {tab.id !== 'account' ? (
+              {tab.id === 'data' ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Database className="h-5 w-5" />
+                      Data Management
+                    </CardTitle>
+                    <CardDescription>
+                      Export and import your data for backup and recovery
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {backupMessage && (
+                      <Alert variant={backupMessage.type === 'error' ? 'destructive' : 'default'}>
+                        {backupMessage.type === 'error' ? (
+                          <AlertTriangle className="h-4 w-4" />
+                        ) : (
+                          <CheckSquare className="h-4 w-4" />
+                        )}
+                        <AlertDescription>{backupMessage.text}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    {/* Export Section */}
+                    <div className="space-y-3">
+                      <h3 className="text-lg font-medium flex items-center gap-2">
+                        <Download className="h-4 w-4" />
+                        Export Backup
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        Download all your data as a JSON file. This includes tasks, projects, stakeholders, team members, meetings, and more.
+                      </p>
+                      <Button onClick={handleExport} disabled={backupLoading}>
+                        {backupLoading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Exporting...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="h-4 w-4 mr-2" />
+                            Download Backup
+                          </>
+                        )}
+                      </Button>
+                    </div>
+
+                    <hr />
+
+                    {/* Import Section */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium flex items-center gap-2">
+                        <Upload className="h-4 w-4" />
+                        Import Backup
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        Restore data from a previously exported backup file.
+                      </p>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="backup-file">Select Backup File</Label>
+                        <Input
+                          id="backup-file"
+                          type="file"
+                          accept=".json"
+                          ref={fileInputRef}
+                          onChange={handleFileSelect}
+                          className="cursor-pointer"
+                        />
+                        {selectedFile && (
+                          <p className="text-sm text-green-600">Selected: {selectedFile.name}</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Import Mode</Label>
+                        <RadioGroup value={importMode} onValueChange={setImportMode} className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="merge" id="merge" />
+                            <Label htmlFor="merge" className="font-normal cursor-pointer">
+                              <span className="font-medium">Merge</span> - Add imported records to existing data
+                            </Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="replace" id="replace" />
+                            <Label htmlFor="replace" className="font-normal cursor-pointer">
+                              <span className="font-medium">Replace</span> - Clear all existing data and import fresh
+                            </Label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+
+                      <Button onClick={handleImportClick} disabled={backupLoading || !selectedFile}>
+                        {backupLoading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Importing...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Import Data
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : tab.id === 'users' ? (
+                <UserManagement />
+              ) : tab.id !== 'account' ? (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -502,7 +702,7 @@ export default function SettingsPage() {
               Are you sure you want to delete {attributeToDelete?.name}? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          
+
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setConfirmDeleteDialog(false)}>
               Cancel
@@ -510,6 +710,29 @@ export default function SettingsPage() {
             <Button variant="destructive" onClick={handleDelete}>
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Confirmation Dialog */}
+      <Dialog open={confirmImportDialog} onOpenChange={setConfirmImportDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Replace Import</DialogTitle>
+            <DialogDescription>
+              You selected "Replace" mode. This will DELETE ALL your existing data before importing the backup.
+              This action cannot be undone. Are you sure you want to proceed?
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setConfirmImportDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={performImport}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete All & Import
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -2,6 +2,7 @@
 // HTTP-based API client for PostgreSQL backend
 
 import { logger } from '../utils/logger.js';
+import AuthService from '../services/authService.js';
 
 // Get API base URL from environment
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -16,6 +17,14 @@ function handleHttpError(response, endpoint) {
       status: response.status,
       statusText: response.statusText
     });
+
+    // Handle 401 Unauthorized by clearing auth data
+    // Note: Don't reload here - let the AuthContext handle the redirect to login
+    // Reloading causes an infinite loop when AppContext loads before authentication
+    if (response.status === 401) {
+      AuthService.clearAuthData();
+    }
+
     throw error;
   }
 }
@@ -27,13 +36,10 @@ async function fetchWithAuth(url, options = {}) {
     ...options.headers,
   };
 
-  // In development mode, no Authorization header needed (auth middleware bypasses)
-  // In production, XSUAA token would be added here
-  const authMode = import.meta.env.VITE_AUTH_MODE || 'development';
-  if (authMode !== 'development') {
-    // TODO: Add XSUAA token from session/auth context
-    // const token = getAuthToken();
-    // if (token) headers['Authorization'] = `Bearer ${token}`;
+  // Add JWT token if available
+  const token = AuthService.getToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
   try {
@@ -90,6 +96,154 @@ function createEntityClient(endpoint) {
   };
 }
 
+// Create WorkItem client with custom addInsight method
+function createWorkItemClient() {
+  const baseClient = createEntityClient('/work-items');
+
+  return {
+    ...baseClient,
+
+    async listByTeamMember(teamMemberId, status = null) {
+      let url = `${API_BASE_URL}/work-items?team_member_id=${teamMemberId}`;
+      if (status) {
+        url += `&status=${status}`;
+      }
+      return fetchWithAuth(url);
+    },
+
+    async addInsight(workItemId, insight) {
+      return fetchWithAuth(`${API_BASE_URL}/work-items/${workItemId}/insights`, {
+        method: 'POST',
+        body: JSON.stringify(insight),
+      });
+    },
+  };
+}
+
+// Create DeveloperGoal client with custom list method
+function createDeveloperGoalClient() {
+  const baseClient = createEntityClient('/developer-goals');
+
+  return {
+    ...baseClient,
+
+    async list(teamMemberId, year = null) {
+      let url = `${API_BASE_URL}/developer-goals?team_member_id=${teamMemberId}`;
+      if (year) {
+        url += `&year=${year}`;
+      }
+      return fetchWithAuth(url);
+    },
+  };
+}
+
+// Create PerformanceEvaluation client with custom methods
+function createPerformanceEvaluationClient() {
+  const baseClient = createEntityClient('/performance-evaluations');
+
+  return {
+    ...baseClient,
+
+    async list(teamMemberId) {
+      return fetchWithAuth(`${API_BASE_URL}/performance-evaluations?team_member_id=${teamMemberId}`);
+    },
+
+    async getByYear(teamMemberId, year) {
+      return fetchWithAuth(`${API_BASE_URL}/performance-evaluations/by-year?team_member_id=${teamMemberId}&year=${year}`);
+    },
+  };
+}
+
+// Create TaskAttribute client with bulkCreate method
+function createTaskAttributeClient() {
+  const baseClient = createEntityClient('/task-attributes');
+
+  return {
+    ...baseClient,
+
+    async bulkCreate(attributes) {
+      // Create attributes one at a time (backend doesn't have bulk endpoint)
+      const results = [];
+      for (const attr of attributes) {
+        try {
+          const result = await fetchWithAuth(`${API_BASE_URL}/task-attributes`, {
+            method: 'POST',
+            body: JSON.stringify(attr),
+          });
+          results.push(result);
+        } catch (error) {
+          // Skip duplicates silently
+          console.warn('Failed to create attribute:', attr.name, error);
+        }
+      }
+      return results;
+    },
+  };
+}
+
+// Create DevOpsDuty client with custom methods
+function createDevOpsDutyClient() {
+  const baseClient = createEntityClient('/devops-duties');
+
+  return {
+    ...baseClient,
+
+    async listByTeamMember(teamMemberId) {
+      return fetchWithAuth(`${API_BASE_URL}/devops-duties/team-member/${teamMemberId}`);
+    },
+
+    async addInsight(dutyId, insight) {
+      return fetchWithAuth(`${API_BASE_URL}/devops-duties/${dutyId}/insights`, {
+        method: 'POST',
+        body: JSON.stringify({ insight }),
+      });
+    },
+
+    async complete(dutyId, endData) {
+      return fetchWithAuth(`${API_BASE_URL}/devops-duties/${dutyId}/complete`, {
+        method: 'POST',
+        body: JSON.stringify(endData),
+      });
+    },
+  };
+}
+
+// Create DutySchedule client with custom methods for duty rotation scheduling
+function createDutyScheduleClient() {
+  const baseClient = createEntityClient('/duty-schedule');
+
+  return {
+    ...baseClient,
+
+    async listUpcoming(team = null) {
+      let url = `${API_BASE_URL}/duty-schedule/upcoming`;
+      if (team) {
+        url += `?team=${encodeURIComponent(team)}`;
+      }
+      return fetchWithAuth(url);
+    },
+
+    async listByDateRange(startDate, endDate, filters = {}) {
+      let url = `${API_BASE_URL}/duty-schedule/date-range?start_date=${startDate}&end_date=${endDate}`;
+      if (filters.team) {
+        url += `&team=${encodeURIComponent(filters.team)}`;
+      }
+      if (filters.duty_type) {
+        url += `&duty_type=${encodeURIComponent(filters.duty_type)}`;
+      }
+      return fetchWithAuth(url);
+    },
+
+    async listByTeam(team) {
+      return fetchWithAuth(`${API_BASE_URL}/duty-schedule?team=${encodeURIComponent(team)}`);
+    },
+
+    async getTeamMembers(department) {
+      return fetchWithAuth(`${API_BASE_URL}/duty-schedule/team-members/${encodeURIComponent(department)}`);
+    },
+  };
+}
+
 export const apiClient = {
   entities: {
     Task: createEntityClient('/tasks'),
@@ -102,7 +256,18 @@ export const apiClient = {
     Notification: createEntityClient('/notifications'),
     Reminder: createEntityClient('/reminders'),
     Comment: createEntityClient('/comments'),
-    TaskAttribute: createEntityClient('/task-attributes'),
+    TaskAttribute: createTaskAttributeClient(),
+    WorkItem: createWorkItemClient(),
+    DeveloperGoal: createDeveloperGoalClient(),
+    PerformanceEvaluation: createPerformanceEvaluationClient(),
+    DevOpsDuty: createDevOpsDutyClient(),
+    DutySchedule: createDutyScheduleClient(),
+    // Additional entities (stored in localStorage until backend routes are created)
+    Peer: createEntityClient('/peers'),
+    OutOfOffice: createEntityClient('/out-of-office'),
+    Duty: createEntityClient('/duties'),
+    AgendaItem: createEntityClient('/agenda-items'),
+    PersonalFileItem: createEntityClient('/personal-file-items'),
   },
 
   auth: {
@@ -113,6 +278,19 @@ export const apiClient = {
     async logout() {
       // TODO: Implement XSUAA logout
       return true;
+    },
+  },
+
+  backup: {
+    async export() {
+      return fetchWithAuth(`${API_BASE_URL}/backup/export`);
+    },
+
+    async import(data, mode = 'merge') {
+      return fetchWithAuth(`${API_BASE_URL}/backup/import`, {
+        method: 'POST',
+        body: JSON.stringify({ data, mode }),
+      });
     },
   },
 };

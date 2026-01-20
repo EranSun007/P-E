@@ -1,195 +1,251 @@
 /**
  * Authentication Service
- * Handles credential validation, token management, and localStorage operations
+ * Handles API-based authentication with JWT tokens
  */
 
-import { 
-  getLocalStorageJSON, 
-  setLocalStorageJSON, 
-  removeLocalStorageItem,
-  isLocalStorageAvailable 
-} from '../utils/authUtils.js';
-
-// Default credentials configuration
-const AUTH_CONFIG = {
-  username: 'admin',
-  password: 'password123'
-};
-
-// localStorage key for authentication token
+// localStorage keys
 const AUTH_TOKEN_KEY = 'auth_token';
+const AUTH_USER_KEY = 'auth_user';
+
+// API base URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 /**
  * Authentication Service Class
- * Provides methods for credential validation and token management
+ * Provides methods for login, logout, and token management
  */
 class AuthService {
   /**
-   * Validates user credentials against configured values
-   * @param {string} username - User provided username
-   * @param {string} password - User provided password
-   * @returns {boolean} - True if credentials are valid
+   * Login with username and password
+   * @param {string} username - User's username
+   * @param {string} password - User's password
+   * @returns {Promise<{success: boolean, user?: object, error?: string}>}
    */
-  static validateCredentials(username, password) {
-    if (!username || !password) {
-      return false;
-    }
-    
-    return username === AUTH_CONFIG.username && password === AUTH_CONFIG.password;
-  }
-
-  /**
-   * Generates a random authentication token
-   * @param {string} username - Username to associate with token
-   * @returns {object} - Token object with value, timestamp, and username
-   */
-  static generateToken(username) {
-    const token = {
-      value: Math.random().toString(36).substring(2) + Date.now().toString(36),
-      timestamp: Date.now(),
-      username: username
-    };
-    
-    return token;
-  }
-
-  /**
-   * Validates if a token is properly formatted and not expired
-   * @param {object} token - Token object to validate
-   * @returns {boolean} - True if token is valid
-   */
-  static isValidToken(token) {
-    if (!token || typeof token !== 'object') {
-      return false;
-    }
-    
-    // Check required properties
-    if (!token.value || !token.timestamp || !token.username) {
-      return false;
-    }
-    
-    // For simplicity, tokens don't expire in this implementation
-    // Could add expiration logic here in the future
-    return true;
-  }
-
-  /**
-   * Clears all authentication data from localStorage
-   * @returns {boolean} - True if successful, false if localStorage unavailable
-   */
-  static clearAuthData() {
-    if (!isLocalStorageAvailable()) {
-      console.warn('localStorage is not available - cannot clear authentication data');
-      return false;
-    }
-    
+  static async login(username, password) {
     try {
-      return removeLocalStorageItem(AUTH_TOKEN_KEY);
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ username, password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.message || 'Login failed'
+        };
+      }
+
+      // Store token and user info
+      this.storeToken(data.token);
+      this.storeUser(data.user);
+
+      return {
+        success: true,
+        user: data.user
+      };
     } catch (error) {
-      console.warn('Failed to clear authentication data:', error);
-      return false;
+      console.error('Login error:', error);
+      return {
+        success: false,
+        error: 'Network error. Please check your connection.'
+      };
     }
   }
 
   /**
-   * Stores authentication token in localStorage
-   * @param {object} token - Token object to store
-   * @throws {Error} When localStorage is unavailable or storage fails
+   * Store JWT token in localStorage
+   * @param {string} token - JWT token
    */
   static storeToken(token) {
-    if (!isLocalStorageAvailable()) {
-      const error = new Error('localStorage is not available - browser storage may be disabled');
-      error.type = 'STORAGE_UNAVAILABLE';
-      throw error;
-    }
-    
     try {
-      const success = setLocalStorageJSON(AUTH_TOKEN_KEY, token);
-      if (!success) {
-        const error = new Error('Unable to store authentication data - storage may be full or restricted');
-        error.type = 'STORAGE_QUOTA_EXCEEDED';
-        throw error;
-      }
-    } catch (err) {
-      // Handle specific storage errors
-      if (err.name === 'QuotaExceededError' || err.code === 22) {
-        const error = new Error('Browser storage is full - please clear some data and try again');
-        error.type = 'STORAGE_QUOTA_EXCEEDED';
-        throw error;
-      } else if (err.name === 'SecurityError') {
-        const error = new Error('Browser storage access is restricted - please check your privacy settings');
-        error.type = 'STORAGE_SECURITY_ERROR';
-        throw error;
-      } else {
-        const error = new Error('Failed to save authentication data - please try again');
-        error.type = 'STORAGE_UNKNOWN_ERROR';
-        error.originalError = err;
-        throw error;
-      }
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+    } catch (error) {
+      console.error('Failed to store token:', error);
+      throw error;
     }
   }
 
   /**
-   * Retrieves authentication token from localStorage
-   * @returns {object|null} - Token object or null if not found/invalid
-   * @throws {Error} When localStorage is unavailable
+   * Store user info in localStorage
+   * @param {object} user - User object
    */
-  static getStoredToken() {
-    if (!isLocalStorageAvailable()) {
-      const error = new Error('localStorage is not available - cannot retrieve authentication token');
-      error.type = 'STORAGE_UNAVAILABLE';
-      throw error;
-    }
-    
+  static storeUser(user) {
     try {
-      const token = getLocalStorageJSON(AUTH_TOKEN_KEY);
-      return this.isValidToken(token) ? token : null;
-    } catch (err) {
-      // Handle corrupted token data
-      console.warn('Corrupted authentication token detected, clearing storage');
-      this.clearAuthData();
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+    } catch (error) {
+      console.error('Failed to store user:', error);
+    }
+  }
+
+  /**
+   * Get stored JWT token
+   * @returns {string|null}
+   */
+  static getToken() {
+    try {
+      return localStorage.getItem(AUTH_TOKEN_KEY);
+    } catch (error) {
+      console.error('Failed to get token:', error);
       return null;
     }
   }
 
   /**
-   * Checks if user is currently authenticated
-   * @returns {boolean} - True if user has valid authentication
-   * @throws {Error} When localStorage is unavailable
+   * Get stored user info
+   * @returns {object|null}
+   */
+  static getStoredUser() {
+    try {
+      const userJson = localStorage.getItem(AUTH_USER_KEY);
+      return userJson ? JSON.parse(userJson) : null;
+    } catch (error) {
+      console.error('Failed to get user:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if user is authenticated (has valid token)
+   * @returns {boolean}
    */
   static isAuthenticated() {
+    const token = this.getToken();
+    if (!token) return false;
+
+    // Check if token is expired (basic check)
     try {
-      const token = this.getStoredToken();
-      return token !== null;
-    } catch (error) {
-      if (error.type === 'STORAGE_UNAVAILABLE') {
-        // Re-throw storage unavailable errors to be handled by caller
-        throw error;
-      }
-      // For other errors, assume not authenticated
-      console.warn('Error checking authentication status:', error);
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const exp = payload.exp * 1000; // Convert to milliseconds
+      return Date.now() < exp;
+    } catch {
       return false;
     }
   }
-  /**
-   * Changes the user's password
-   * @param {string} username - The user's username
-   * @param {string} currentPassword - The user's current password
-   * @param {string} newPassword - The new password
-   * @returns {Promise<void>}
-   * @throws {Error} If the current password is incorrect
-   */
-  static async changePassword(username, currentPassword, newPassword) {
-    if (username !== AUTH_CONFIG.username || currentPassword !== AUTH_CONFIG.password) {
-      throw new Error("Incorrect current password.");
-    }
 
-    AUTH_CONFIG.password = newPassword;
-    console.log("Password for user '" + username + "' has been changed.");
-    
-    // In a real application, you would also invalidate the current token
-    // and force the user to log in again.
-    this.clearAuthData();
+  /**
+   * Clear authentication data
+   * @returns {boolean}
+   */
+  static clearAuthData() {
+    try {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+      localStorage.removeItem(AUTH_USER_KEY);
+      return true;
+    } catch (error) {
+      console.error('Failed to clear auth data:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Change password
+   * @param {string} currentPassword - Current password
+   * @param {string} newPassword - New password
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  static async changePassword(currentPassword, newPassword) {
+    try {
+      const token = this.getToken();
+      if (!token) {
+        return { success: false, error: 'Not authenticated' };
+      }
+
+      const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.message || 'Failed to change password'
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Change password error:', error);
+      return {
+        success: false,
+        error: 'Network error. Please try again.'
+      };
+    }
+  }
+
+  /**
+   * Fetch current user from API
+   * @returns {Promise<object|null>}
+   */
+  static async fetchCurrentUser() {
+    try {
+      const token = this.getToken();
+      if (!token) return null;
+
+      const response = await fetch(`${API_BASE_URL}/auth/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          this.clearAuthData();
+        }
+        return null;
+      }
+
+      const user = await response.json();
+      this.storeUser(user);
+      return user;
+    } catch (error) {
+      console.error('Fetch user error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Setup initial admin user (first-time setup)
+   * @param {string} password - Initial admin password
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  static async setupInitialAdmin(password) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/setup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ password })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.message || 'Setup failed'
+        };
+      }
+
+      return { success: true, user: data.user };
+    } catch (error) {
+      console.error('Setup error:', error);
+      return {
+        success: false,
+        error: 'Network error. Please try again.'
+      };
+    }
   }
 }
 
