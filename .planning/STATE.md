@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-21)
 
 **Core value:** See team's Jira workload alongside existing P&E Manager data without switching contexts
-**Current focus:** Ready for Phase 5 (Web App Integration)
+**Current focus:** v1.0 COMPLETE - All phases delivered
 
 ## Current Position
 
-Phase: 4 of 5 (Extension UI) - COMPLETE
-Plan: 1 of 1 in current phase (PHASE COMPLETE)
-Status: Phase complete
-Last activity: 2026-01-21 - Completed 04-01-PLAN.md (Badge status and manual sync)
+Phase: 5 of 5 (Web App Integration) - COMPLETE
+Plan: 2 of 2 in current phase (MILESTONE COMPLETE)
+Status: v1.0 Jira Integration MVP complete
+Last activity: 2026-01-21 - Completed 05-02-PLAN.md (Workload view and assignee mapping)
 
-Progress: [########--] 80% (8/10 plans executed)
+Progress: [##########] 100% (10/10 plans executed)
 
 ## Performance Metrics
 
@@ -31,7 +31,7 @@ Progress: [########--] 80% (8/10 plans executed)
 | 2. Extension Core | 2/2 | 7 min | 3.5 min |
 | 3. Content Script | 2/2 | 7 min | 3.5 min |
 | 4. Extension UI | 1/1 | 4 min | 4.0 min |
-| 5. Web App Integration | 0/2 | - | - |
+| 5. Web App Integration | 2/2 | 6 min | 3.0 min |
 
 **Recent Trend:**
 - Last 5 plans: 02-02 (4 min), 03-01 (3 min), 03-02 (4 min), 04-01 (4 min)
@@ -88,20 +88,33 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-21T17:04:00Z
-Stopped at: Completed 04-01-PLAN.md (Badge status and manual sync)
+Last session: 2026-01-21T18:30:00Z
+Stopped at: Completed v1.0 Jira Integration MVP
 Resume file: None
 
-## Phase 4 Complete Summary
+## Phase 5 Complete Summary
 
 | Plan | Wave | Objective | Requirements | Status |
 |------|------|-----------|--------------|--------|
-| 04-01 | 1 | Badge status and manual sync | EXT-03, UI-04 | COMPLETE |
+| 05-01 | 1 | JiraIssues page, API client, routing, navigation | UI-01, UI-05 | COMPLETE |
+| 05-02 | 2 | Team workload view and assignee mapping | UI-02, UI-03 | COMPLETE |
 
-**Phase 4 Key Files Modified:**
-- `extension/service-worker.js` - Added updateBadge function, badge calls after sync status changes
-- `extension/popup/popup.html` - Added .status.syncing CSS, Sync Now button
-- `extension/popup/popup.js` - Added syncBtn handler, storage.onChanged listener
-- `extension/options/` - Already complete from Phase 2
+**Phase 5 Key Files Created/Modified:**
+- `src/api/apiClient.js` - Added JiraIssue and JiraMapping entity clients
+- `src/api/entities.js` - Exported JiraIssue and JiraMapping with local mode fallbacks
+- `src/pages/JiraIssues.jsx` - Main page with filtering, tabs, sync status
+- `src/pages/index.jsx` - Added /Jira route with lazy loading
+- `src/pages/Layout.jsx` - Added Bug icon navigation item
+- `src/components/jira/WorkloadView.jsx` - Groups issues by assignee with points
+- `src/components/jira/AssigneeMappingDialog.jsx` - Map Jira users to team members
 
-**Next step:** Execute Phase 5 (Web App Integration)
+## v1.0 Milestone Complete
+
+All 5 phases delivered:
+1. ✅ Backend Foundation - Database, JiraService, REST API
+2. ✅ Extension Core - Service worker, storage, API client
+3. ✅ Content Script - DOM scraping for board/backlog/detail
+4. ✅ Extension UI - Popup status, manual sync, options page
+5. ✅ Web App Integration - JiraIssues page, workload view, assignee mapping
+
+**Next step:** Deploy to production and test end-to-end flow

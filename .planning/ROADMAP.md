@@ -16,7 +16,7 @@ This roadmap delivers a browser extension that captures Jira board data from the
 - [x] **Phase 2: Extension Core** - Service worker, chrome.storage, backend API communication
 - [x] **Phase 3: Content Script** - DOM scraping for Jira board, backlog, and issue detail pages
 - [x] **Phase 4: Extension UI** - Popup interface and options page for configuration
-- [ ] **Phase 5: Web App Integration** - Frontend components for viewing synced Jira data
+- [x] **Phase 5: Web App Integration** - Frontend components for viewing synced Jira data
 
 ## Phase Details
 
@@ -97,8 +97,8 @@ Plans:
 **Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 05-01-PLAN.md - JiraIssues page, API client, routing, navigation (Wave 1)
-- [ ] 05-02-PLAN.md - Team workload view and assignee mapping (Wave 2)
+- [x] 05-01-PLAN.md - JiraIssues page, API client, routing, navigation (Wave 1)
+- [x] 05-02-PLAN.md - Team workload view and assignee mapping (Wave 2)
 
 ## Parallelization Notes
 
@@ -122,7 +122,7 @@ Phases 1 -> 2 -> 3 -> (4 | 5 in parallel)
 | 2. Extension Core | 2/2 | Complete | 2026-01-21 |
 | 3. Content Script | 2/2 | Complete | 2026-01-21 |
 | 4. Extension UI | 1/1 | Complete | 2026-01-21 |
-| 5. Web App Integration | 0/2 | Planned | - |
+| 5. Web App Integration | 2/2 | Complete | 2026-01-21 |
 
 ## Requirement Coverage
 
