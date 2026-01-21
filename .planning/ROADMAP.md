@@ -47,7 +47,7 @@ Plans:
   3. Auth token persists in chrome.storage.local across browser restarts
   4. Service worker successfully POSTs test data to backend /api/jira-issues/sync
   5. Sync status (success/error/timestamp) stored and retrievable
-**Plans**: TBD
+**Plans**: 2 plans in 2 waves
 
 Plans:
 - [x] 02-01-PLAN.md - Extension manifest and service worker scaffold (Wave 1)
@@ -63,11 +63,11 @@ Plans:
   3. Backlog view extracts items with sprint assignment and ranking
   4. Issue detail pages provide fallback data extraction
   5. Extracted data automatically syncs to backend within 60 seconds
-**Plans**: TBD
+**Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 03-01: DOM scraping for sprint board view
-- [ ] 03-02: DOM scraping for backlog and issue details
+- [ ] 03-01-PLAN.md - Content script scaffold, page detection, SPA navigation (Wave 1)
+- [ ] 03-02-PLAN.md - Board, backlog, and detail extractors (Wave 2)
 
 ### Phase 4: Extension UI
 **Goal**: User can configure extension, view sync status, and trigger manual syncs
