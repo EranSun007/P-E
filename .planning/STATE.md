@@ -5,37 +5,37 @@
 See: .planning/PROJECT.md (updated 2026-01-21)
 
 **Core value:** See team's Jira workload alongside existing P&E Manager data without switching contexts
-**Current focus:** Phase 2 - Extension Core (IN PROGRESS)
+**Current focus:** Phase 2 - Extension Core (COMPLETE)
 
 ## Current Position
 
 Phase: 2 of 5 (Extension Core)
-Plan: 1 of 2 in current phase (02-01 complete, ready for 02-02)
-Status: Executing Phase 2
-Last activity: 2026-01-21 - Completed 02-01-PLAN.md (Extension scaffold)
+Plan: 2 of 2 in current phase (PHASE COMPLETE)
+Status: Ready for Phase 3
+Last activity: 2026-01-21 - Completed 02-02-PLAN.md (Storage and API client)
 
-Progress: [####------] 36% (4/11 plans executed)
+Progress: [#####-----] 45% (5/11 plans executed)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: 3.3 min
-- Total execution time: 13 min
+- Total plans completed: 5
+- Average duration: 3.4 min
+- Total execution time: 17 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1. Backend Foundation | 3/3 | 10 min | 3.3 min |
-| 2. Extension Core | 1/2 | 3 min | 3 min |
+| 2. Extension Core | 2/2 | 7 min | 3.5 min |
 | 3. Content Script | 0/2 | - | - |
 | 4. Extension UI | 0/2 | - | - |
 | 5. Web App Integration | 0/2 | - | - |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (2 min), 01-02 (4 min), 01-03 (4 min), 02-01 (3 min)
-- Trend: Stable
+- Last 5 plans: 01-02 (4 min), 01-03 (4 min), 02-01 (3 min), 02-02 (4 min)
+- Trend: Stable at ~3-4 min per plan
 
 *Updated after each plan completion*
 
@@ -63,6 +63,10 @@ Recent decisions affecting current work:
 - [02-01]: ES modules in service worker (type: module)
 - [02-01]: Default backend URL set to production BTP endpoint
 - [02-01]: Message protocol: {type, payload} with response {success, data|error}
+- [02-02]: Storage module pattern: all state through Storage.* methods
+- [02-02]: API retry: only retry on network/5xx errors, never on 4xx
+- [02-02]: Sync states: never, syncing, success, error
+- [02-02]: Pending issues queue for retry on failure
 
 ### Pending Todos
 
@@ -74,22 +78,25 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-21T13:57:20Z
-Stopped at: Completed 02-01-PLAN.md (Extension scaffold)
+Last session: 2026-01-21T14:02:36Z
+Stopped at: Completed 02-02-PLAN.md (Storage and API client)
 Resume file: None
 
-## Phase 2 Plan Summary
+## Phase 2 Complete Summary
 
 | Plan | Wave | Objective | Requirements | Status |
 |------|------|-----------|--------------|--------|
 | 02-01 | 1 | Extension manifest and service worker scaffold | EXT-01 | COMPLETE |
-| 02-02 | 2 | Storage management and backend API client | EXT-08, EXT-09 | READY |
+| 02-02 | 2 | Storage management and backend API client | EXT-08, EXT-09 | COMPLETE |
 
 **Phase 2 Key Files Created:**
 - `extension/manifest.json` - Manifest V3 config
-- `extension/service-worker.js` - Background service worker
+- `extension/service-worker.js` - Background service worker (refactored with modules)
 - `extension/popup/popup.html` + `popup.js` - Extension popup
 - `extension/options/options.html` + `options.js` - Settings page
 - `extension/icons/icon*.png` - Placeholder icons
+- `extension/lib/storage.js` - Storage module for chrome.storage.local
+- `extension/lib/api.js` - API client with exponential backoff retry
+- `extension/test-sync.js` - Manual sync testing script
 
-**Next step:** Execute 02-02 (Storage management and backend API client)
+**Next step:** Execute Phase 3 (Content Script for Jira board data extraction)
