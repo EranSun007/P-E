@@ -11,6 +11,31 @@ import { Storage } from './lib/storage.js';
 import { Api, ApiError } from './lib/api.js';
 
 // =============================================================================
+// BADGE STATUS INDICATOR
+// =============================================================================
+
+/**
+ * Update extension icon badge based on sync status
+ * @param {string} status - One of: 'never', 'syncing', 'success', 'error'
+ */
+async function updateBadge(status) {
+  switch (status) {
+    case 'syncing':
+      await chrome.action.setBadgeText({ text: '...' });
+      await chrome.action.setBadgeBackgroundColor({ color: '#2196F3' }); // Blue
+      break;
+    case 'success':
+    case 'never':
+      await chrome.action.setBadgeText({ text: '' }); // Clear badge
+      break;
+    case 'error':
+      await chrome.action.setBadgeText({ text: '!' });
+      await chrome.action.setBadgeBackgroundColor({ color: '#F44336' }); // Red
+      break;
+  }
+}
+
+// =============================================================================
 // SPA NAVIGATION DETECTION
 // =============================================================================
 
@@ -63,8 +88,11 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 });
 
 // Service worker startup (runs on wake from termination)
-chrome.runtime.onStartup.addListener(() => {
+chrome.runtime.onStartup.addListener(async () => {
   console.log('[PE-Jira] Service worker started');
+  // Restore badge state from storage
+  const lastSync = await Storage.getLastSync();
+  await updateBadge(lastSync.status);
 });
 
 // Message handler
@@ -156,12 +184,14 @@ async function handleSyncIssues(issues) {
   try {
     // Update status to syncing
     await Storage.updateSyncStatus('syncing');
+    await updateBadge('syncing');
 
     // Send to backend
     const result = await Api.syncIssues(issues);
 
     // Update status to success
     await Storage.updateSyncStatus('success', result.total);
+    await updateBadge('success');
     await Storage.clearPendingIssues();
 
     console.log('[PE-Jira] Sync complete:', result);
@@ -173,6 +203,7 @@ async function handleSyncIssues(issues) {
     // Store for retry
     await Storage.setPendingIssues(issues);
     await Storage.updateSyncStatus('error', null, error.message);
+    await updateBadge('error');
 
     return { success: false, error: error.message };
   }
