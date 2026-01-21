@@ -30,12 +30,12 @@ This roadmap delivers a browser extension that captures Jira board data from the
   3. GET /api/jira-issues returns user's synced issues (multi-tenancy enforced)
   4. Jira assignees can be mapped to team members via /api/jira-mappings
   5. All endpoints reject unauthenticated requests (401 response)
-**Plans**: TBD
+**Plans**: 3 plans in 2 waves
 
 Plans:
-- [ ] 01-01: Database schema and migration
-- [ ] 01-02: JiraService implementation
-- [ ] 01-03: REST API routes and authentication
+- [ ] 01-01-PLAN.md - Database schema and migration (Wave 1)
+- [ ] 01-02-PLAN.md - JiraService implementation (Wave 2)
+- [ ] 01-03-PLAN.md - REST API routes and authentication (Wave 2)
 
 ### Phase 2: Extension Core
 **Goal**: Extension can authenticate with backend, store data, and sync via service worker
@@ -119,7 +119,7 @@ Phases 1 -> 2 -> 3 -> (4 | 5 in parallel)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Backend Foundation | 0/3 | Not started | - |
+| 1. Backend Foundation | 0/3 | Planned | - |
 | 2. Extension Core | 0/2 | Not started | - |
 | 3. Content Script | 0/2 | Not started | - |
 | 4. Extension UI | 0/2 | Not started | - |
