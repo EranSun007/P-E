@@ -14,7 +14,7 @@ This roadmap delivers a browser extension that captures Jira board data from the
 
 - [x] **Phase 1: Backend Foundation** - Database schema, JiraService, REST API endpoints
 - [x] **Phase 2: Extension Core** - Service worker, chrome.storage, backend API communication
-- [ ] **Phase 3: Content Script** - DOM scraping for Jira board, backlog, and issue detail pages
+- [x] **Phase 3: Content Script** - DOM scraping for Jira board, backlog, and issue detail pages
 - [ ] **Phase 4: Extension UI** - Popup interface and options page for configuration
 - [ ] **Phase 5: Web App Integration** - Frontend components for viewing synced Jira data
 
@@ -66,8 +66,8 @@ Plans:
 **Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 03-01-PLAN.md - Content script scaffold, page detection, SPA navigation (Wave 1)
-- [ ] 03-02-PLAN.md - Board, backlog, and detail extractors (Wave 2)
+- [x] 03-01-PLAN.md - Content script scaffold, page detection, SPA navigation (Wave 1)
+- [x] 03-02-PLAN.md - Board, backlog, and detail extractors (Wave 2)
 
 ### Phase 4: Extension UI
 **Goal**: User can configure extension, view sync status, and trigger manual syncs
@@ -79,11 +79,10 @@ Plans:
   3. User can trigger manual sync from popup
   4. Options page allows configuring backend URL and auth token
   5. Extension icon badge shows sync state at a glance
-**Plans**: TBD
+**Plans**: 1 plan in 1 wave
 
 Plans:
-- [ ] 04-01: Popup UI and status display
-- [ ] 04-02: Options page for configuration
+- [ ] 04-01-PLAN.md - Badge status indicator and popup sync button
 
 ### Phase 5: Web App Integration
 **Goal**: Users can view and manage synced Jira data in P&E Manager web app
@@ -121,8 +120,8 @@ Phases 1 -> 2 -> 3 -> (4 | 5 in parallel)
 |-------|----------------|--------|-----------|
 | 1. Backend Foundation | 3/3 | Complete | 2026-01-21 |
 | 2. Extension Core | 2/2 | Complete | 2026-01-21 |
-| 3. Content Script | 0/2 | Not started | - |
-| 4. Extension UI | 0/2 | Not started | - |
+| 3. Content Script | 2/2 | Complete | 2026-01-21 |
+| 4. Extension UI | 0/1 | Planned | - |
 | 5. Web App Integration | 0/2 | Not started | - |
 
 ## Requirement Coverage
