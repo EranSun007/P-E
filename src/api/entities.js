@@ -31,11 +31,57 @@ export const DeveloperGoal = client.entities.DeveloperGoal;
 export const PerformanceEvaluation = client.entities.PerformanceEvaluation;
 export const DevOpsDuty = client.entities.DevOpsDuty;
 export const DutySchedule = client.entities.DutySchedule;
+export const TimeOff = client.entities.TimeOff;
 
 // Export Backup API (only available with API mode)
 export const Backup = USE_API ? apiClient.backup : {
   export: async () => { throw new Error('Backup not available in local mode'); },
   import: async () => { throw new Error('Backup not available in local mode'); }
+};
+
+// GitHub Integration API (only available with API mode)
+export const GitHub = USE_API ? apiClient.github : {
+  listRepos: async () => { throw new Error('GitHub integration not available in local mode'); },
+  addRepo: async () => { throw new Error('GitHub integration not available in local mode'); },
+  getRepo: async () => { throw new Error('GitHub integration not available in local mode'); },
+  removeRepo: async () => { throw new Error('GitHub integration not available in local mode'); },
+  searchRepos: async () => { throw new Error('GitHub integration not available in local mode'); },
+  linkRepoToProject: async () => { throw new Error('GitHub integration not available in local mode'); },
+  syncRepo: async () => { throw new Error('GitHub integration not available in local mode'); },
+  syncAllRepos: async () => { throw new Error('GitHub integration not available in local mode'); },
+  getPullRequests: async () => { throw new Error('GitHub integration not available in local mode'); },
+  getIssues: async () => { throw new Error('GitHub integration not available in local mode'); },
+  getCommits: async () => { throw new Error('GitHub integration not available in local mode'); },
+};
+
+// User Settings API (only available with API mode)
+export const UserSettings = USE_API ? apiClient.userSettings : {
+  getGitHubStatus: async () => ({ connected: false, message: 'Not available in local mode' }),
+  setGitHubToken: async () => { throw new Error('User settings not available in local mode'); },
+  deleteGitHubToken: async () => { throw new Error('User settings not available in local mode'); },
+  get: async () => null,
+  set: async () => { throw new Error('User settings not available in local mode'); },
+  delete: async () => { throw new Error('User settings not available in local mode'); },
+};
+
+// Jira Integration API (only available with API mode)
+export const JiraIssue = USE_API ? apiClient.entities.JiraIssue : {
+  list: async () => { throw new Error('Jira integration not available in local mode'); },
+  listWithFilters: async () => { throw new Error('Jira integration not available in local mode'); },
+  getFilterOptions: async () => { throw new Error('Jira integration not available in local mode'); },
+  getSyncStatus: async () => { throw new Error('Jira integration not available in local mode'); },
+  get: async () => { throw new Error('Jira integration not available in local mode'); },
+  create: async () => { throw new Error('Jira integration not available in local mode'); },
+  update: async () => { throw new Error('Jira integration not available in local mode'); },
+  delete: async () => { throw new Error('Jira integration not available in local mode'); },
+};
+
+export const JiraMapping = USE_API ? apiClient.entities.JiraMapping : {
+  list: async () => { throw new Error('Jira mapping not available in local mode'); },
+  get: async () => { throw new Error('Jira mapping not available in local mode'); },
+  create: async () => { throw new Error('Jira mapping not available in local mode'); },
+  update: async () => { throw new Error('Jira mapping not available in local mode'); },
+  delete: async () => { throw new Error('Jira mapping not available in local mode'); },
 };
 
 // User entity that works with both authentication systems

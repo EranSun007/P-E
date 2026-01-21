@@ -244,6 +244,34 @@ function createDutyScheduleClient() {
   };
 }
 
+// Create TimeOff client with custom methods for time off / OOO tracking
+function createTimeOffClient() {
+  const baseClient = createEntityClient('/time-off');
+
+  return {
+    ...baseClient,
+
+    async listByDateRange(startDate, endDate, filters = {}) {
+      let url = `${API_BASE_URL}/time-off/date-range?start_date=${startDate}&end_date=${endDate}`;
+      if (filters.team_member_id) {
+        url += `&team_member_id=${encodeURIComponent(filters.team_member_id)}`;
+      }
+      if (filters.type) {
+        url += `&type=${encodeURIComponent(filters.type)}`;
+      }
+      return fetchWithAuth(url);
+    },
+
+    async listUpcoming(days = 30) {
+      return fetchWithAuth(`${API_BASE_URL}/time-off/upcoming?days=${days}`);
+    },
+
+    async listByTeamMember(teamMemberId) {
+      return fetchWithAuth(`${API_BASE_URL}/time-off/team-member/${teamMemberId}`);
+    },
+  };
+}
+
 export const apiClient = {
   entities: {
     Task: createEntityClient('/tasks'),
@@ -262,9 +290,38 @@ export const apiClient = {
     PerformanceEvaluation: createPerformanceEvaluationClient(),
     DevOpsDuty: createDevOpsDutyClient(),
     DutySchedule: createDutyScheduleClient(),
+    TimeOff: createTimeOffClient(),
+
+    // Jira Integration
+    JiraIssue: {
+      ...createEntityClient('/jira-issues'),
+
+      // Get all issues with optional filters
+      async listWithFilters(filters = {}) {
+        const params = new URLSearchParams();
+        if (filters.status) params.append('status', filters.status);
+        if (filters.assignee) params.append('assignee', filters.assignee);
+        if (filters.sprint) params.append('sprint', filters.sprint);
+        const queryString = params.toString();
+        const url = `${API_BASE_URL}/jira-issues${queryString ? '?' + queryString : ''}`;
+        return fetchWithAuth(url);
+      },
+
+      // Get unique filter options (statuses, assignees, sprints)
+      async getFilterOptions() {
+        return fetchWithAuth(`${API_BASE_URL}/jira-issues/filters`);
+      },
+
+      // Get sync status (last synced timestamp, issue count)
+      async getSyncStatus() {
+        return fetchWithAuth(`${API_BASE_URL}/jira-issues/status`);
+      }
+    },
+
+    JiraMapping: createEntityClient('/jira-mappings'),
+
     // Additional entities (stored in localStorage until backend routes are created)
     Peer: createEntityClient('/peers'),
-    OutOfOffice: createEntityClient('/out-of-office'),
     Duty: createEntityClient('/duties'),
     AgendaItem: createEntityClient('/agenda-items'),
     PersonalFileItem: createEntityClient('/personal-file-items'),
@@ -291,6 +348,120 @@ export const apiClient = {
         method: 'POST',
         body: JSON.stringify({ data, mode }),
       });
+    },
+  },
+
+  // User Settings API
+  userSettings: {
+    async getGitHubStatus() {
+      return fetchWithAuth(`${API_BASE_URL}/user-settings/github/status`);
+    },
+
+    async setGitHubToken(token) {
+      return fetchWithAuth(`${API_BASE_URL}/user-settings/github/token`, {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+      });
+    },
+
+    async deleteGitHubToken() {
+      return fetchWithAuth(`${API_BASE_URL}/user-settings/github/token`, {
+        method: 'DELETE',
+      });
+    },
+
+    async get(key) {
+      return fetchWithAuth(`${API_BASE_URL}/user-settings/${key}`);
+    },
+
+    async set(key, value, encrypted = false) {
+      return fetchWithAuth(`${API_BASE_URL}/user-settings/${key}`, {
+        method: 'PUT',
+        body: JSON.stringify({ value, encrypted }),
+      });
+    },
+
+    async delete(key) {
+      return fetchWithAuth(`${API_BASE_URL}/user-settings/${key}`, {
+        method: 'DELETE',
+      });
+    },
+  },
+
+  // Metrics API
+  metrics: {
+    async getOneOnOneCompliance(rollingDays = 30) {
+      return fetchWithAuth(`${API_BASE_URL}/metrics/one-on-one-compliance?rollingDays=${rollingDays}`);
+    },
+
+    async getOneOnOneCadenceRules() {
+      return fetchWithAuth(`${API_BASE_URL}/metrics/one-on-one-compliance/cadence-rules`);
+    },
+  },
+
+  // GitHub Integration API
+  github: {
+    // Repository management
+    async listRepos() {
+      return fetchWithAuth(`${API_BASE_URL}/github/repos`);
+    },
+
+    async addRepo(fullName) {
+      return fetchWithAuth(`${API_BASE_URL}/github/repos`, {
+        method: 'POST',
+        body: JSON.stringify({ full_name: fullName }),
+      });
+    },
+
+    async getRepo(id) {
+      return fetchWithAuth(`${API_BASE_URL}/github/repos/${id}`);
+    },
+
+    async removeRepo(id) {
+      return fetchWithAuth(`${API_BASE_URL}/github/repos/${id}`, {
+        method: 'DELETE',
+      });
+    },
+
+    async searchRepos(query) {
+      return fetchWithAuth(`${API_BASE_URL}/github/repos/search?q=${encodeURIComponent(query)}`);
+    },
+
+    async linkRepoToProject(repoId, projectId) {
+      return fetchWithAuth(`${API_BASE_URL}/github/repos/${repoId}/link`, {
+        method: 'PUT',
+        body: JSON.stringify({ project_id: projectId }),
+      });
+    },
+
+    // Sync operations
+    async syncRepo(id) {
+      return fetchWithAuth(`${API_BASE_URL}/github/repos/${id}/sync`, {
+        method: 'POST',
+      });
+    },
+
+    async syncAllRepos() {
+      return fetchWithAuth(`${API_BASE_URL}/github/sync`, {
+        method: 'POST',
+      });
+    },
+
+    // Repository data
+    async getPullRequests(repoId, state = null) {
+      let url = `${API_BASE_URL}/github/repos/${repoId}/pulls`;
+      if (state) url += `?state=${state}`;
+      return fetchWithAuth(url);
+    },
+
+    async getIssues(repoId, state = null) {
+      let url = `${API_BASE_URL}/github/repos/${repoId}/issues`;
+      if (state) url += `?state=${state}`;
+      return fetchWithAuth(url);
+    },
+
+    async getCommits(repoId, limit = 50) {
+      return fetchWithAuth(`${API_BASE_URL}/github/repos/${repoId}/commits?limit=${limit}`);
     },
   },
 };

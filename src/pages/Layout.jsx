@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import {
   CheckSquare,
@@ -16,13 +16,23 @@ import {
   Folders,
   UserPlus,
   Eye,
-  EyeOff
+  EyeOff,
+  Github,
+  Bug,
+  Server,
+  Map,
+  ListTodo,
+  TrendingUp,
+  MessageSquare,
+  Rocket
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { User as UserEntity } from "@/api/entities";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext.jsx";
 import { useDisplayMode } from "@/contexts/DisplayModeContext.jsx";
+import { useAppMode } from "@/contexts/AppModeContext.jsx";
+import { AIChatPanel, AIAssistantButton } from "@/components/ai";
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -30,6 +40,8 @@ export default function Layout({ children, currentPageName }) {
   const [userLoading, setUserLoading] = useState(true);
   const { logout, isAuthenticated } = useAuth();
   const { isPresentationMode, togglePresentationMode } = useDisplayMode();
+  const { isProductMode, toggleAppMode } = useAppMode();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -50,7 +62,7 @@ export default function Layout({ children, currentPageName }) {
         setUserLoading(false);
       }
     };
-    
+
     fetchUser();
   }, [isAuthenticated]);
 
@@ -58,7 +70,20 @@ export default function Layout({ children, currentPageName }) {
     logout();
   };
 
-  const navigation = [
+  const handleModeToggle = () => {
+    toggleAppMode();
+    // Navigate to the default page of the new mode
+    if (isProductMode) {
+      // Switching to People mode
+      navigate('/Tasks');
+    } else {
+      // Switching to Product mode
+      navigate('/Services');
+    }
+  };
+
+  // People & Engineering Mode Navigation
+  const peopleNavigation = [
     {
       name: "Tasks",
       icon: CheckSquare,
@@ -106,11 +131,68 @@ export default function Layout({ children, currentPageName }) {
       icon: Users,
       href: createPageUrl("Peers"),
       current: currentPageName === "Peers"
+    },
+    {
+      name: "GitHub",
+      icon: Github,
+      href: createPageUrl("GitHub"),
+      current: currentPageName === "GitHubRepos"
+    },
+    {
+      name: "Jira",
+      icon: Bug,
+      href: createPageUrl("Jira"),
+      current: currentPageName === "JiraIssues"
     }
   ];
 
+  // Product & Engineering Mode Navigation
+  const productNavigation = [
+    {
+      name: "My Services",
+      icon: Server,
+      href: createPageUrl("Services"),
+      current: currentPageName === "Services"
+    },
+    {
+      name: "My Roadmap",
+      icon: Map,
+      href: createPageUrl("Roadmap"),
+      current: currentPageName === "Roadmap"
+    },
+    {
+      name: "My Backlog",
+      icon: ListTodo,
+      href: createPageUrl("Backlog"),
+      current: currentPageName === "Backlog"
+    },
+    {
+      name: "Usage Analytics",
+      icon: TrendingUp,
+      href: createPageUrl("Analytics"),
+      current: currentPageName === "Analytics"
+    },
+    {
+      name: "Customer Feedback",
+      icon: MessageSquare,
+      href: createPageUrl("Feedback"),
+      current: currentPageName === "Feedback"
+    },
+    {
+      name: "Releases",
+      icon: Rocket,
+      href: createPageUrl("Releases"),
+      current: currentPageName === "Releases"
+    }
+  ];
+
+  const navigation = isProductMode ? productNavigation : peopleNavigation;
+
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className={cn(
+      "min-h-screen flex transition-colors duration-300",
+      isProductMode ? "bg-gray-800" : "bg-gray-50"
+    )}>
       {/* Mobile Sidebar Backdrop */}
       {sidebarOpen && (
         <div
@@ -119,22 +201,53 @@ export default function Layout({ children, currentPageName }) {
         />
       )}
 
-      {/* Sidebar - now sticky */}
+      {/* Sidebar - with mode-based theming */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-200 ease-in-out lg:translate-x-0 overflow-y-auto",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed inset-y-0 left-0 z-50 w-64 shadow-lg transform transition-all duration-300 ease-in-out lg:translate-x-0 overflow-y-auto",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full",
+          isProductMode ? "bg-gray-900" : "bg-white"
         )}
       >
-        <div className="sticky top-0 bg-white z-10 border-b">
+        <div className={cn(
+          "sticky top-0 z-10 border-b transition-colors duration-300",
+          isProductMode ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"
+        )}>
           <div className="flex items-center justify-between h-16 px-6">
-            <div className="flex items-center">
-              <Coffee className="h-8 w-8 text-indigo-600" />
-              <span className="ml-2 text-xl font-bold text-gray-900">P&E Manager</span>
-            </div>
+            {/* Clickable Logo Area */}
+            <button
+              onClick={handleModeToggle}
+              className={cn(
+                "flex items-center cursor-pointer rounded-lg px-2 py-1 -ml-2 transition-all duration-200",
+                isProductMode
+                  ? "hover:bg-gray-800"
+                  : "hover:bg-gray-100"
+              )}
+              title={isProductMode ? "Switch to People & Engineering" : "Switch to Product & Engineering"}
+            >
+              <Coffee
+                className={cn(
+                  "h-8 w-8 transition-all duration-300",
+                  isProductMode
+                    ? "text-purple-400 fill-purple-400"
+                    : "text-indigo-600"
+                )}
+              />
+              <span className={cn(
+                "ml-2 text-xl font-bold transition-colors duration-300",
+                isProductMode ? "text-white" : "text-gray-900"
+              )}>
+                {isProductMode ? "Product & Eng." : "P & Engineering"}
+              </span>
+            </button>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="lg:hidden text-gray-500 hover:text-gray-700"
+              className={cn(
+                "lg:hidden transition-colors",
+                isProductMode
+                  ? "text-gray-400 hover:text-gray-200"
+                  : "text-gray-500 hover:text-gray-700"
+              )}
             >
               <X className="h-5 w-5" />
             </button>
@@ -150,10 +263,14 @@ export default function Layout({ children, currentPageName }) {
                   to={item.href}
                   onClick={() => setSidebarOpen(false)}
                   className={cn(
-                    "flex items-center px-4 py-3 text-sm font-medium rounded-md",
-                    item.current
-                      ? "bg-indigo-50 text-indigo-700"
-                      : "text-gray-700 hover:bg-gray-100"
+                    "flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors duration-200",
+                    isProductMode
+                      ? item.current
+                        ? "bg-purple-900/50 text-purple-300"
+                        : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                      : item.current
+                        ? "bg-indigo-50 text-indigo-700"
+                        : "text-gray-700 hover:bg-gray-100"
                   )}
                 >
                   <item.icon className="h-5 w-5 mr-3" />
@@ -162,68 +279,111 @@ export default function Layout({ children, currentPageName }) {
               ))}
             </div>
           </nav>
-          
-          <div className="p-4 border-t">
+
+          <div className={cn(
+            "p-4 border-t transition-colors duration-300",
+            isProductMode ? "border-gray-700" : "border-gray-200"
+          )}>
             {userLoading ? (
               <div className="mb-4 px-4 py-3 flex items-center gap-3">
-                <div className="h-10 w-10 bg-gray-200 rounded-full animate-pulse"></div>
+                <div className={cn(
+                  "h-10 w-10 rounded-full animate-pulse",
+                  isProductMode ? "bg-gray-700" : "bg-gray-200"
+                )}></div>
                 <div className="flex-1 min-w-0">
-                  <div className="h-4 bg-gray-200 rounded animate-pulse mb-1"></div>
-                  <div className="h-3 bg-gray-200 rounded animate-pulse w-2/3"></div>
+                  <div className={cn(
+                    "h-4 rounded animate-pulse mb-1",
+                    isProductMode ? "bg-gray-700" : "bg-gray-200"
+                  )}></div>
+                  <div className={cn(
+                    "h-3 rounded animate-pulse w-2/3",
+                    isProductMode ? "bg-gray-700" : "bg-gray-200"
+                  )}></div>
                 </div>
               </div>
             ) : user ? (
               <div className="mb-4 px-4 py-3 flex items-center gap-3">
-                <Avatar className="h-10 w-10 bg-indigo-100">
-                  <AvatarFallback className="text-indigo-700">
+                <Avatar className={cn(
+                  "h-10 w-10",
+                  isProductMode ? "bg-purple-900" : "bg-indigo-100"
+                )}>
+                  <AvatarFallback className={cn(
+                    isProductMode ? "text-purple-300" : "text-indigo-700"
+                  )}>
                     {user.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className={cn(
+                    "text-sm font-medium truncate transition-colors",
+                    isProductMode ? "text-white" : "text-gray-900"
+                  )}>
                     {user.name || "User"}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">
+                  <p className={cn(
+                    "text-xs truncate transition-colors",
+                    isProductMode ? "text-gray-400" : "text-gray-500"
+                  )}>
                     @{user.username || "user"}
                   </p>
                 </div>
               </div>
             ) : isAuthenticated && (
               <div className="mb-4 px-4 py-3 flex items-center gap-3">
-                <Avatar className="h-10 w-10 bg-gray-100">
-                  <AvatarFallback className="text-gray-500">
+                <Avatar className={cn(
+                  "h-10 w-10",
+                  isProductMode ? "bg-gray-700" : "bg-gray-100"
+                )}>
+                  <AvatarFallback className={cn(
+                    isProductMode ? "text-gray-400" : "text-gray-500"
+                  )}>
                     <User className="h-5 w-5" />
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className={cn(
+                    "text-sm font-medium truncate",
+                    isProductMode ? "text-white" : "text-gray-900"
+                  )}>
                     User
                   </p>
-                  <p className="text-xs text-gray-500 truncate">
+                  <p className={cn(
+                    "text-xs truncate",
+                    isProductMode ? "text-gray-400" : "text-gray-500"
+                  )}>
                     Authenticated
                   </p>
                 </div>
               </div>
             )}
-            
+
             <div className="space-y-1">
               <Link
                 to={createPageUrl("Settings")}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  "flex items-center px-4 py-3 text-sm font-medium rounded-md",
-                  currentPageName === "Settings"
-                    ? "bg-indigo-50 text-indigo-700"
-                    : "text-gray-700 hover:bg-gray-100"
+                  "flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors",
+                  isProductMode
+                    ? currentPageName === "Settings"
+                      ? "bg-purple-900/50 text-purple-300"
+                      : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                    : currentPageName === "Settings"
+                      ? "bg-indigo-50 text-indigo-700"
+                      : "text-gray-700 hover:bg-gray-100"
                 )}
               >
                 <Settings className="h-5 w-5 mr-3" />
                 Settings
               </Link>
-              
+
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center px-4 py-3 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100"
+                className={cn(
+                  "w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors",
+                  isProductMode
+                    ? "text-gray-300 hover:bg-gray-800 hover:text-white"
+                    : "text-gray-700 hover:bg-gray-100"
+                )}
               >
                 <LogOut className="h-5 w-5 mr-3" />
                 Log out
@@ -237,32 +397,59 @@ export default function Layout({ children, currentPageName }) {
       <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
         {/* Top navigation - now sticky */}
         <header className={cn(
-          "sticky top-0 shadow-sm z-10 transition-colors",
-          isPresentationMode ? "bg-amber-50" : "bg-white"
+          "sticky top-0 shadow-sm z-10 transition-colors duration-300",
+          isPresentationMode
+            ? "bg-amber-50"
+            : isProductMode
+              ? "bg-gray-800"
+              : "bg-white"
         )}>
           <div className="flex justify-between items-center h-16 px-4 sm:px-6">
             <div className="flex items-center">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="lg:hidden text-gray-500 hover:text-gray-700 mr-4"
+                className={cn(
+                  "lg:hidden mr-4 transition-colors",
+                  isProductMode ? "text-gray-400 hover:text-white" : "text-gray-500 hover:text-gray-700"
+                )}
               >
                 <Menu className="h-6 w-6" />
               </button>
 
-              <div className="text-md font-medium text-gray-800">
-                P&E Manager {currentPageName && <span className="text-gray-500"> &gt; {currentPageName}</span>}
+              <div className={cn(
+                "text-md font-medium transition-colors",
+                isProductMode ? "text-white" : "text-gray-800"
+              )}>
+                {isProductMode ? "Product & Eng." : "P & Engineering"} Manager
+                {currentPageName && (
+                  <span className={isProductMode ? "text-gray-400" : "text-gray-500"}>
+                    {" "}&gt; {currentPageName}
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Presentation Mode Toggle */}
+            {/* Mode indicator and Presentation Mode Toggle */}
             <div className="flex items-center gap-2">
+              {/* Mode indicator badge */}
+              <span className={cn(
+                "hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors",
+                isProductMode
+                  ? "bg-purple-900 text-purple-200"
+                  : "bg-indigo-100 text-indigo-800"
+              )}>
+                {isProductMode ? "Product" : "People"}
+              </span>
+
               <button
                 onClick={togglePresentationMode}
                 className={cn(
                   "flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all",
                   isPresentationMode
                     ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    : isProductMode
+                      ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 )}
                 title={isPresentationMode ? "Switch to Working Mode" : "Switch to Presentation Mode"}
               >
@@ -287,7 +474,10 @@ export default function Layout({ children, currentPageName }) {
           {children}
         </main>
       </div>
+
+      {/* AI Assistant */}
+      <AIAssistantButton />
+      <AIChatPanel />
     </div>
   );
 }
-

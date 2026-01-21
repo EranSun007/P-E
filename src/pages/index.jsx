@@ -44,6 +44,16 @@ const TeamMemberProfile = lazy(() => retryImport(() => import(/* webpackChunkNam
 const Peers = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-peers" */ "./Peers"), 3, 1000));
 const PeerProfile = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-peer-profile" */ "./PeerProfile"), 3, 1000));
 const Duties = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-duties" */ "./Duties"), 3, 1000));
+const GitHubRepos = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-github-repos" */ "./GitHubRepos"), 3, 1000));
+const JiraIssues = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-jira-issues" */ "./JiraIssues"), 3, 1000));
+
+// Product Mode Pages
+const Services = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-services" */ "./Services"), 3, 1000));
+const Roadmap = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-roadmap" */ "./Roadmap"), 3, 1000));
+const Backlog = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-backlog" */ "./Backlog"), 3, 1000));
+const Analytics = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-analytics" */ "./Analytics"), 3, 1000));
+const Feedback = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-feedback" */ "./Feedback"), 3, 1000));
+const Releases = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-releases" */ "./Releases"), 3, 1000));
 
 const PAGES = {
     
@@ -70,6 +80,23 @@ const PAGES = {
     PeerProfile: PeerProfile,
 
     Duties: Duties,
+
+    GitHubRepos: GitHubRepos,
+
+    JiraIssues: JiraIssues,
+
+    // Product Mode Pages
+    Services: Services,
+
+    Roadmap: Roadmap,
+
+    Backlog: Backlog,
+
+    Analytics: Analytics,
+
+    Feedback: Feedback,
+
+    Releases: Releases,
 
 }
 
@@ -133,6 +160,18 @@ function PagesContent() {
                         <Route path="/PeerProfile" element={<PeerProfile />} />
 
                         <Route path="/Duties" element={<Duties />} />
+
+                        <Route path="/GitHub" element={<GitHubRepos />} />
+
+                        <Route path="/Jira" element={<JiraIssues />} />
+
+                        {/* Product Mode Pages */}
+                        <Route path="/Services" element={<Services />} />
+                        <Route path="/Roadmap" element={<Roadmap />} />
+                        <Route path="/Backlog" element={<Backlog />} />
+                        <Route path="/Analytics" element={<Analytics />} />
+                        <Route path="/Feedback" element={<Feedback />} />
+                        <Route path="/Releases" element={<Releases />} />
 
                     </Routes>
                 </Suspense>
