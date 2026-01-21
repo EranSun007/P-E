@@ -76,6 +76,21 @@ const MIGRATIONS = [
     version: '014_duty_schedule',
     name: 'Create duty_schedule table for upcoming duty rotation assignments',
     file: '014_duty_schedule.sql'
+  },
+  {
+    version: '015_time_off',
+    name: 'Create time_off table for tracking team member absences',
+    file: '015_time_off.sql'
+  },
+  {
+    version: '016_github_integration',
+    name: 'Create tables for GitHub repository tracking and user settings',
+    file: '016_github_integration.sql'
+  },
+  {
+    version: '017_jira_integration',
+    name: 'Create tables for Jira issue tracking and team mappings',
+    file: '017_jira_integration.sql'
   }
 ];
 
