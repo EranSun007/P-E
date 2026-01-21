@@ -12,7 +12,7 @@ This roadmap delivers a browser extension that captures Jira board data from the
 - Integer phases (1, 2, 3, 4, 5): Planned milestone work
 - Decimal phases (e.g., 2.1): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Backend Foundation** - Database schema, JiraService, REST API endpoints
+- [x] **Phase 1: Backend Foundation** - Database schema, JiraService, REST API endpoints
 - [ ] **Phase 2: Extension Core** - Service worker, chrome.storage, backend API communication
 - [ ] **Phase 3: Content Script** - DOM scraping for Jira board, backlog, and issue detail pages
 - [ ] **Phase 4: Extension UI** - Popup interface and options page for configuration
@@ -33,9 +33,9 @@ This roadmap delivers a browser extension that captures Jira board data from the
 **Plans**: 3 plans in 2 waves
 
 Plans:
-- [ ] 01-01-PLAN.md - Database schema and migration (Wave 1)
-- [ ] 01-02-PLAN.md - JiraService implementation (Wave 2)
-- [ ] 01-03-PLAN.md - REST API routes and authentication (Wave 2)
+- [x] 01-01-PLAN.md - Database schema and migration (Wave 1)
+- [x] 01-02-PLAN.md - JiraService implementation (Wave 2)
+- [x] 01-03-PLAN.md - REST API routes and authentication (Wave 2)
 
 ### Phase 2: Extension Core
 **Goal**: Extension can authenticate with backend, store data, and sync via service worker
@@ -119,7 +119,7 @@ Phases 1 -> 2 -> 3 -> (4 | 5 in parallel)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Backend Foundation | 0/3 | Planned | - |
+| 1. Backend Foundation | 3/3 | Complete | 2026-01-21 |
 | 2. Extension Core | 0/2 | Not started | - |
 | 3. Content Script | 0/2 | Not started | - |
 | 4. Extension UI | 0/2 | Not started | - |
