@@ -94,11 +94,11 @@ Plans:
   3. Users can link Jira assignees to existing team members
   4. Sync status indicator shows data freshness in web app
   5. Clicking an issue opens it in Jira (new tab)
-**Plans**: TBD
+**Plans**: 2 plans in 2 waves
 
 Plans:
-- [ ] 05-01: JiraIssues page and API client
-- [ ] 05-02: Team workload view and assignee mapping
+- [ ] 05-01-PLAN.md - JiraIssues page, API client, routing, navigation (Wave 1)
+- [ ] 05-02-PLAN.md - Team workload view and assignee mapping (Wave 2)
 
 ## Parallelization Notes
 
@@ -122,7 +122,7 @@ Phases 1 -> 2 -> 3 -> (4 | 5 in parallel)
 | 2. Extension Core | 2/2 | Complete | 2026-01-21 |
 | 3. Content Script | 2/2 | Complete | 2026-01-21 |
 | 4. Extension UI | 1/1 | Complete | 2026-01-21 |
-| 5. Web App Integration | 0/2 | Not started | - |
+| 5. Web App Integration | 0/2 | Planned | - |
 
 ## Requirement Coverage
 
