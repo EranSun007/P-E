@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { JiraIssue } from "@/api/entities";
+import { JiraIssue, JiraMapping, TeamMember } from "@/api/entities";
 import {
   Bug,
   RefreshCw,
@@ -9,8 +9,14 @@ import {
   Clock,
   Loader2,
   ExternalLink,
-  AlertTriangle
+  AlertTriangle,
+  Users,
+  LayoutList,
+  Link2
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import WorkloadView from "@/components/jira/WorkloadView";
+import AssigneeMappingDialog from "@/components/jira/AssigneeMappingDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -60,6 +66,11 @@ export default function JiraIssuesPage() {
     search: ""
   });
 
+  // Mapping dialog state
+  const [showMappingDialog, setShowMappingDialog] = useState(false);
+  const [mappings, setMappings] = useState({});
+  const [teamMembers, setTeamMembers] = useState([]);
+
   // Load data on mount
   useEffect(() => {
     loadData();
@@ -69,14 +80,24 @@ export default function JiraIssuesPage() {
     setLoading(true);
     setError(null);
     try {
-      const [issuesData, filterData, statusData] = await Promise.all([
+      const [issuesData, filterData, statusData, mappingsData, membersData] = await Promise.all([
         JiraIssue.list(),
         JiraIssue.getFilterOptions(),
-        JiraIssue.getSyncStatus()
+        JiraIssue.getSyncStatus(),
+        JiraMapping.list().catch(() => []),
+        TeamMember.list().catch(() => [])
       ]);
       setIssues(issuesData || []);
       setFilterOptions(filterData || { statuses: [], assignees: [], sprints: [] });
       setSyncStatus(statusData);
+
+      // Convert mappings array to object keyed by jira_assignee_id
+      const mappingsObj = {};
+      (mappingsData || []).forEach(m => {
+        mappingsObj[m.jira_assignee_id] = m;
+      });
+      setMappings(mappingsObj);
+      setTeamMembers(membersData || []);
     } catch (err) {
       console.error("Failed to load Jira issues:", err);
       setError(err.message || "Failed to load Jira issues");
@@ -185,6 +206,25 @@ export default function JiraIssuesPage() {
     }));
   };
 
+  // Extract unique assignees for mapping dialog
+  const uniqueAssignees = useMemo(() => {
+    const assigneeMap = new Map();
+    issues.forEach(issue => {
+      if (issue.jira_assignee_id && issue.assignee_name) {
+        assigneeMap.set(issue.jira_assignee_id, {
+          id: issue.jira_assignee_id,
+          name: issue.assignee_name
+        });
+      }
+    });
+    return Array.from(assigneeMap.values());
+  }, [issues]);
+
+  // Handle mapping updates from dialog
+  const handleMappingsUpdated = (newMappings) => {
+    setMappings(newMappings);
+  };
+
   return (
     <div className="p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -207,6 +247,10 @@ export default function JiraIssuesPage() {
                 <span>Last synced: {formatTimeAgo(syncStatus.last_synced_at)}</span>
               </div>
             )}
+            <Button variant="outline" onClick={() => setShowMappingDialog(true)}>
+              <Link2 className="h-4 w-4 mr-2" />
+              Link Assignees
+            </Button>
             <Button variant="outline" onClick={loadData} disabled={loading}>
               {loading ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -232,9 +276,21 @@ export default function JiraIssuesPage() {
             <span className="ml-2 text-gray-500">Loading Jira issues...</span>
           </div>
         ) : (
-          <>
-            {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Tabs defaultValue="issues" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="issues" className="gap-2">
+                <LayoutList className="h-4 w-4" />
+                Issues
+              </TabsTrigger>
+              <TabsTrigger value="workload" className="gap-2">
+                <Users className="h-4 w-4" />
+                Workload
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="issues" className="space-y-4">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-2xl font-bold">{stats.total}</div>
@@ -423,8 +479,25 @@ export default function JiraIssuesPage() {
                 )}
               </CardContent>
             </Card>
-          </>
+            </TabsContent>
+
+            <TabsContent value="workload">
+              <WorkloadView
+                issues={filteredIssues}
+                mappings={mappings}
+                teamMembers={teamMembers}
+              />
+            </TabsContent>
+          </Tabs>
         )}
+
+        {/* Assignee Mapping Dialog */}
+        <AssigneeMappingDialog
+          open={showMappingDialog}
+          onOpenChange={setShowMappingDialog}
+          jiraAssignees={uniqueAssignees}
+          onMappingsUpdated={handleMappingsUpdated}
+        />
       </div>
     </div>
   );
