@@ -79,7 +79,7 @@
   - (No PUT - issues are read-only from Jira)
 
 - [ ] **API-03**: Team member mapping endpoints
-  - GET /api/jira-mappings - List Jira→team member mappings
+  - GET /api/jira-mappings - List Jira->team member mappings
   - POST /api/jira-mappings - Create/update mapping
   - DELETE /api/jira-mappings/:id - Remove mapping
 
@@ -210,28 +210,28 @@
 
 | REQ-ID | Phase | Tasks | Status |
 |--------|-------|-------|--------|
-| EXT-01 | — | — | Pending |
-| EXT-02 | — | — | Pending |
-| EXT-03 | — | — | Pending |
-| EXT-04 | — | — | Pending |
-| EXT-05 | — | — | Pending |
-| EXT-06 | — | — | Pending |
-| EXT-07 | — | — | Pending |
-| EXT-08 | — | — | Pending |
-| EXT-09 | — | — | Pending |
-| API-01 | — | — | Pending |
-| API-02 | — | — | Pending |
-| API-03 | — | — | Pending |
-| API-04 | — | — | Pending |
-| API-05 | — | — | Pending |
-| DB-01 | — | — | Pending |
-| DB-02 | — | — | Pending |
-| DB-03 | — | — | Pending |
-| UI-01 | — | — | Pending |
-| UI-02 | — | — | Pending |
-| UI-03 | — | — | Pending |
-| UI-04 | — | — | Pending |
-| UI-05 | — | — | Pending |
+| EXT-01 | Phase 2 | - | Pending |
+| EXT-02 | Phase 3 | - | Pending |
+| EXT-03 | Phase 4 | - | Pending |
+| EXT-04 | Phase 3 | - | Pending |
+| EXT-05 | Phase 3 | - | Pending |
+| EXT-06 | Phase 3 | - | Pending |
+| EXT-07 | Phase 3 | - | Pending |
+| EXT-08 | Phase 2 | - | Pending |
+| EXT-09 | Phase 2 | - | Pending |
+| API-01 | Phase 1 | - | Pending |
+| API-02 | Phase 1 | - | Pending |
+| API-03 | Phase 1 | - | Pending |
+| API-04 | Phase 1 | - | Pending |
+| API-05 | Phase 1 | - | Pending |
+| DB-01 | Phase 1 | - | Pending |
+| DB-02 | Phase 1 | - | Pending |
+| DB-03 | Phase 1 | - | Pending |
+| UI-01 | Phase 5 | - | Pending |
+| UI-02 | Phase 5 | - | Pending |
+| UI-03 | Phase 5 | - | Pending |
+| UI-04 | Phase 4 | - | Pending |
+| UI-05 | Phase 5 | - | Pending |
 
 *Traceability table updated by roadmap generator*
 
