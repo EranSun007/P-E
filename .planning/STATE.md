@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-21)
 
 **Core value:** See team's Jira workload alongside existing P&E Manager data without switching contexts
-**Current focus:** Phase 3 - Content Script (COMPLETE)
+**Current focus:** Phase 4 (Extension UI) in progress - 04-01 complete
 
 ## Current Position
 
-Phase: 3 of 5 (Content Script)
-Plan: 2 of 2 in current phase (COMPLETE)
-Status: Phase complete
-Last activity: 2026-01-21 - Completed 03-02-PLAN.md (DOM extractors)
+Phase: 4 of 5 (Extension UI)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-01-21 - Completed 04-01-PLAN.md (Badge status and manual sync)
 
-Progress: [#######---] 64% (7/11 plans executed)
+Progress: [########--] 73% (8/11 plans executed)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 3.4 min
-- Total execution time: 24 min
+- Total plans completed: 8
+- Average duration: 3.5 min
+- Total execution time: 28 min
 
 **By Phase:**
 
@@ -30,11 +30,11 @@ Progress: [#######---] 64% (7/11 plans executed)
 | 1. Backend Foundation | 3/3 | 10 min | 3.3 min |
 | 2. Extension Core | 2/2 | 7 min | 3.5 min |
 | 3. Content Script | 2/2 | 7 min | 3.5 min |
-| 4. Extension UI | 0/2 | - | - |
+| 4. Extension UI | 1/2 | 4 min | 4.0 min |
 | 5. Web App Integration | 0/2 | - | - |
 
 **Recent Trend:**
-- Last 5 plans: 02-01 (3 min), 02-02 (4 min), 03-01 (3 min), 03-02 (4 min)
+- Last 5 plans: 02-02 (4 min), 03-01 (3 min), 03-02 (4 min), 04-01 (4 min)
 - Trend: Stable at ~3-4 min per plan
 
 *Updated after each plan completion*
@@ -74,6 +74,9 @@ Recent decisions affecting current work:
 - [03-02]: Multi-tier selector fallbacks (data-testid > data-* > ghx-* classes)
 - [03-02]: Dynamic script loading via web_accessible_resources
 - [03-02]: Window global export pattern for extractor modules
+- [04-01]: Badge colors: blue (#2196F3) for syncing, red (#F44336) for error
+- [04-01]: Badge text: '...' syncing, '!' error, empty success/never
+- [04-01]: storage.onChanged listener for reactive popup updates
 
 ### Pending Todos
 
@@ -85,27 +88,20 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-21T16:58:00Z
-Stopped at: Completed 03-02-PLAN.md (DOM extractors)
+Last session: 2026-01-21T17:04:00Z
+Stopped at: Completed 04-01-PLAN.md (Badge status and manual sync)
 Resume file: None
 
-## Phase 3 Progress (COMPLETE)
+## Phase 4 Progress
 
 | Plan | Wave | Objective | Requirements | Status |
 |------|------|-----------|--------------|--------|
-| 03-01 | 1 | Content script foundation | EXT-02 partial | COMPLETE |
-| 03-02 | 2 | DOM extractors for board/backlog/detail | EXT-02, EXT-03, EXT-04, EXT-05, EXT-06 | COMPLETE |
+| 04-01 | 1 | Badge status and manual sync | EXT-07 partial | COMPLETE |
+| 04-02 | 2 | Options page polish | EXT-07 complete | TODO |
 
-**Phase 3 Key Files Created:**
-- `extension/content/content.js` - Main content script with dynamic extractor loading
-- `extension/content/utils.js` - PageType, detectPageType, debounce, waitForElement
-- `extension/content/observer.js` - ContentObserver class with MutationObserver
-- `extension/content/extractors/board.js` - Sprint board card extraction (383 lines)
-- `extension/content/extractors/backlog.js` - Backlog view extraction (381 lines)
-- `extension/content/extractors/detail.js` - Detail page extraction (317 lines)
+**Phase 4 Key Files Modified:**
+- `extension/service-worker.js` - Added updateBadge function, badge calls after sync status changes
+- `extension/popup/popup.html` - Added .status.syncing CSS, Sync Now button
+- `extension/popup/popup.js` - Added syncBtn handler, storage.onChanged listener
 
-**Phase 3 Key Files Modified:**
-- `extension/manifest.json` - Added content_scripts, webNavigation, web_accessible_resources
-- `extension/service-worker.js` - Added webNavigation.onHistoryStateUpdated listener
-
-**Next step:** Execute Phase 4 - Extension UI (popup and options pages)
+**Next step:** Execute 04-02 (Options page polish) or Phase 5 (Web App Integration)
