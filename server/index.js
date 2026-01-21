@@ -1,6 +1,5 @@
 import dotenv from 'dotenv';
 import express from 'express';
-import cors from 'cors';
 
 // Load environment variables
 dotenv.config({ path: '.env.development' });
@@ -26,28 +25,52 @@ import usersRouter from './routes/users.js';
 import peersRouter from './routes/peers.js';
 import devopsDutiesRouter from './routes/devopsDuties.js';
 import dutyScheduleRouter from './routes/dutySchedule.js';
+import timeOffRouter from './routes/timeOff.js';
+import userSettingsRouter from './routes/userSettings.js';
+import githubRouter from './routes/github.js';
+import aiRouter from './routes/ai.js';
+import jiraRouter from './routes/jira.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
 // CORS configuration with debugging
-const corsOrigin = process.env.NODE_ENV === 'production'
-  ? process.env.FRONTEND_URL || 'https://pe-manager-frontend.cfapps.eu01-canary.hana.ondemand.com'
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? [
+      'https://pe-manager-frontend.cfapps.eu01-canary.hana.ondemand.com',
+      process.env.FRONTEND_URL
+    ].filter(Boolean)
   : ['http://localhost:5173', 'http://localhost:3000'];
 
 console.log('🔧 CORS Configuration:', {
   nodeEnv: process.env.NODE_ENV,
   frontendUrl: process.env.FRONTEND_URL,
-  corsOrigin: corsOrigin
+  allowedOrigins: allowedOrigins
 });
 
-app.use(cors({
-  origin: corsOrigin,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// Handle preflight OPTIONS requests explicitly FIRST
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
+  }
+  res.status(204).end();
+});
+
+// CORS middleware for actual requests
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  next();
+});
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -105,6 +128,11 @@ app.use('/api/users', usersRouter);
 app.use('/api/peers', peersRouter);
 app.use('/api/devops-duties', devopsDutiesRouter);
 app.use('/api/duty-schedule', dutyScheduleRouter);
+app.use('/api/time-off', timeOffRouter);
+app.use('/api/user-settings', userSettingsRouter);
+app.use('/api/github', githubRouter);
+app.use('/api/ai', aiRouter);
+app.use('/api/jira-issues', jiraRouter);
 
 // 404 handler
 app.use((req, res) => {
@@ -115,7 +143,7 @@ app.use((req, res) => {
 });
 
 // Global error handler
-app.use((err, req, res, next) => {
+app.use((err, _req, res, _next) => {
   console.error('Error:', err);
 
   const statusCode = err.statusCode || 500;
