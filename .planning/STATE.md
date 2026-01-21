@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-21)
 
 **Core value:** See team's Jira workload alongside existing P&E Manager data without switching contexts
-**Current focus:** Phase 2 - Extension Core (COMPLETE)
+**Current focus:** Phase 3 - Content Script (IN PROGRESS)
 
 ## Current Position
 
-Phase: 2 of 5 (Extension Core)
-Plan: 2 of 2 in current phase (PHASE COMPLETE)
-Status: Ready for Phase 3
-Last activity: 2026-01-21 - Completed 02-02-PLAN.md (Storage and API client)
+Phase: 3 of 5 (Content Script)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-01-21 - Completed 03-01-PLAN.md (Content script foundation)
 
-Progress: [#####-----] 45% (5/11 plans executed)
+Progress: [######----] 55% (6/11 plans executed)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 3.4 min
-- Total execution time: 17 min
+- Total plans completed: 6
+- Average duration: 3.3 min
+- Total execution time: 20 min
 
 **By Phase:**
 
@@ -29,12 +29,12 @@ Progress: [#####-----] 45% (5/11 plans executed)
 |-------|-------|-------|----------|
 | 1. Backend Foundation | 3/3 | 10 min | 3.3 min |
 | 2. Extension Core | 2/2 | 7 min | 3.5 min |
-| 3. Content Script | 0/2 | - | - |
+| 3. Content Script | 1/2 | 3 min | 3.0 min |
 | 4. Extension UI | 0/2 | - | - |
 | 5. Web App Integration | 0/2 | - | - |
 
 **Recent Trend:**
-- Last 5 plans: 01-02 (4 min), 01-03 (4 min), 02-01 (3 min), 02-02 (4 min)
+- Last 5 plans: 01-03 (4 min), 02-01 (3 min), 02-02 (4 min), 03-01 (3 min)
 - Trend: Stable at ~3-4 min per plan
 
 *Updated after each plan completion*
@@ -67,6 +67,10 @@ Recent decisions affecting current work:
 - [02-02]: API retry: only retry on network/5xx errors, never on 4xx
 - [02-02]: Sync states: never, syncing, success, error
 - [02-02]: Pending issues queue for retry on failure
+- [03-01]: IIFE pattern for content scripts (Chrome cannot use ES modules in content)
+- [03-01]: 30s sync throttle to prevent excessive backend calls
+- [03-01]: webNavigation API for SPA detection (more reliable than polling)
+- [03-01]: PageType enum: BOARD, BACKLOG, DETAIL, UNKNOWN
 
 ### Pending Todos
 
@@ -78,25 +82,24 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-01-21T14:02:36Z
-Stopped at: Completed 02-02-PLAN.md (Storage and API client)
+Last session: 2026-01-21T14:51:16Z
+Stopped at: Completed 03-01-PLAN.md (Content script foundation)
 Resume file: None
 
-## Phase 2 Complete Summary
+## Phase 3 Progress
 
 | Plan | Wave | Objective | Requirements | Status |
 |------|------|-----------|--------------|--------|
-| 02-01 | 1 | Extension manifest and service worker scaffold | EXT-01 | COMPLETE |
-| 02-02 | 2 | Storage management and backend API client | EXT-08, EXT-09 | COMPLETE |
+| 03-01 | 1 | Content script foundation | EXT-02 partial | COMPLETE |
+| 03-02 | 2 | DOM extractors for board/backlog/detail | EXT-02, EXT-03 | PENDING |
 
-**Phase 2 Key Files Created:**
-- `extension/manifest.json` - Manifest V3 config
-- `extension/service-worker.js` - Background service worker (refactored with modules)
-- `extension/popup/popup.html` + `popup.js` - Extension popup
-- `extension/options/options.html` + `options.js` - Settings page
-- `extension/icons/icon*.png` - Placeholder icons
-- `extension/lib/storage.js` - Storage module for chrome.storage.local
-- `extension/lib/api.js` - API client with exponential backoff retry
-- `extension/test-sync.js` - Manual sync testing script
+**Phase 3 Key Files Created (so far):**
+- `extension/content/content.js` - Main content script (IIFE pattern)
+- `extension/content/utils.js` - PageType, detectPageType, debounce, waitForElement
+- `extension/content/observer.js` - ContentObserver class with MutationObserver
 
-**Next step:** Execute Phase 3 (Content Script for Jira board data extraction)
+**Phase 3 Key Files Modified:**
+- `extension/manifest.json` - Added content_scripts and webNavigation permission
+- `extension/service-worker.js` - Added webNavigation.onHistoryStateUpdated listener
+
+**Next step:** Execute 03-02-PLAN.md (DOM extractors for Jira pages)
