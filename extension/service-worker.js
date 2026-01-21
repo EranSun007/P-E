@@ -10,12 +10,45 @@
 import { Storage } from './lib/storage.js';
 import { Api, ApiError } from './lib/api.js';
 
+// =============================================================================
+// SPA NAVIGATION DETECTION
+// =============================================================================
+
+/**
+ * Detect SPA navigation in Jira (pushState/replaceState URL changes)
+ * Notifies content script to re-initialize when user navigates within Jira
+ */
+chrome.webNavigation.onHistoryStateUpdated.addListener(
+  (details) => {
+    // Only care about main frame, not iframes
+    if (details.frameId !== 0) return;
+
+    console.log('[PE-Jira] SPA navigation detected:', details.url);
+
+    // Notify content script to re-extract for new page
+    chrome.tabs.sendMessage(details.tabId, {
+      type: 'URL_CHANGED',
+      url: details.url
+    }).catch(err => {
+      // Content script may not be loaded yet, ignore
+      console.log('[PE-Jira] Could not notify tab:', err.message);
+    });
+  },
+  { url: [{ hostSuffix: 'jira.tools.sap' }] }
+);
+
+// =============================================================================
+// MESSAGE TYPES
+// =============================================================================
+
 // Message types
 const MessageType = {
   SYNC_ISSUES: 'SYNC_ISSUES',
   GET_STATUS: 'GET_STATUS',
   MANUAL_SYNC: 'MANUAL_SYNC',
-  TEST_CONNECTION: 'TEST_CONNECTION'
+  TEST_CONNECTION: 'TEST_CONNECTION',
+  URL_CHANGED: 'URL_CHANGED',       // Sent TO content script (SPA navigation)
+  REFRESH_DATA: 'REFRESH_DATA'      // Sent TO content script (manual refresh)
 };
 
 // Service worker lifecycle

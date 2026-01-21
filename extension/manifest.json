@@ -6,7 +6,8 @@
 
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "webNavigation"
   ],
 
   "host_permissions": [
@@ -19,6 +20,15 @@
     "service_worker": "service-worker.js",
     "type": "module"
   },
+
+  "content_scripts": [
+    {
+      "matches": ["https://jira.tools.sap/*"],
+      "js": ["content/content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
 
   "action": {
     "default_popup": "popup/popup.html",
