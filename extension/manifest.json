@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "P&E Manager Jira Sync",
+  "version": "1.0.0",
+  "description": "Sync Jira board data to P&E Manager",
+
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+
+  "host_permissions": [
+    "https://jira.tools.sap/*",
+    "https://pe-manager-backend.cfapps.eu01-canary.hana.ondemand.com/*",
+    "http://localhost:3001/*"
+  ],
+
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "P&E Jira Sync"
+  },
+
+  "options_page": "options/options.html",
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
