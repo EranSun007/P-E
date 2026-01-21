@@ -41,5 +41,16 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "content/extractors/board.js",
+        "content/extractors/backlog.js",
+        "content/extractors/detail.js"
+      ],
+      "matches": ["https://jira.tools.sap/*"]
+    }
+  ]
 }

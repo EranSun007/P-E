@@ -2,10 +2,12 @@
  * P&E Manager Jira Sync - Content Script
  *
  * Main entry point for content script injection on Jira pages.
- * Detects page type, sets up DOM observation, and coordinates extraction.
+ * Detects page type, loads appropriate extractor, sets up DOM observation,
+ * and coordinates extraction and sync to backend.
  *
  * CRITICAL: Content scripts CANNOT use ES modules in Chrome.
  * All dependencies are inlined in this IIFE.
+ * Extractors are loaded dynamically as web_accessible_resources.
  */
 
 (function() {
@@ -80,13 +82,17 @@
   /**
    * Wait for element to appear in DOM
    */
-  async function waitForElement(selector, timeout = 10000) {
+  async function waitForElement(selector, timeout = 15000) {
     const startTime = Date.now();
 
     while (Date.now() - startTime < timeout) {
-      const element = document.querySelector(selector);
-      if (element) {
-        return element;
+      // Handle comma-separated selectors
+      const selectors = selector.split(',').map(s => s.trim());
+      for (const sel of selectors) {
+        const element = document.querySelector(sel);
+        if (element) {
+          return element;
+        }
       }
       await new Promise(resolve => setTimeout(resolve, 100));
     }
@@ -101,11 +107,43 @@
   function getContainerSelector(pageType) {
     switch (pageType) {
       case PageType.BOARD:
-        return '[data-test-id="software-board"], #ghx-pool, .ghx-pool';
+        return '[data-test-id="software-board"], [data-testid*="board"], #ghx-pool, .ghx-pool, #ghx-board';
       case PageType.BACKLOG:
-        return '[data-test-id="software-backlog"], #ghx-backlog, .ghx-backlog';
+        return '[data-test-id="software-backlog"], [data-testid*="backlog"], #ghx-backlog, .ghx-backlog, .js-sprint-container';
       case PageType.DETAIL:
-        return '[data-test-id="issue.views.issue-base"], #jira-issue-header, .issue-header-content';
+        return '[data-test-id*="issue"], [data-testid*="issue"], #jira-issue-header, .issue-header-content, #details-module';
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Get extractor script path for a page type
+   */
+  function getExtractorPath(pageType) {
+    switch (pageType) {
+      case PageType.BOARD:
+        return 'content/extractors/board.js';
+      case PageType.BACKLOG:
+        return 'content/extractors/backlog.js';
+      case PageType.DETAIL:
+        return 'content/extractors/detail.js';
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * Get extractor function name for a page type
+   */
+  function getExtractorFunctionName(pageType) {
+    switch (pageType) {
+      case PageType.BOARD:
+        return 'extractBoardIssues';
+      case PageType.BACKLOG:
+        return 'extractBacklogIssues';
+      case PageType.DETAIL:
+        return 'extractDetailIssue';
       default:
         return null;
     }
@@ -124,7 +162,15 @@
     }
 
     observe(targetSelector) {
-      const target = document.querySelector(targetSelector);
+      // Handle comma-separated selectors
+      const selectors = targetSelector.split(',').map(s => s.trim());
+      let target = null;
+
+      for (const sel of selectors) {
+        target = document.querySelector(sel);
+        if (target) break;
+      }
+
       if (!target) {
         console.log('[PE-Jira] Observer target not found:', targetSelector);
         return false;
@@ -166,6 +212,46 @@
   }
 
   // ==========================================================================
+  // EXTRACTOR LOADER
+  // ==========================================================================
+
+  /**
+   * Dynamically load an extractor script
+   * Scripts are loaded as web_accessible_resources and attach to window
+   */
+  async function loadExtractorScript(path) {
+    return new Promise((resolve, reject) => {
+      // Check if already loaded
+      const funcName = getExtractorFunctionName(currentPageType);
+      if (window[funcName]) {
+        console.log('[PE-Jira] Extractor already loaded:', funcName);
+        resolve();
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = chrome.runtime.getURL(path);
+      script.type = 'text/javascript';
+
+      script.onload = () => {
+        console.log('[PE-Jira] Extractor script loaded:', path);
+        // Remove script element after execution
+        script.remove();
+        resolve();
+      };
+
+      script.onerror = (error) => {
+        console.error('[PE-Jira] Failed to load extractor:', path, error);
+        script.remove();
+        reject(new Error(`Failed to load ${path}`));
+      };
+
+      // Inject into page
+      (document.head || document.documentElement).appendChild(script);
+    });
+  }
+
+  // ==========================================================================
   // CONTENT SCRIPT STATE
   // ==========================================================================
 
@@ -173,17 +259,10 @@
   let currentPageType = null;
   let observer = null;
   let lastSyncTime = 0;
+  let extractorLoaded = false;
 
   // Configuration
   const SYNC_THROTTLE_MS = 30000; // 30 seconds between syncs
-
-  // Extractors - will be populated in Plan 02
-  // Each extractor function returns an array of issue objects
-  const extractors = {
-    [PageType.BOARD]: null,    // extractBoardIssues() - Plan 02
-    [PageType.BACKLOG]: null,  // extractBacklogIssues() - Plan 02
-    [PageType.DETAIL]: null    // extractDetailIssue() - Plan 02
-  };
 
   // ==========================================================================
   // SYNC LOGIC
@@ -198,36 +277,49 @@
   }
 
   /**
+   * Get the current extractor function
+   */
+  function getExtractor() {
+    const funcName = getExtractorFunctionName(currentPageType);
+    return funcName ? window[funcName] : null;
+  }
+
+  /**
    * Extract issues and sync to backend via service worker
    */
   async function extractAndSync() {
-    // Get extractor for current page type
-    const extractor = extractors[currentPageType];
+    if (!currentPageType || currentPageType === PageType.UNKNOWN) {
+      console.log('[PE-Jira] Unknown page type, skipping extraction');
+      return;
+    }
+
+    // Get extractor function from window
+    const extractor = getExtractor();
 
     if (!extractor) {
-      // Extractors not yet implemented (Plan 02)
-      console.log('[PE-Jira] No extractor for page type:', currentPageType, '(expected - extractors added in Plan 02)');
+      console.log('[PE-Jira] No extractor available for:', currentPageType);
       return;
     }
 
     try {
       // Extract issues from DOM
-      const issues = await extractor();
+      const issues = extractor();
 
       if (!issues || issues.length === 0) {
         console.log('[PE-Jira] No issues extracted');
         return;
       }
 
-      console.log('[PE-Jira] Extracted', issues.length, 'issues');
+      console.log('[PE-Jira] Extracted', issues.length, 'issues from', currentPageType);
 
       // Check throttle
       if (!shouldSync()) {
-        console.log('[PE-Jira] Sync throttled, skipping');
+        console.log('[PE-Jira] Sync throttled, will sync later');
         return;
       }
 
       // Send to service worker for backend sync
+      console.log('[PE-Jira] Sending issues to service worker for sync');
       const response = await chrome.runtime.sendMessage({
         type: 'SYNC_ISSUES',
         payload: issues
@@ -249,6 +341,9 @@
     }
   }
 
+  // Debounced extraction for DOM mutations
+  const debouncedExtractAndSync = debounce(extractAndSync, 1000);
+
   // ==========================================================================
   // INITIALIZATION
   // ==========================================================================
@@ -267,16 +362,53 @@
     }
 
     currentPageType = pageType;
+    extractorLoaded = false;
 
-    // Placeholder: Will wait for content and set up observer once extractors exist
-    // The extractors will be added in Plan 02, which will also enable:
-    // 1. Waiting for container element to appear
-    // 2. Initial extraction call
-    // 3. Setting up observer for ongoing DOM changes
-    //
-    // For now, just log that we're ready
-    console.log('[PE-Jira] Content script ready for', pageType, 'page');
-    console.log('[PE-Jira] Extraction will be enabled in Plan 02');
+    // Load the appropriate extractor script
+    const extractorPath = getExtractorPath(pageType);
+    if (extractorPath) {
+      try {
+        await loadExtractorScript(extractorPath);
+        extractorLoaded = true;
+        console.log('[PE-Jira] Extractor ready for', pageType);
+      } catch (error) {
+        console.error('[PE-Jira] Failed to load extractor:', error);
+        return;
+      }
+    }
+
+    // Wait for content container to appear
+    const containerSelector = getContainerSelector(pageType);
+    console.log('[PE-Jira] Waiting for container:', containerSelector);
+
+    const container = await waitForElement(containerSelector, 15000);
+
+    if (!container) {
+      console.error('[PE-Jira] Container not found after timeout');
+      // Try extraction anyway - content might be loaded differently
+      console.log('[PE-Jira] Attempting extraction without container...');
+    }
+
+    // Small delay to let Jira fully render
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Perform initial extraction
+    console.log('[PE-Jira] Starting initial extraction');
+    await extractAndSync();
+
+    // Set up observer for dynamic content updates
+    if (containerSelector) {
+      observer = new ContentObserver(debouncedExtractAndSync);
+      const observing = observer.observe(containerSelector);
+
+      if (!observing) {
+        // Try to observe body as fallback
+        console.log('[PE-Jira] Falling back to body observer');
+        observer.observe('body');
+      }
+    }
+
+    console.log('[PE-Jira] Content script fully initialized for', pageType);
   }
 
   // ==========================================================================
@@ -298,6 +430,9 @@
           observer = null;
         }
 
+        // Reset state
+        extractorLoaded = false;
+
         // Re-initialize for new page
         init();
         sendResponse({ success: true });
@@ -313,6 +448,19 @@
         // Trigger extraction
         extractAndSync();
         sendResponse({ success: true });
+        break;
+
+      case 'GET_PAGE_INFO':
+        // Return current page info for popup/debugging
+        sendResponse({
+          success: true,
+          data: {
+            pageType: currentPageType,
+            extractorLoaded: extractorLoaded,
+            lastSyncTime: lastSyncTime,
+            isObserving: observer?.isObserving() || false
+          }
+        });
         break;
 
       default:
