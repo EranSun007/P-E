@@ -3,9 +3,12 @@
  *
  * Handles:
  * - Message routing from popup and content scripts
- * - Backend API communication
- * - Sync state management
+ * - Backend API communication via Api module
+ * - Sync state management via Storage module
  */
+
+import { Storage } from './lib/storage.js';
+import { Api, ApiError } from './lib/api.js';
 
 // Message types
 const MessageType = {
@@ -16,33 +19,33 @@ const MessageType = {
 };
 
 // Service worker lifecycle
-chrome.runtime.onInstalled.addListener((details) => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   console.log('[PE-Jira] Extension installed:', details.reason);
 
   // Initialize default storage on fresh install
   if (details.reason === 'install') {
-    chrome.storage.local.set({
-      backendUrl: 'https://pe-manager-backend.cfapps.eu01-canary.hana.ondemand.com',
-      authToken: '',
-      lastSync: {
-        timestamp: null,
-        status: 'never',
-        issueCount: 0,
-        error: null
-      },
-      pendingIssues: []
-    });
+    await Storage.initDefaults();
+    console.log('[PE-Jira] Default settings initialized');
   }
+});
+
+// Service worker startup (runs on wake from termination)
+chrome.runtime.onStartup.addListener(() => {
+  console.log('[PE-Jira] Service worker started');
 });
 
 // Message handler
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('[PE-Jira] Received message:', message.type, 'from:', sender.id ? 'extension' : sender.tab?.url);
+  const source = sender.tab ? `tab:${sender.tab.id}` : 'extension';
+  console.log('[PE-Jira] Message:', message.type, 'from:', source);
 
   // Must return true for async response
   handleMessage(message, sender)
     .then(response => sendResponse(response))
-    .catch(error => sendResponse({ success: false, error: error.message }));
+    .catch(error => {
+      console.error('[PE-Jira] Handler error:', error);
+      sendResponse({ success: false, error: error.message });
+    });
 
   return true; // Keep channel open for async response
 });
@@ -53,16 +56,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function handleMessage(message, sender) {
   switch (message.type) {
     case MessageType.GET_STATUS:
-      return await getStatus();
+      return await handleGetStatus();
 
     case MessageType.TEST_CONNECTION:
-      return await testConnection();
+      return await handleTestConnection();
 
     case MessageType.SYNC_ISSUES:
-      return await syncIssues(message.payload);
+      return await handleSyncIssues(message.payload);
 
     case MessageType.MANUAL_SYNC:
-      return await manualSync();
+      return await handleManualSync();
 
     default:
       return { success: false, error: `Unknown message type: ${message.type}` };
@@ -70,61 +73,89 @@ async function handleMessage(message, sender) {
 }
 
 /**
- * Get current sync status from storage
+ * Get current sync status
  */
-async function getStatus() {
-  const data = await chrome.storage.local.get(['lastSync', 'authToken', 'backendUrl']);
+async function handleGetStatus() {
+  const [lastSync, isConfigured] = await Promise.all([
+    Storage.getLastSync(),
+    Storage.isConfigured()
+  ]);
+
   return {
     success: true,
-    data: {
-      lastSync: data.lastSync,
-      isConfigured: Boolean(data.authToken && data.backendUrl)
-    }
+    data: { lastSync, isConfigured }
   };
 }
 
 /**
  * Test connection to backend
  */
-async function testConnection() {
-  const { backendUrl, authToken } = await chrome.storage.local.get(['backendUrl', 'authToken']);
+async function handleTestConnection() {
+  const isConfigured = await Storage.isConfigured();
 
-  if (!backendUrl || !authToken) {
+  if (!isConfigured) {
     return { success: false, error: 'Backend URL or auth token not configured' };
   }
 
   try {
-    const response = await fetch(`${backendUrl}/api/health`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${authToken}`
-      }
-    });
-
-    if (response.ok) {
-      return { success: true, data: await response.json() };
-    } else {
-      return { success: false, error: `Backend returned ${response.status}` };
-    }
+    const health = await Api.testConnection();
+    return { success: true, data: health };
   } catch (error) {
     return { success: false, error: error.message };
   }
 }
 
 /**
- * Sync issues to backend (placeholder - full implementation in 02-02)
+ * Sync issues from content script
  */
-async function syncIssues(issues) {
-  console.log('[PE-Jira] syncIssues called with', issues?.length || 0, 'issues');
-  return { success: true, message: 'Sync not yet implemented' };
+async function handleSyncIssues(issues) {
+  if (!issues || !Array.isArray(issues) || issues.length === 0) {
+    return { success: false, error: 'No issues to sync' };
+  }
+
+  const isConfigured = await Storage.isConfigured();
+  if (!isConfigured) {
+    // Store pending issues for later
+    await Storage.setPendingIssues(issues);
+    return { success: false, error: 'Extension not configured' };
+  }
+
+  try {
+    // Update status to syncing
+    await Storage.updateSyncStatus('syncing');
+
+    // Send to backend
+    const result = await Api.syncIssues(issues);
+
+    // Update status to success
+    await Storage.updateSyncStatus('success', result.total);
+    await Storage.clearPendingIssues();
+
+    console.log('[PE-Jira] Sync complete:', result);
+    return { success: true, data: result };
+
+  } catch (error) {
+    console.error('[PE-Jira] Sync failed:', error);
+
+    // Store for retry
+    await Storage.setPendingIssues(issues);
+    await Storage.updateSyncStatus('error', null, error.message);
+
+    return { success: false, error: error.message };
+  }
 }
 
 /**
- * Manual sync trigger (placeholder - full implementation in 02-02)
+ * Manual sync trigger - retry pending issues
  */
-async function manualSync() {
-  console.log('[PE-Jira] manualSync called');
-  return { success: true, message: 'Manual sync not yet implemented' };
+async function handleManualSync() {
+  const pending = await Storage.getPendingIssues();
+
+  if (pending.length === 0) {
+    return { success: true, message: 'No pending issues to sync' };
+  }
+
+  return handleSyncIssues(pending);
 }
 
 console.log('[PE-Jira] Service worker loaded');
