@@ -15,7 +15,7 @@ This roadmap delivers a browser extension that captures Jira board data from the
 - [x] **Phase 1: Backend Foundation** - Database schema, JiraService, REST API endpoints
 - [x] **Phase 2: Extension Core** - Service worker, chrome.storage, backend API communication
 - [x] **Phase 3: Content Script** - DOM scraping for Jira board, backlog, and issue detail pages
-- [ ] **Phase 4: Extension UI** - Popup interface and options page for configuration
+- [x] **Phase 4: Extension UI** - Popup interface and options page for configuration
 - [ ] **Phase 5: Web App Integration** - Frontend components for viewing synced Jira data
 
 ## Phase Details
@@ -82,7 +82,7 @@ Plans:
 **Plans**: 1 plan in 1 wave
 
 Plans:
-- [ ] 04-01-PLAN.md - Badge status indicator and popup sync button
+- [x] 04-01-PLAN.md - Badge status indicator and popup sync button
 
 ### Phase 5: Web App Integration
 **Goal**: Users can view and manage synced Jira data in P&E Manager web app
@@ -121,7 +121,7 @@ Phases 1 -> 2 -> 3 -> (4 | 5 in parallel)
 | 1. Backend Foundation | 3/3 | Complete | 2026-01-21 |
 | 2. Extension Core | 2/2 | Complete | 2026-01-21 |
 | 3. Content Script | 2/2 | Complete | 2026-01-21 |
-| 4. Extension UI | 0/1 | Planned | - |
+| 4. Extension UI | 1/1 | Complete | 2026-01-21 |
 | 5. Web App Integration | 0/2 | Not started | - |
 
 ## Requirement Coverage
