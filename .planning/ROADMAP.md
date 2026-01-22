@@ -1,24 +1,14 @@
-# Roadmap: P&E Manager Jira Integration
+# Roadmap: P&E Manager
 
-## v1.0 Jira Integration MVP
+## Milestones
 
-## Overview
-
-This roadmap delivers a browser extension that captures Jira board data from the browser DOM and syncs it to P&E Manager's PostgreSQL backend. The backend-first approach enables testing with curl before tackling extension complexity. Phases 1-3 build the critical path (backend -> service worker -> content script), while Phases 4-5 can parallelize (extension UI and web app both depend on earlier phases but not each other).
+- **v1.0 Jira Integration MVP** - Phases 1-5 (shipped 2026-01-21)
+- **v1.1 Web Capture Framework** - Phases 6-9 (in progress)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3, 4, 5): Planned milestone work
-- Decimal phases (e.g., 2.1): Urgent insertions (marked with INSERTED)
-
-- [x] **Phase 1: Backend Foundation** - Database schema, JiraService, REST API endpoints
-- [x] **Phase 2: Extension Core** - Service worker, chrome.storage, backend API communication
-- [x] **Phase 3: Content Script** - DOM scraping for Jira board, backlog, and issue detail pages
-- [x] **Phase 4: Extension UI** - Popup interface and options page for configuration
-- [x] **Phase 5: Web App Integration** - Frontend components for viewing synced Jira data
-
-## Phase Details
+<details>
+<summary>v1.0 Jira Integration MVP (Phases 1-5) - SHIPPED 2026-01-21</summary>
 
 ### Phase 1: Backend Foundation
 **Goal**: Backend can receive, store, and return Jira issue data via REST API
@@ -30,16 +20,16 @@ This roadmap delivers a browser extension that captures Jira board data from the
   3. GET /api/jira-issues returns user's synced issues (multi-tenancy enforced)
   4. Jira assignees can be mapped to team members via /api/jira-mappings
   5. All endpoints reject unauthenticated requests (401 response)
-**Plans**: 3 plans in 2 waves
+**Plans**: 3/3 complete
 
 Plans:
-- [x] 01-01-PLAN.md - Database schema and migration (Wave 1)
-- [x] 01-02-PLAN.md - JiraService implementation (Wave 2)
-- [x] 01-03-PLAN.md - REST API routes and authentication (Wave 2)
+- [x] 01-01-PLAN.md - Database schema and migration
+- [x] 01-02-PLAN.md - JiraService implementation
+- [x] 01-03-PLAN.md - REST API routes and authentication
 
 ### Phase 2: Extension Core
 **Goal**: Extension can authenticate with backend, store data, and sync via service worker
-**Depends on**: Phase 1 (backend must exist to receive syncs)
+**Depends on**: Phase 1
 **Requirements**: EXT-01, EXT-08, EXT-09
 **Success Criteria** (what must be TRUE):
   1. Extension installs in Chrome with Manifest V3 structure
@@ -47,15 +37,15 @@ Plans:
   3. Auth token persists in chrome.storage.local across browser restarts
   4. Service worker successfully POSTs test data to backend /api/jira-issues/sync
   5. Sync status (success/error/timestamp) stored and retrievable
-**Plans**: 2 plans in 2 waves
+**Plans**: 2/2 complete
 
 Plans:
-- [x] 02-01-PLAN.md - Extension manifest and service worker scaffold (Wave 1)
-- [x] 02-02-PLAN.md - Storage management and backend API client (Wave 2)
+- [x] 02-01-PLAN.md - Extension manifest and service worker scaffold
+- [x] 02-02-PLAN.md - Storage management and backend API client
 
 ### Phase 3: Content Script
 **Goal**: Extension extracts Jira issue data from DOM while user browses Jira
-**Depends on**: Phase 2 (service worker must handle extracted data)
+**Depends on**: Phase 2
 **Requirements**: EXT-02, EXT-04, EXT-05, EXT-06, EXT-07
 **Success Criteria** (what must be TRUE):
   1. Content script activates on jira.tools.sap board pages
@@ -63,15 +53,15 @@ Plans:
   3. Backlog view extracts items with sprint assignment and ranking
   4. Issue detail pages provide fallback data extraction
   5. Extracted data automatically syncs to backend within 60 seconds
-**Plans**: 2 plans in 2 waves
+**Plans**: 2/2 complete
 
 Plans:
-- [x] 03-01-PLAN.md - Content script scaffold, page detection, SPA navigation (Wave 1)
-- [x] 03-02-PLAN.md - Board, backlog, and detail extractors (Wave 2)
+- [x] 03-01-PLAN.md - Content script scaffold, page detection, SPA navigation
+- [x] 03-02-PLAN.md - Board, backlog, and detail extractors
 
 ### Phase 4: Extension UI
 **Goal**: User can configure extension, view sync status, and trigger manual syncs
-**Depends on**: Phase 2 (service worker provides data and handles actions)
+**Depends on**: Phase 2
 **Requirements**: EXT-03, UI-04
 **Success Criteria** (what must be TRUE):
   1. Popup displays current sync status (syncing, success, error, stale)
@@ -79,76 +69,155 @@ Plans:
   3. User can trigger manual sync from popup
   4. Options page allows configuring backend URL and auth token
   5. Extension icon badge shows sync state at a glance
-**Plans**: 1 plan in 1 wave
+**Plans**: 1/1 complete
 
 Plans:
 - [x] 04-01-PLAN.md - Badge status indicator and popup sync button
 
 ### Phase 5: Web App Integration
 **Goal**: Users can view and manage synced Jira data in P&E Manager web app
-**Depends on**: Phase 1 (backend API must exist; independent of extension UI)
+**Depends on**: Phase 1
 **Requirements**: UI-01, UI-02, UI-03, UI-05
 **Success Criteria** (what must be TRUE):
-  1. Jira Issues page lists all synced issues with filtering (status, assignee, sprint)
-  2. Team workload view shows issues grouped by assignee with point totals
+  1. Jira Issues page lists all synced issues with filtering
+  2. Team workload view shows issues grouped by assignee
   3. Users can link Jira assignees to existing team members
-  4. Sync status indicator shows data freshness in web app
-  5. Clicking an issue opens it in Jira (new tab)
-**Plans**: 2 plans in 2 waves
+  4. Sync status indicator shows data freshness
+  5. Clicking an issue opens it in Jira
+**Plans**: 2/2 complete
 
 Plans:
-- [x] 05-01-PLAN.md - JiraIssues page, API client, routing, navigation (Wave 1)
-- [x] 05-02-PLAN.md - Team workload view and assignee mapping (Wave 2)
+- [x] 05-01-PLAN.md - JiraIssues page, API client, routing, navigation
+- [x] 05-02-PLAN.md - Team workload view and assignee mapping
 
-## Parallelization Notes
+</details>
 
-**Sequential dependencies (cannot parallelize):**
-- Phase 2 depends on Phase 1 (backend must exist)
-- Phase 3 depends on Phase 2 (service worker must receive messages)
+## v1.1 Web Capture Framework (In Progress)
 
-**Can parallelize:**
-- Phase 4 + Phase 5 (both depend on Phase 2/1, but not each other)
+**Milestone Goal:** Evolve the Jira-specific extension into a configurable multi-site capture framework with data staging and entity mapping.
 
-After completing Phase 3, begin Phase 4 and Phase 5 in parallel if desired.
+- [ ] **Phase 6: Backend Foundation** - Database schema, services, and REST API for capture rules, inbox, and mappings
+- [ ] **Phase 7: Extension Core** - Dynamic rule loading, generic extractor, and staging capture flow
+- [ ] **Phase 8: Inbox and Mapping UI** - Review workflow and entity mapping interface
+- [ ] **Phase 9: Rule Builder UI** - Create and test capture rules via web app
+
+### Phase 6: Backend Foundation
+**Goal**: Backend can store capture rules, receive staged captures, and manage entity mappings
+**Depends on**: Phase 5 (v1.0 complete)
+**Requirements**: DB-01, DB-02, DB-03, DB-04, API-01, API-02, API-03, API-04, API-05, API-06, API-07
+**Success Criteria** (what must be TRUE):
+  1. User can retrieve their capture rules via GET /api/capture-rules (extension fetches these on startup)
+  2. User can create/update/delete capture rules via REST API (foundation for Rule Builder UI)
+  3. Extension can POST captured data to /api/capture-inbox (data stages, not visible in main app)
+  4. User can accept or reject inbox items via /api/capture-inbox/:id/accept and /reject
+  5. Entity mappings persist and can be retrieved for auto-application to future captures
+**Plans**: 2 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Database schema and migration (capture_rules, capture_inbox, entity_mappings)
+- [ ] 06-02-PLAN.md — CaptureService and REST API routes
+
+### Phase 7: Extension Core
+**Goal**: Extension dynamically loads capture rules and sends extracted data to inbox
+**Depends on**: Phase 6 (API must exist)
+**Requirements**: EXT-01, EXT-02, EXT-03, EXT-04, EXT-05
+**Success Criteria** (what must be TRUE):
+  1. Extension fetches capture rules from backend on startup and when user triggers refresh
+  2. Extension activates content scripts on sites matching enabled rule URL patterns (dynamic, not hardcoded)
+  3. Generic extractor applies rule-defined CSS selectors and field names to page DOM
+  4. Captured data is sent to /api/capture-inbox (staged for review)
+  5. Extension badge shows count of captures pending review
+**Plans**: TBD (estimated 2-3 plans)
+
+Plans:
+- [ ] 07-01: Dynamic rule fetching and content script registration
+- [ ] 07-02: Generic extractor and staging capture flow
+- [ ] 07-03: Badge status and manual capture trigger
+
+### Phase 8: Inbox and Mapping UI
+**Goal**: User can review captured data and map it to P&E Manager entities
+**Depends on**: Phase 6 (API must exist)
+**Requirements**: STAGE-01, STAGE-02, STAGE-03, STAGE-04, STAGE-05, MAP-01, MAP-02, MAP-03, MAP-04
+**Success Criteria** (what must be TRUE):
+  1. Capture Inbox page shows all pending items with source site, rule name, and capture timestamp
+  2. User can preview raw captured data for each item before deciding
+  3. User can accept (with entity mapping) or reject individual items
+  4. User can select target entity type (project, team member, service) when accepting
+  5. Bulk accept/reject allows processing 10+ items at once without page-by-page clicking
+**Plans**: TBD (estimated 2 plans)
+
+Plans:
+- [ ] 08-01: Capture Inbox page with preview and accept/reject
+- [ ] 08-02: Entity mapping selection and bulk operations
+
+### Phase 9: Rule Builder UI
+**Goal**: User can create and configure capture rules without editing code
+**Depends on**: Phase 6 (API must exist), Phase 7 (rules are used by extension)
+**Requirements**: RULE-01, RULE-02, RULE-03, RULE-04, RULE-05, RULE-06
+**Success Criteria** (what must be TRUE):
+  1. User can create a new rule with URL pattern (e.g., *.grafana.sap/*)
+  2. User can define CSS selectors and name the extracted fields (e.g., "status", "job_name")
+  3. User can test selectors against a live page before saving the rule
+  4. User can enable/disable rules without deleting them
+  5. Preset templates available for Jenkins, Grafana, Concourse, Dynatrace (jump-start configuration)
+**Plans**: TBD (estimated 2 plans)
+
+Plans:
+- [ ] 09-01: Rule CRUD form with URL pattern and selectors
+- [ ] 09-02: Selector tester and preset templates
 
 ## Progress
 
 **Execution Order:**
-Phases 1 -> 2 -> 3 -> (4 | 5 in parallel)
+v1.0: 1 -> 2 -> 3 -> 4/5 parallel
+v1.1: 6 -> 7 (depends on 6), 8 (depends on 6), 9 (depends on 6+7)
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Backend Foundation | 3/3 | Complete | 2026-01-21 |
-| 2. Extension Core | 2/2 | Complete | 2026-01-21 |
-| 3. Content Script | 2/2 | Complete | 2026-01-21 |
-| 4. Extension UI | 1/1 | Complete | 2026-01-21 |
-| 5. Web App Integration | 2/2 | Complete | 2026-01-21 |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Backend Foundation | v1.0 | 3/3 | Complete | 2026-01-21 |
+| 2. Extension Core | v1.0 | 2/2 | Complete | 2026-01-21 |
+| 3. Content Script | v1.0 | 2/2 | Complete | 2026-01-21 |
+| 4. Extension UI | v1.0 | 1/1 | Complete | 2026-01-21 |
+| 5. Web App Integration | v1.0 | 2/2 | Complete | 2026-01-21 |
+| 6. Backend Foundation | v1.1 | 0/2 | Planned | - |
+| 7. Extension Core | v1.1 | 0/3 | Not started | - |
+| 8. Inbox and Mapping UI | v1.1 | 0/2 | Not started | - |
+| 9. Rule Builder UI | v1.1 | 0/2 | Not started | - |
 
-## Requirement Coverage
+## v1.1 Requirement Coverage
 
 | REQ-ID | Phase | Description |
 |--------|-------|-------------|
-| DB-01 | 1 | jira_issues table |
-| DB-02 | 1 | jira_team_mappings table |
-| DB-03 | 1 | Migration file |
-| API-01 | 1 | Sync endpoint |
-| API-02 | 1 | CRUD endpoints |
-| API-03 | 1 | Team member mapping endpoints |
-| API-04 | 1 | JiraService implementation |
-| API-05 | 1 | Authentication for extension |
-| EXT-01 | 2 | Manifest V3 structure |
-| EXT-08 | 2 | Extension storage management |
-| EXT-09 | 2 | Backend API communication |
-| EXT-02 | 3 | Automatic background sync |
-| EXT-04 | 3 | DOM scraping for sprint board |
-| EXT-05 | 3 | DOM scraping for backlog |
-| EXT-06 | 3 | DOM scraping for issue details |
-| EXT-07 | 3 | Core issue data extraction |
-| EXT-03 | 4 | Sync status indicator |
-| UI-04 | 4 | Extension settings management |
-| UI-01 | 5 | Jira Issues page |
-| UI-02 | 5 | Team workload view |
-| UI-03 | 5 | Link Jira assignees to team members |
-| UI-05 | 5 | Sync status in web app |
+| DB-01 | 6 | capture_rules table with URL patterns and selectors |
+| DB-02 | 6 | capture_inbox table for staged items |
+| DB-03 | 6 | entity_mappings table for source-to-target mappings |
+| DB-04 | 6 | Migration file following conventions |
+| API-01 | 6 | GET /api/capture-rules for extension fetch |
+| API-02 | 6 | CRUD for /api/capture-rules |
+| API-03 | 6 | POST /api/capture-inbox for captured items |
+| API-04 | 6 | GET /api/capture-inbox for inbox UI |
+| API-05 | 6 | POST /api/capture-inbox/:id/accept |
+| API-06 | 6 | POST /api/capture-inbox/:id/reject |
+| API-07 | 6 | CRUD for /api/entity-mappings |
+| EXT-01 | 7 | Extension fetches rules on startup/refresh |
+| EXT-02 | 7 | Extension activates on matching URL patterns |
+| EXT-03 | 7 | Extension sends to staging table |
+| EXT-04 | 7 | Badge shows capture count |
+| EXT-05 | 7 | Manual capture trigger |
+| STAGE-01 | 8 | View captured items in inbox |
+| STAGE-02 | 8 | Preview raw captured data |
+| STAGE-03 | 8 | Accept or reject items |
+| STAGE-04 | 8 | Select target entity type |
+| STAGE-05 | 8 | Bulk accept/reject |
+| MAP-01 | 8 | Map source identifier to target entity |
+| MAP-02 | 8 | Select target entity type |
+| MAP-03 | 8 | Auto-suggest mappings by name similarity |
+| MAP-04 | 8 | Reusable mapping rules |
+| RULE-01 | 9 | Create rule with URL pattern |
+| RULE-02 | 9 | Define CSS selectors in rule |
+| RULE-03 | 9 | Name extracted fields |
+| RULE-04 | 9 | Enable/disable rules |
+| RULE-05 | 9 | Test selectors against live page |
+| RULE-06 | 9 | Preset templates for common sites |
 
-**Coverage:** 22/22 v1 requirements mapped
+**Coverage:** 31/31 v1.1 requirements mapped
