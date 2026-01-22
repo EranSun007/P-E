@@ -25,7 +25,8 @@ import {
   TrendingUp,
   MessageSquare,
   Rocket,
-  Inbox
+  Inbox,
+  FileCode
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { User as UserEntity } from "@/api/entities";
@@ -150,6 +151,12 @@ export default function Layout({ children, currentPageName }) {
       icon: Inbox,
       href: createPageUrl("CaptureInbox"),
       current: currentPageName === "CaptureInbox"
+    },
+    {
+      name: "Capture Rules",
+      icon: FileCode,
+      href: createPageUrl("CaptureRules"),
+      current: currentPageName === "CaptureRules"
     }
   ];
 

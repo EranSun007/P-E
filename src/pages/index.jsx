@@ -57,6 +57,7 @@ const Releases = lazy(() => retryImport(() => import(/* webpackChunkName: "pages
 
 // Capture Framework Pages
 const CaptureInbox = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-capture-inbox" */ "./CaptureInbox"), 3, 1000));
+const CaptureRules = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-capture-rules" */ "./CaptureRules"), 3, 1000));
 
 const PAGES = {
     
@@ -103,6 +104,8 @@ const PAGES = {
 
     // Capture Framework Pages
     CaptureInbox: CaptureInbox,
+
+    CaptureRules: CaptureRules,
 
 }
 
@@ -181,6 +184,7 @@ function PagesContent() {
 
                         {/* Capture Framework Routes */}
                         <Route path="/capture-inbox" element={<CaptureInbox />} />
+                        <Route path="/capture-rules" element={<CaptureRules />} />
 
                     </Routes>
                 </Suspense>
