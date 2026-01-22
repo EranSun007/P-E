@@ -97,7 +97,7 @@ Plans:
 **Milestone Goal:** Evolve the Jira-specific extension into a configurable multi-site capture framework with data staging and entity mapping.
 
 - [x] **Phase 6: Backend Foundation** - Database schema, services, and REST API for capture rules, inbox, and mappings
-- [ ] **Phase 7: Extension Core** - Dynamic rule loading, generic extractor, and staging capture flow
+- [x] **Phase 7: Extension Core** - Dynamic rule loading, generic extractor, and staging capture flow
 - [ ] **Phase 8: Inbox and Mapping UI** - Review workflow and entity mapping interface
 - [ ] **Phase 9: Rule Builder UI** - Create and test capture rules via web app
 
@@ -130,9 +130,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — Rule fetching, storage, API client, dynamic script registration
-- [ ] 07-02-PLAN.md — Generic extractor content script and capture flow
-- [ ] 07-03-PLAN.md — Badge status and manual capture trigger in popup
+- [x] 07-01-PLAN.md — Rule fetching, storage, API client, dynamic script registration
+- [x] 07-02-PLAN.md — Generic extractor content script and capture flow
+- [x] 07-03-PLAN.md — Badge status and manual capture trigger in popup
 
 ### Phase 8: Inbox and Mapping UI
 **Goal**: User can review captured data and map it to P&E Manager entities
@@ -144,11 +144,11 @@ Plans:
   3. User can accept (with entity mapping) or reject individual items
   4. User can select target entity type (project, team member, service) when accepting
   5. Bulk accept/reject allows processing 10+ items at once without page-by-page clicking
-**Plans**: TBD (estimated 2 plans)
+**Plans**: 2 plans
 
 Plans:
-- [ ] 08-01: Capture Inbox page with preview and accept/reject
-- [ ] 08-02: Entity mapping selection and bulk operations
+- [ ] 08-01-PLAN.md — Capture Inbox page with API client, table, filtering, preview, and basic accept/reject
+- [ ] 08-02-PLAN.md — Entity mapping dialog with auto-suggest and bulk operations
 
 ### Phase 9: Rule Builder UI
 **Goal**: User can create and configure capture rules without editing code
@@ -180,8 +180,8 @@ v1.1: 6 -> 7 (depends on 6), 8 (depends on 6), 9 (depends on 6+7)
 | 4. Extension UI | v1.0 | 1/1 | Complete | 2026-01-21 |
 | 5. Web App Integration | v1.0 | 2/2 | Complete | 2026-01-21 |
 | 6. Backend Foundation | v1.1 | 2/2 | Complete | 2026-01-22 |
-| 7. Extension Core | v1.1 | 0/3 | Planned | - |
-| 8. Inbox and Mapping UI | v1.1 | 0/2 | Not started | - |
+| 7. Extension Core | v1.1 | 3/3 | Complete | 2026-01-22 |
+| 8. Inbox and Mapping UI | v1.1 | 0/2 | Planned | - |
 | 9. Rule Builder UI | v1.1 | 0/2 | Not started | - |
 
 ## v1.1 Requirement Coverage
