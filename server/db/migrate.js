@@ -91,6 +91,11 @@ const MIGRATIONS = [
     version: '017_jira_integration',
     name: 'Create tables for Jira issue tracking and team mappings',
     file: '017_jira_integration.sql'
+  },
+  {
+    version: '018_capture_framework',
+    name: 'Create tables for capture rules, inbox, and entity mappings',
+    file: '018_capture_framework.sql'
   }
 ];
 
