@@ -89,6 +89,41 @@ export const Api = {
     return this.request('/api/jira-issues/status');
   },
 
+  // =============================================================================
+  // CAPTURE FRAMEWORK ENDPOINTS
+  // =============================================================================
+
+  /**
+   * Get enabled capture rules from backend
+   * @returns {Promise<Array>} Array of capture rule objects
+   */
+  async getCaptureRules() {
+    return this.request('/api/capture-rules?enabled=true');
+  },
+
+  /**
+   * Send captured data to inbox for review
+   * @param {Object} captureData - { rule_id, rule_name, source_url, source_identifier, captured_data }
+   * @returns {Promise<Object>} Created inbox item
+   */
+  async sendToInbox(captureData) {
+    return this.requestWithRetry('/api/capture-inbox', {
+      method: 'POST',
+      body: JSON.stringify(captureData)
+    });
+  },
+
+  /**
+   * Get inbox items with optional filters
+   * @param {Object} filters - Optional filters (status, limit, etc.)
+   * @returns {Promise<Array>} Array of inbox items
+   */
+  async getInboxItems(filters = {}) {
+    const params = new URLSearchParams(filters).toString();
+    const endpoint = params ? `/api/capture-inbox?${params}` : '/api/capture-inbox';
+    return this.request(endpoint);
+  },
+
   /**
    * Make request with exponential backoff retry
    */
