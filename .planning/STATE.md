@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-22)
 
 ## Current Position
 
-Phase: 7 of 9 (Extension Core) - Ready to plan
-Plan: 0 of 3 in current phase
-Status: Ready to plan
-Last activity: 2026-01-22 — Completed Phase 6 (Backend Foundation)
+Phase: 7 of 9 (Extension Core) - In progress
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-01-22 — Completed 07-01-PLAN.md (Capture Rule Fetching)
 
-Progress: [=======|  ] 67% (6/9 phases complete across milestones)
+Progress: [=======|  ] 70% (6/9 phases, 1/3 plans in phase 7)
 
 ## Performance Metrics
 
@@ -25,9 +25,10 @@ Progress: [=======|  ] 67% (6/9 phases complete across milestones)
 
 **Current Milestone (v1.1):**
 - Estimated plans: 9
-- Completed: 2 (Phase 6)
+- Completed: 3 (Phase 6 + Phase 7 plan 1)
 - 06-01: 2m 6s (database schema)
 - 06-02: 3m 22s (backend services)
+- 07-01: 3m 6s (capture rule fetching)
 
 ## Accumulated Context
 
@@ -53,6 +54,8 @@ v1.1 decisions from execution:
 - D-0602-01: Single CaptureService handles rules, inbox, and mappings (cohesive domain)
 - D-0602-02: Bulk accept/reject via loop over single methods (consistent behavior)
 - D-0602-03: Auto-create entity mapping when create_mapping=true on accept
+- D-0701-01: 30-minute rule refresh interval (balance freshness vs API load)
+- D-0701-02: Rule scripts use rule-{id} naming to distinguish from static scripts
 
 ### Pending Todos
 
@@ -84,5 +87,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed Phase 6, ready for Phase 7 planning
+Stopped at: Completed 07-01-PLAN.md, ready for 07-02
 Resume file: None
