@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-22)
 ## Current Position
 
 Phase: 7 of 9 (Extension Core) - In progress
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-01-22 — Completed 07-01-PLAN.md (Capture Rule Fetching)
+Last activity: 2026-01-22 — Completed 07-02-PLAN.md (Generic Extractor Content Script)
 
-Progress: [=======|  ] 70% (6/9 phases, 1/3 plans in phase 7)
+Progress: [========| ] 75% (6/9 phases, 2/3 plans in phase 7)
 
 ## Performance Metrics
 
@@ -25,10 +25,11 @@ Progress: [=======|  ] 70% (6/9 phases, 1/3 plans in phase 7)
 
 **Current Milestone (v1.1):**
 - Estimated plans: 9
-- Completed: 3 (Phase 6 + Phase 7 plan 1)
+- Completed: 4 (Phase 6 + Phase 7 plans 1-2)
 - 06-01: 2m 6s (database schema)
 - 06-02: 3m 22s (backend services)
 - 07-01: 3m 6s (capture rule fetching)
+- 07-02: 3m 29s (generic extractor content script)
 
 ## Accumulated Context
 
@@ -56,6 +57,9 @@ v1.1 decisions from execution:
 - D-0602-03: Auto-create entity mapping when create_mapping=true on accept
 - D-0701-01: 30-minute rule refresh interval (balance freshness vs API load)
 - D-0701-02: Rule scripts use rule-{id} naming to distinguish from static scripts
+- D-0702-01: Manual capture only, no auto-capture on page load (user control)
+- D-0702-02: Orange badge (FF9800) for pending inbox count
+- D-0702-03: Generic extractor uses <all_urls> in web_accessible_resources
 
 ### Pending Todos
 
@@ -84,8 +88,24 @@ None.
 - GET/POST /api/capture-inbox, POST /:id/accept, POST /:id/reject, POST /bulk-accept, POST /bulk-reject
 - GET/POST/DELETE /api/entity-mappings, GET /lookup/:source
 
+## Phase 7 Progress
+
+**Plan 07-01:** Capture Rule Fetching (completed 2026-01-22)
+- Rule fetching from backend API
+- chrome.storage caching with 30-min refresh
+- Dynamic content script registration via scripting API
+
+**Plan 07-02:** Generic Extractor Content Script (completed 2026-01-22)
+- Rule-based DOM extraction (text/html/attribute/href/src types)
+- Complete capture flow to backend inbox
+- Pending inbox badge with count display
+
+**Plan 07-03:** Popup UI (next)
+- Capture controls in extension popup
+- Inbox preview with pending count
+
 ## Session Continuity
 
-Last session: 2026-01-22
-Stopped at: Completed 07-01-PLAN.md, ready for 07-02
+Last session: 2026-01-22T08:59:13Z
+Stopped at: Completed 07-02-PLAN.md, ready for 07-03
 Resume file: None
