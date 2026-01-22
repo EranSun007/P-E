@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-22)
 
 **Core value:** Single dashboard showing health and status across all team tools without switching contexts
-**Current focus:** v1.1 Web Capture Framework — Phase 6: Backend Foundation
+**Current focus:** v1.1 Web Capture Framework — Phase 7: Extension Backend Integration
 
 ## Current Position
 
-Phase: 6 of 9 (Backend Foundation)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-01-22 — Completed 06-01-PLAN.md (Database Schema)
+Phase: 6 of 9 (Backend Foundation) - COMPLETE
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-01-22 — Completed 06-02-PLAN.md (Backend Services)
 
-Progress: [=====|    ] 58% (11/19 total plans)
+Progress: [======|   ] 63% (12/19 total plans)
 
 ## Performance Metrics
 
@@ -25,8 +25,9 @@ Progress: [=====|    ] 58% (11/19 total plans)
 
 **Current Milestone (v1.1):**
 - Estimated plans: 9
-- Completed: 1
+- Completed: 2
 - 06-01: 2m 6s (database schema)
+- 06-02: 3m 22s (backend services)
 
 ## Accumulated Context
 
@@ -49,6 +50,9 @@ v1.1 architectural decisions (from research):
 
 v1.1 decisions from execution:
 - D-0601-01: JSONB array for selectors column (flexible schema for field extraction rules)
+- D-0602-01: Single CaptureService handles rules, inbox, and mappings (cohesive domain)
+- D-0602-02: Bulk accept/reject via loop over single methods (consistent behavior)
+- D-0602-03: Auto-create entity mapping when create_mapping=true on accept
 
 ### Pending Todos
 
@@ -62,6 +66,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-22 08:11 UTC
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-01-22 08:19 UTC
+Stopped at: Completed 06-02-PLAN.md (Phase 6 complete)
 Resume file: None
