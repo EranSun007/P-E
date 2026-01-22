@@ -30,6 +30,10 @@ import userSettingsRouter from './routes/userSettings.js';
 import githubRouter from './routes/github.js';
 import aiRouter from './routes/ai.js';
 import jiraRouter from './routes/jira.js';
+import metricsRouter from './routes/metrics.js';
+import captureRulesRouter from './routes/captureRules.js';
+import captureInboxRouter from './routes/captureInbox.js';
+import entityMappingsRouter from './routes/entityMappings.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -133,6 +137,10 @@ app.use('/api/user-settings', userSettingsRouter);
 app.use('/api/github', githubRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api/jira-issues', jiraRouter);
+app.use('/api/metrics', metricsRouter);
+app.use('/api/capture-rules', captureRulesRouter);
+app.use('/api/capture-inbox', captureInboxRouter);
+app.use('/api/entity-mappings', entityMappingsRouter);
 
 // 404 handler
 app.use((req, res) => {
