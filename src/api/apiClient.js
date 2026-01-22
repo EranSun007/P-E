@@ -386,6 +386,7 @@ export const apiClient = {
     // Capture Framework
     CaptureInbox: createCaptureInboxClient(),
     EntityMapping: createEntityMappingClient(),
+    CaptureRule: createEntityClient('/capture-rules'),
   },
 
   auth: {

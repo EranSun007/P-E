@@ -104,6 +104,14 @@ export const EntityMapping = USE_API ? apiClient.entities.EntityMapping : {
   lookup: async () => { throw new Error('Entity mapping not available in local mode'); },
 };
 
+export const CaptureRule = USE_API ? apiClient.entities.CaptureRule : {
+  list: async () => { throw new Error('Capture rules not available in local mode'); },
+  get: async () => { throw new Error('Capture rules not available in local mode'); },
+  create: async () => { throw new Error('Capture rules not available in local mode'); },
+  update: async () => { throw new Error('Capture rules not available in local mode'); },
+  delete: async () => { throw new Error('Capture rules not available in local mode'); },
+};
+
 // User entity that works with both authentication systems
 export const User = USE_API ? apiClient.auth : {
   me: async () => {
