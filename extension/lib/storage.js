@@ -9,7 +9,9 @@ const STORAGE_KEYS = {
   AUTH_TOKEN: 'authToken',
   BACKEND_URL: 'backendUrl',
   LAST_SYNC: 'lastSync',
-  PENDING_ISSUES: 'pendingIssues'
+  PENDING_ISSUES: 'pendingIssues',
+  CAPTURE_RULES: 'captureRules',
+  PENDING_COUNT: 'pendingInboxCount'
 };
 
 const DEFAULTS = {
@@ -21,7 +23,12 @@ const DEFAULTS = {
     issueCount: 0,
     error: null
   },
-  [STORAGE_KEYS.PENDING_ISSUES]: []
+  [STORAGE_KEYS.PENDING_ISSUES]: [],
+  [STORAGE_KEYS.CAPTURE_RULES]: {
+    rules: [],
+    lastRefresh: null
+  },
+  [STORAGE_KEYS.PENDING_COUNT]: 0
 };
 
 export const Storage = {
@@ -108,6 +115,45 @@ export const Storage = {
       this.getBackendUrl()
     ]);
     return Boolean(token && url);
+  },
+
+  /**
+   * Get cached capture rules
+   * @returns {{ rules: Array, lastRefresh: string|null }}
+   */
+  async getCaptureRules() {
+    const data = await chrome.storage.local.get(STORAGE_KEYS.CAPTURE_RULES);
+    return data[STORAGE_KEYS.CAPTURE_RULES] || DEFAULTS[STORAGE_KEYS.CAPTURE_RULES];
+  },
+
+  /**
+   * Set capture rules with refresh timestamp
+   * @param {Array} rules - Array of capture rule objects
+   */
+  async setCaptureRules(rules) {
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.CAPTURE_RULES]: {
+        rules,
+        lastRefresh: new Date().toISOString()
+      }
+    });
+  },
+
+  /**
+   * Get pending inbox count for badge display
+   * @returns {number}
+   */
+  async getPendingCount() {
+    const data = await chrome.storage.local.get(STORAGE_KEYS.PENDING_COUNT);
+    return data[STORAGE_KEYS.PENDING_COUNT] || DEFAULTS[STORAGE_KEYS.PENDING_COUNT];
+  },
+
+  /**
+   * Set pending inbox count
+   * @param {number} count
+   */
+  async setPendingCount(count) {
+    await chrome.storage.local.set({ [STORAGE_KEYS.PENDING_COUNT]: count });
   },
 
   /**

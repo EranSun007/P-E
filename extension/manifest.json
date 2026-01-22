@@ -1,19 +1,26 @@
 {
   "manifest_version": 3,
-  "name": "P&E Manager Jira Sync",
-  "version": "1.0.0",
-  "description": "Sync Jira board data to P&E Manager",
+  "name": "P&E Manager Web Capture",
+  "version": "1.1.0",
+  "description": "Capture data from any configured website to P&E Manager",
 
   "permissions": [
     "storage",
     "activeTab",
-    "webNavigation"
+    "webNavigation",
+    "scripting",
+    "alarms"
   ],
 
   "host_permissions": [
     "https://jira.tools.sap/*",
     "https://pe-manager-backend.cfapps.eu01-canary.hana.ondemand.com/*",
     "http://localhost:3001/*"
+  ],
+
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://*/*"
   ],
 
   "background": {
