@@ -13,6 +13,23 @@
       font-size: 16px;
       margin: 0 0 12px 0;
     }
+    .pending-section {
+      background: #fff3cd;
+      color: #856404;
+      padding: 8px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .pending-section a {
+      color: #856404;
+      font-size: 12px;
+    }
+    #pendingCount {
+      font-weight: bold;
+    }
     .status {
       padding: 8px;
       border-radius: 4px;
@@ -29,6 +46,18 @@
       margin-top: 8px;
       cursor: pointer;
     }
+    button.secondary {
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      color: #333;
+    }
+    button.secondary:hover {
+      background: #e0e0e0;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
     .info {
       font-size: 12px;
       color: #666;
@@ -37,13 +66,20 @@
   </style>
 </head>
 <body>
-  <h1>P&E Jira Sync</h1>
+  <h1>P&E Web Capture</h1>
+
+  <div id="pendingSection" class="pending-section" style="display: none;">
+    <span><span id="pendingCount">0</span> captures pending review</span>
+    <a href="#" id="viewInbox">View Inbox</a>
+  </div>
 
   <div id="status" class="status loading">Loading...</div>
 
   <button id="testBtn">Test Connection</button>
   <button id="syncBtn">Sync Now</button>
+  <button id="captureBtn">Capture This Page</button>
   <button id="optionsBtn">Settings</button>
+  <button id="refreshRulesBtn" class="secondary">Refresh Rules</button>
 
   <div class="info" id="info"></div>
 

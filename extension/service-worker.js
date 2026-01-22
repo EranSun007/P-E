@@ -77,7 +77,9 @@ const MessageType = {
   // Capture framework messages
   GET_RULE_FOR_URL: 'GET_RULE_FOR_URL',   // Content script asks for matching rule
   CAPTURE_DATA: 'CAPTURE_DATA',           // Content script sends extracted data
-  REFRESH_RULES: 'REFRESH_RULES'          // Popup requests rule refresh
+  REFRESH_RULES: 'REFRESH_RULES',         // Popup requests rule refresh
+  GET_PENDING_COUNT: 'GET_PENDING_COUNT', // Popup requests pending inbox count
+  MANUAL_CAPTURE: 'MANUAL_CAPTURE'        // Popup triggers manual capture
 };
 
 // Capture rules refresh alarm
@@ -96,18 +98,28 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
   // Load rules from cache on install and update
   await loadRulesFromCache();
+  await scheduleRuleRefresh();
+
+  // Initialize pending badge
+  await updatePendingBadge();
 });
 
 // Service worker startup (runs on wake from termination)
 chrome.runtime.onStartup.addListener(async () => {
   console.log('[PE-Capture] Service worker started');
-  // Restore badge state from storage
+
+  // Restore Jira sync badge state (only show error badge, pending count takes priority otherwise)
   const lastSync = await Storage.getLastSync();
-  await updateBadge(lastSync.status);
+  if (lastSync.status === 'error') {
+    await updateBadge(lastSync.status);
+  }
 
   // Load capture rules from cache and schedule refresh
   await loadRulesFromCache();
   await scheduleRuleRefresh();
+
+  // Update pending capture badge (takes priority over sync status)
+  await updatePendingBadge();
 });
 
 // Alarm listener for periodic rule refresh
@@ -160,6 +172,12 @@ async function handleMessage(message, sender) {
 
     case MessageType.REFRESH_RULES:
       return await refreshRulesFromBackend();
+
+    case MessageType.GET_PENDING_COUNT:
+      return await handleGetPendingCount();
+
+    case MessageType.MANUAL_CAPTURE:
+      return await handleManualCapture();
 
     default:
       return { success: false, error: `Unknown message type: ${message.type}` };
@@ -446,13 +464,118 @@ async function handleGetRuleForUrl(url) {
 
 /**
  * Handle captured data from content script
- * Placeholder - full implementation in 07-02
+ * Validates payload, sends to backend inbox, updates badge
  * @param {Object} payload - Captured data payload
+ * @returns {{ success: boolean, data?: Object, error?: string }}
  */
 async function handleCaptureData(payload) {
-  // TODO: Implement in plan 07-02
-  console.log('[PE-Capture] Received capture data (not yet implemented):', payload);
-  return { success: false, error: 'Not implemented' };
+  // Validate payload
+  if (!payload || !payload.rule_id || !payload.captured_data) {
+    return { success: false, error: 'Invalid capture payload' };
+  }
+
+  // Check configuration
+  const isConfigured = await Storage.isConfigured();
+  if (!isConfigured) {
+    console.warn('[PE-Capture] Cannot capture: extension not configured');
+    return { success: false, error: 'Extension not configured' };
+  }
+
+  try {
+    console.log('[PE-Capture] Sending to inbox:', payload.rule_name);
+
+    // Send to backend
+    const result = await Api.sendToInbox(payload);
+
+    // Update pending count badge
+    await updatePendingBadge();
+
+    console.log('[PE-Capture] Capture successful:', result.id);
+    return { success: true, data: result };
+
+  } catch (error) {
+    console.error('[PE-Capture] Capture failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// =============================================================================
+// PENDING INBOX BADGE
+// =============================================================================
+
+/**
+ * Update extension badge with pending inbox count
+ * Fetches pending count from backend and displays on badge
+ * Orange badge for pending items, clear badge if zero
+ */
+async function updatePendingBadge() {
+  try {
+    const isConfigured = await Storage.isConfigured();
+    if (!isConfigured) {
+      return;
+    }
+
+    // Fetch pending items from backend
+    const items = await Api.getInboxItems({ status: 'pending' });
+    const count = items.length;
+
+    if (count === 0) {
+      await chrome.action.setBadgeText({ text: '' });
+    } else {
+      await chrome.action.setBadgeText({ text: count > 99 ? '99+' : String(count) });
+      await chrome.action.setBadgeBackgroundColor({ color: '#FF9800' }); // Orange for pending
+    }
+
+    // Also store count for offline access
+    await Storage.setPendingCount(count);
+
+    console.log('[PE-Capture] Pending badge updated:', count);
+  } catch (error) {
+    // Don't fail capture if badge update fails
+    console.warn('[PE-Capture] Failed to update badge:', error.message);
+  }
+}
+
+/**
+ * Handle GET_PENDING_COUNT message from popup
+ * Returns cached count for offline/fast access
+ * @returns {{ success: boolean, count: number }}
+ */
+async function handleGetPendingCount() {
+  try {
+    const count = await Storage.getPendingCount();
+    return { success: true, count };
+  } catch (error) {
+    return { success: false, count: 0, error: error.message };
+  }
+}
+
+/**
+ * Handle manual capture request from popup
+ * Forwards MANUAL_CAPTURE message to active tab's content script
+ * @returns {{ success: boolean, error?: string }}
+ */
+async function handleManualCapture() {
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const activeTab = tabs[0];
+
+    if (!activeTab || !activeTab.id) {
+      return { success: false, error: 'No active tab' };
+    }
+
+    // Send MANUAL_CAPTURE message to content script (generic-extractor.js)
+    const response = await chrome.tabs.sendMessage(activeTab.id, { type: 'MANUAL_CAPTURE' });
+    return response;
+
+  } catch (error) {
+    // Content script may not be loaded on this page
+    console.warn('[PE-Capture] Manual capture failed:', error.message);
+    return {
+      success: false,
+      error: 'No capture script on this page. Check if URL matches a capture rule.'
+    };
+  }
 }
 
 console.log('[PE-Capture] Service worker loaded');

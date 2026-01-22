@@ -125,6 +125,15 @@ export const Api = {
   },
 
   /**
+   * Get count of pending inbox items
+   * @returns {Promise<number>} Count of pending items
+   */
+  async getPendingInboxCount() {
+    const items = await this.request('/api/capture-inbox?status=pending');
+    return Array.isArray(items) ? items.length : 0;
+  },
+
+  /**
    * Make request with exponential backoff retry
    */
   async requestWithRetry(endpoint, options, retryCount = 0) {
