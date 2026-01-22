@@ -84,6 +84,26 @@ export const JiraMapping = USE_API ? apiClient.entities.JiraMapping : {
   delete: async () => { throw new Error('Jira mapping not available in local mode'); },
 };
 
+// Capture Framework (only available with API mode)
+export const CaptureInbox = USE_API ? apiClient.entities.CaptureInbox : {
+  list: async () => { throw new Error('Capture inbox not available in local mode'); },
+  get: async () => { throw new Error('Capture inbox not available in local mode'); },
+  create: async () => { throw new Error('Capture inbox not available in local mode'); },
+  accept: async () => { throw new Error('Capture inbox not available in local mode'); },
+  reject: async () => { throw new Error('Capture inbox not available in local mode'); },
+  bulkAccept: async () => { throw new Error('Capture inbox not available in local mode'); },
+  bulkReject: async () => { throw new Error('Capture inbox not available in local mode'); },
+};
+
+export const EntityMapping = USE_API ? apiClient.entities.EntityMapping : {
+  list: async () => { throw new Error('Entity mapping not available in local mode'); },
+  get: async () => { throw new Error('Entity mapping not available in local mode'); },
+  create: async () => { throw new Error('Entity mapping not available in local mode'); },
+  update: async () => { throw new Error('Entity mapping not available in local mode'); },
+  delete: async () => { throw new Error('Entity mapping not available in local mode'); },
+  lookup: async () => { throw new Error('Entity mapping not available in local mode'); },
+};
+
 // User entity that works with both authentication systems
 export const User = USE_API ? apiClient.auth : {
   me: async () => {

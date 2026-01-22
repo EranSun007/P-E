@@ -272,6 +272,63 @@ function createTimeOffClient() {
   };
 }
 
+// Create CaptureInbox client with custom methods for inbox workflow
+function createCaptureInboxClient() {
+  const baseClient = createEntityClient('/capture-inbox');
+
+  return {
+    ...baseClient,
+
+    // Accept item with optional entity mapping
+    async accept(id, data = {}) {
+      return fetchWithAuth(`${API_BASE_URL}/capture-inbox/${id}/accept`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+
+    // Reject item with optional reason
+    async reject(id, data = {}) {
+      return fetchWithAuth(`${API_BASE_URL}/capture-inbox/${id}/reject`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+
+    // Bulk accept multiple items
+    async bulkAccept(itemIds, options = {}) {
+      return fetchWithAuth(`${API_BASE_URL}/capture-inbox/bulk-accept`, {
+        method: 'POST',
+        body: JSON.stringify({ item_ids: itemIds, ...options }),
+      });
+    },
+
+    // Bulk reject multiple items
+    async bulkReject(itemIds) {
+      return fetchWithAuth(`${API_BASE_URL}/capture-inbox/bulk-reject`, {
+        method: 'POST',
+        body: JSON.stringify({ item_ids: itemIds }),
+      });
+    },
+  };
+}
+
+// Create EntityMapping client with lookup method
+function createEntityMappingClient() {
+  const baseClient = createEntityClient('/entity-mappings');
+
+  return {
+    ...baseClient,
+
+    // Lookup existing mapping by source identifier
+    async lookup(sourceIdentifier) {
+      return fetchWithAuth(
+        `${API_BASE_URL}/entity-mappings/lookup/${encodeURIComponent(sourceIdentifier)}`
+      );
+    },
+  };
+}
+
 export const apiClient = {
   entities: {
     Task: createEntityClient('/tasks'),
@@ -318,13 +375,17 @@ export const apiClient = {
       }
     },
 
-    JiraMapping: createEntityClient('/jira-mappings'),
+    JiraMapping: createEntityClient('/jira-issues/mappings'),
 
     // Additional entities (stored in localStorage until backend routes are created)
     Peer: createEntityClient('/peers'),
     Duty: createEntityClient('/duties'),
     AgendaItem: createEntityClient('/agenda-items'),
     PersonalFileItem: createEntityClient('/personal-file-items'),
+
+    // Capture Framework
+    CaptureInbox: createCaptureInboxClient(),
+    EntityMapping: createEntityMappingClient(),
   },
 
   auth: {
