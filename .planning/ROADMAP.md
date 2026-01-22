@@ -127,12 +127,12 @@ Plans:
   3. Generic extractor applies rule-defined CSS selectors and field names to page DOM
   4. Captured data is sent to /api/capture-inbox (staged for review)
   5. Extension badge shows count of captures pending review
-**Plans**: TBD (estimated 2-3 plans)
+**Plans**: 3 plans
 
 Plans:
-- [ ] 07-01: Dynamic rule fetching and content script registration
-- [ ] 07-02: Generic extractor and staging capture flow
-- [ ] 07-03: Badge status and manual capture trigger
+- [ ] 07-01-PLAN.md — Rule fetching, storage, API client, dynamic script registration
+- [ ] 07-02-PLAN.md — Generic extractor content script and capture flow
+- [ ] 07-03-PLAN.md — Badge status and manual capture trigger in popup
 
 ### Phase 8: Inbox and Mapping UI
 **Goal**: User can review captured data and map it to P&E Manager entities
@@ -180,7 +180,7 @@ v1.1: 6 -> 7 (depends on 6), 8 (depends on 6), 9 (depends on 6+7)
 | 4. Extension UI | v1.0 | 1/1 | Complete | 2026-01-21 |
 | 5. Web App Integration | v1.0 | 2/2 | Complete | 2026-01-21 |
 | 6. Backend Foundation | v1.1 | 2/2 | Complete | 2026-01-22 |
-| 7. Extension Core | v1.1 | 0/3 | Not started | - |
+| 7. Extension Core | v1.1 | 0/3 | Planned | - |
 | 8. Inbox and Mapping UI | v1.1 | 0/2 | Not started | - |
 | 9. Rule Builder UI | v1.1 | 0/2 | Not started | - |
 
