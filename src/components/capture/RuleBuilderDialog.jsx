@@ -134,22 +134,6 @@ export default function RuleBuilderDialog({ open, onOpenChange, rule, onSave }) 
     setSelectors(selectors.filter((_, i) => i !== index));
   };
 
-  const updateSelector = (index, field, value) => {
-    setSelectors(selectors.map((sel, i) => {
-      if (i === index) {
-        const updated = { ...sel, [field]: value };
-
-        // Clear attribute if type is changed away from 'attribute'
-        if (field === 'type' && value !== 'attribute') {
-          delete updated.attribute;
-        }
-
-        return updated;
-      }
-      return sel;
-    }));
-  };
-
   // Form handlers
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
