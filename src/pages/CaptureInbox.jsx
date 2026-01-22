@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
-import { CaptureInbox } from "@/api/entities";
+import { CaptureInbox as CaptureInboxApi } from "@/api/entities";
+import { format } from "date-fns";
 import {
   Inbox,
   RefreshCw,
   Search,
-  Filter,
   X,
   Clock,
   Loader2,
@@ -12,39 +12,41 @@ import {
   Eye,
   Check,
   XCircle,
-  Globe
+  Globe,
+  ExternalLink,
+  Link2,
 } from "lucide-react";
-import InboxItemDetail from "@/components/capture/InboxItemDetail";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
-  TableRow
+  TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem
-} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from "@/components/ui/select";
+import { EmptyState } from "@/components/ui/EmptyState";
+import InboxItemDetail from "@/components/capture/InboxItemDetail";
+import EntityMappingDialog from "@/components/capture/EntityMappingDialog";
+import InboxBulkActions from "@/components/capture/InboxBulkActions";
 
 export default function CaptureInboxPage() {
   // Loading and error states
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(null);
+  const [bulkLoading, setBulkLoading] = useState(false);
   const [error, setError] = useState(null);
 
   // Data state
@@ -53,27 +55,36 @@ export default function CaptureInboxPage() {
   // Filter state
   const [filters, setFilters] = useState({
     status: "pending",
+    search: "",
     source: null,
-    search: ""
   });
 
-  // Detail dialog state
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  // Preview dialog state
   const [selectedItem, setSelectedItem] = useState(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
 
-  // Action loading states
-  const [actionLoading, setActionLoading] = useState({});
+  // Entity mapping dialog state
+  const [mappingItem, setMappingItem] = useState(null);
+  const [showMappingDialog, setShowMappingDialog] = useState(false);
 
   // Load data on mount
   useEffect(() => {
     loadData();
   }, []);
 
+  // Clear selection when filters change
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [filters]);
+
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await CaptureInbox.list();
+      const data = await CaptureInboxApi.list();
       setItems(data || []);
     } catch (err) {
       console.error("Failed to load capture inbox:", err);
@@ -83,7 +94,7 @@ export default function CaptureInboxPage() {
     }
   };
 
-  // Extract unique sources from items
+  // Extract unique sources for filter dropdown
   const uniqueSources = useMemo(() => {
     const sources = new Set();
     items.forEach(item => {
@@ -98,120 +109,213 @@ export default function CaptureInboxPage() {
     return Array.from(sources).sort();
   }, [items]);
 
-  // Client-side filtering with useMemo
+  // Client-side filtering
   const filteredItems = useMemo(() => {
     return items.filter(item => {
       // Status filter
-      if (filters.status !== "all" && item.status !== filters.status) {
+      if (filters.status && filters.status !== "all" && item.status !== filters.status) {
         return false;
+      }
+
+      // Search filter
+      if (filters.search) {
+        const searchLower = filters.search.toLowerCase();
+        const matchesIdentifier = item.source_identifier?.toLowerCase().includes(searchLower);
+        const matchesUrl = item.source_url?.toLowerCase().includes(searchLower);
+        const matchesRule = item.rule_name?.toLowerCase().includes(searchLower);
+        if (!matchesIdentifier && !matchesUrl && !matchesRule) {
+          return false;
+        }
       }
 
       // Source filter
       if (filters.source) {
         try {
-          const itemHostname = item.source_url ? new URL(item.source_url).hostname : "";
-          if (itemHostname !== filters.source) return false;
+          const itemHost = new URL(item.source_url).hostname;
+          if (itemHost !== filters.source) return false;
         } catch {
           return false;
         }
-      }
-
-      // Search filter (source_identifier or rule_name)
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        const matchesIdentifier = item.source_identifier?.toLowerCase().includes(searchLower);
-        const matchesRule = item.rule_name?.toLowerCase().includes(searchLower);
-        if (!matchesIdentifier && !matchesRule) return false;
       }
 
       return true;
     });
   }, [items, filters]);
 
+  // Only pending items can be selected
+  const selectableItems = useMemo(() => {
+    return filteredItems.filter(item => item.status === "pending");
+  }, [filteredItems]);
+
   // Calculate summary stats
   const stats = useMemo(() => {
     const total = items.length;
-    const pending = items.filter(i => i.status === 'pending').length;
-    const accepted = items.filter(i => i.status === 'accepted').length;
-    const rejected = items.filter(i => i.status === 'rejected').length;
+    const pending = items.filter(i => i.status === "pending").length;
+    const accepted = items.filter(i => i.status === "accepted").length;
+    const rejected = items.filter(i => i.status === "rejected").length;
     return { total, pending, accepted, rejected };
   }, [items]);
 
-  // Helper: format time ago
-  const formatTimeAgo = (dateStr) => {
+  // Selection helpers
+  const allSelected = selectableItems.length > 0 &&
+    selectableItems.every(item => selectedIds.has(item.id));
+  const someSelected = selectedIds.size > 0 && !allSelected;
+
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedIds(new Set(selectableItems.map(i => i.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleSelectItem = (id, checked) => {
+    const newSet = new Set(selectedIds);
+    if (checked) {
+      newSet.add(id);
+    } else {
+      newSet.delete(id);
+    }
+    setSelectedIds(newSet);
+  };
+
+  // Format timestamp
+  const formatTime = (dateStr) => {
     if (!dateStr) return "Unknown";
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 30) return `${diffDays}d ago`;
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    try {
+      return format(new Date(dateStr), "MMM d, h:mm a");
+    } catch {
+      return dateStr;
+    }
   };
 
-  // Helper: get status badge color
-  const getStatusColor = (status) => {
-    if (status === "accepted") return "bg-green-100 text-green-800";
-    if (status === "rejected") return "bg-red-100 text-red-800";
-    if (status === "pending") return "bg-yellow-100 text-yellow-800";
-    return "bg-gray-100 text-gray-800";
-  };
-
-  // Helper: get hostname from URL
+  // Get hostname from URL
   const getHostname = (url) => {
     if (!url) return "Unknown";
     try {
       return new URL(url).hostname;
     } catch {
-      return "Unknown";
+      return url;
     }
   };
 
-  // Check if any filters are active (besides status)
-  const hasActiveFilters = filters.source !== null || filters.search !== "";
+  // Status badge colors
+  const getStatusBadge = (status) => {
+    const variants = {
+      pending: "bg-yellow-100 text-yellow-800",
+      accepted: "bg-green-100 text-green-800",
+      rejected: "bg-red-100 text-red-800",
+    };
+    return variants[status] || "bg-gray-100 text-gray-800";
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters = filters.status !== "pending" ||
+                           filters.search !== "" ||
+                           filters.source !== null;
 
   // Clear all filters
   const clearFilters = () => {
-    setFilters({ status: "pending", source: null, search: "" });
+    setFilters({ status: "pending", search: "", source: null });
   };
 
-  // Handle accept action
-  const handleAccept = async (itemId, e) => {
-    e?.stopPropagation();
-    setActionLoading(prev => ({ ...prev, [itemId]: 'accept' }));
+  // Handle accept with mapping dialog
+  const handleAcceptWithMapping = (item) => {
+    setMappingItem(item);
+    setShowMappingDialog(true);
+  };
+
+  // Handle accept from mapping dialog
+  const handleMappingAccept = async ({ inboxItemId, target_entity_type, target_entity_id, create_mapping }) => {
+    setActionLoading(inboxItemId);
     try {
-      await CaptureInbox.accept(itemId);
+      await CaptureInboxApi.accept(inboxItemId, {
+        target_entity_type,
+        target_entity_id,
+        create_mapping,
+      });
       // Update local state
-      setItems(prev => prev.map(item =>
-        item.id === itemId ? { ...item, status: 'accepted', processed_at: new Date().toISOString() } : item
+      setItems(prev => prev.map(i =>
+        i.id === inboxItemId ? { ...i, status: "accepted" } : i
       ));
+      // Remove from selection if selected
+      setSelectedIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(inboxItemId);
+        return newSet;
+      });
     } catch (err) {
       console.error("Failed to accept item:", err);
-      setError(err.message || "Failed to accept item");
+      throw err; // Re-throw to show error in dialog
     } finally {
-      setActionLoading(prev => ({ ...prev, [itemId]: null }));
+      setActionLoading(null);
     }
   };
 
-  // Handle reject action
-  const handleReject = async (itemId, e) => {
-    e?.stopPropagation();
-    setActionLoading(prev => ({ ...prev, [itemId]: 'reject' }));
+  // Handle quick reject (no mapping needed)
+  const handleReject = async (item) => {
+    setActionLoading(item.id);
     try {
-      await CaptureInbox.reject(itemId);
-      // Update local state
-      setItems(prev => prev.map(item =>
-        item.id === itemId ? { ...item, status: 'rejected', processed_at: new Date().toISOString() } : item
+      await CaptureInboxApi.reject(item.id, {});
+      setItems(prev => prev.map(i =>
+        i.id === item.id ? { ...i, status: "rejected" } : i
       ));
+      setSelectedIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(item.id);
+        return newSet;
+      });
     } catch (err) {
       console.error("Failed to reject item:", err);
-      setError(err.message || "Failed to reject item");
+      setError("Failed to reject item");
     } finally {
-      setActionLoading(prev => ({ ...prev, [itemId]: null }));
+      setActionLoading(null);
+    }
+  };
+
+  // Handle preview click
+  const handlePreview = (item) => {
+    setSelectedItem(item);
+    setShowDetailDialog(true);
+  };
+
+  // Handle bulk accept
+  const handleBulkAccept = async (entityType) => {
+    setBulkLoading(true);
+    setError(null);
+    try {
+      const ids = Array.from(selectedIds);
+      await CaptureInboxApi.bulkAccept(ids, { target_entity_type: entityType });
+      // Update local state
+      setItems(prev => prev.map(i =>
+        selectedIds.has(i.id) ? { ...i, status: "accepted" } : i
+      ));
+      setSelectedIds(new Set());
+    } catch (err) {
+      console.error("Failed to bulk accept:", err);
+      setError("Failed to accept selected items");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  // Handle bulk reject
+  const handleBulkReject = async () => {
+    setBulkLoading(true);
+    setError(null);
+    try {
+      const ids = Array.from(selectedIds);
+      await CaptureInboxApi.bulkReject(ids);
+      // Update local state
+      setItems(prev => prev.map(i =>
+        selectedIds.has(i.id) ? { ...i, status: "rejected" } : i
+      ));
+      setSelectedIds(new Set());
+    } catch (err) {
+      console.error("Failed to bulk reject:", err);
+      setError("Failed to reject selected items");
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -226,19 +330,17 @@ export default function CaptureInboxPage() {
               Capture Inbox
             </h1>
             <p className="text-gray-500 mt-1">
-              Review and process captured data from web pages
+              Review and process captured data from websites
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={loadData} disabled={loading}>
-              {loading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
-              )}
-              Refresh
-            </Button>
-          </div>
+          <Button variant="outline" onClick={loadData} disabled={loading}>
+            {loading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            Refresh
+          </Button>
         </div>
 
         {/* Error alert */}
@@ -252,7 +354,7 @@ export default function CaptureInboxPage() {
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            <span className="ml-2 text-gray-500">Loading inbox items...</span>
+            <span className="ml-2 text-gray-500">Loading capture inbox...</span>
           </div>
         ) : (
           <div className="space-y-4">
@@ -292,7 +394,7 @@ export default function CaptureInboxPage() {
                   <div className="relative flex-1 min-w-[200px] max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
-                      placeholder="Search by identifier or rule..."
+                      placeholder="Search by identifier, URL, or rule..."
                       value={filters.search}
                       onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
                       className="pl-9"
@@ -301,11 +403,14 @@ export default function CaptureInboxPage() {
 
                   {/* Status filter */}
                   <Select
-                    value={filters.status}
-                    onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
+                    value={filters.status || "all"}
+                    onValueChange={(value) => setFilters(prev => ({
+                      ...prev,
+                      status: value === "all" ? null : value
+                    }))}
                   >
                     <SelectTrigger className="w-[140px]">
-                      <SelectValue placeholder="Status" />
+                      <SelectValue placeholder="All Status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Status</SelectItem>
@@ -316,26 +421,27 @@ export default function CaptureInboxPage() {
                   </Select>
 
                   {/* Source filter */}
-                  <Select
-                    value={filters.source || "all"}
-                    onValueChange={(value) => setFilters(prev => ({
-                      ...prev,
-                      source: value === "all" ? null : value
-                    }))}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <Globe className="h-4 w-4 mr-2" />
-                      <SelectValue placeholder="All Sources" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Sources</SelectItem>
-                      {uniqueSources.map((source) => (
-                        <SelectItem key={source} value={source}>
-                          {source}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {uniqueSources.length > 0 && (
+                    <Select
+                      value={filters.source || "all"}
+                      onValueChange={(value) => setFilters(prev => ({
+                        ...prev,
+                        source: value === "all" ? null : value
+                      }))}
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="All Sources" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Sources</SelectItem>
+                        {uniqueSources.map((source) => (
+                          <SelectItem key={source} value={source}>
+                            {source}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
 
                   {/* Clear filters */}
                   {hasActiveFilters && (
@@ -348,24 +454,44 @@ export default function CaptureInboxPage() {
               </CardContent>
             </Card>
 
+            {/* Bulk Actions Bar */}
+            {selectedIds.size > 0 && (
+              <InboxBulkActions
+                selectedCount={selectedIds.size}
+                onBulkAccept={handleBulkAccept}
+                onBulkReject={handleBulkReject}
+                onClearSelection={() => setSelectedIds(new Set())}
+                loading={bulkLoading}
+              />
+            )}
+
             {/* Items Table */}
             <Card>
               <CardContent className="p-0">
                 {filteredItems.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <Inbox className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>No inbox items found</p>
-                    {hasActiveFilters && (
-                      <Button variant="link" onClick={clearFilters}>
-                        Clear filters to see all items
-                      </Button>
-                    )}
-                  </div>
+                  <EmptyState
+                    icon={Inbox}
+                    title="No Items Found"
+                    description={hasActiveFilters
+                      ? "No items match your current filters."
+                      : "Your capture inbox is empty. Captured data will appear here."}
+                    size="md"
+                  />
                 ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Source</TableHead>
+                        <TableHead className="w-12">
+                          <Checkbox
+                            checked={allSelected}
+                            // Note: Radix Checkbox uses data-state, not indeterminate prop
+                            // We show partial state via different styling
+                            onCheckedChange={handleSelectAll}
+                            disabled={selectableItems.length === 0}
+                            className={someSelected ? "data-[state=checked]:bg-blue-400" : ""}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[180px]">Source</TableHead>
                         <TableHead>Identifier</TableHead>
                         <TableHead>Rule</TableHead>
                         <TableHead>Captured</TableHead>
@@ -377,80 +503,100 @@ export default function CaptureInboxPage() {
                       {filteredItems.map((item) => (
                         <TableRow
                           key={item.id}
-                          className="cursor-pointer hover:bg-gray-50"
-                          onClick={() => {
-                            setSelectedItem(item);
-                            setShowDetailDialog(true);
-                          }}
+                          className={selectedIds.has(item.id) ? "bg-blue-50" : ""}
                         >
                           <TableCell>
-                            <div className="flex items-center gap-1 text-gray-600">
-                              <Globe className="h-4 w-4" />
-                              <span className="text-sm">{getHostname(item.source_url)}</span>
+                            <Checkbox
+                              checked={selectedIds.has(item.id)}
+                              onCheckedChange={(checked) => handleSelectItem(item.id, checked)}
+                              disabled={item.status !== "pending"}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1 text-sm">
+                              <Globe className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                              <span className="truncate max-w-[140px]" title={item.source_url}>
+                                {getHostname(item.source_url)}
+                              </span>
                             </div>
                           </TableCell>
-                          <TableCell className="max-w-xs truncate font-medium">
-                            {item.source_identifier || "-"}
+                          <TableCell>
+                            <span className="text-sm font-medium truncate max-w-[200px] block">
+                              {item.source_identifier || "—"}
+                            </span>
                           </TableCell>
-                          <TableCell className="text-sm text-gray-500">
-                            {item.rule_name || "-"}
+                          <TableCell>
+                            <span className="text-sm text-gray-600">
+                              {item.rule_name || "—"}
+                            </span>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1 text-sm text-gray-500">
-                              <Clock className="h-4 w-4" />
-                              {formatTimeAgo(item.captured_at)}
+                              <Clock className="h-3 w-3" />
+                              {formatTime(item.captured_at)}
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={getStatusColor(item.status)}>
+                            <Badge className={getStatusBadge(item.status)}>
                               {item.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right">
-                            {item.status === 'pending' && (
-                              <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedItem(item);
-                                    setShowDetailDialog(true);
-                                  }}
-                                  title="Preview"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                  onClick={(e) => handleAccept(item.id, e)}
-                                  disabled={actionLoading[item.id]}
-                                  title="Accept"
-                                >
-                                  {actionLoading[item.id] === 'accept' ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Check className="h-4 w-4" />
-                                  )}
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  onClick={(e) => handleReject(item.id, e)}
-                                  disabled={actionLoading[item.id]}
-                                  title="Reject"
-                                >
-                                  {actionLoading[item.id] === 'reject' ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-1">
+                              {/* Preview button */}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handlePreview(item)}
+                                title="Preview"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+
+                              {/* Accept/Reject buttons only for pending items */}
+                              {item.status === "pending" && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleAcceptWithMapping(item)}
+                                    disabled={actionLoading === item.id}
+                                    title="Accept with mapping"
+                                    className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                                  >
+                                    {actionLoading === item.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Link2 className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleReject(item)}
+                                    disabled={actionLoading === item.id}
+                                    title="Reject"
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
                                     <XCircle className="h-4 w-4" />
-                                  )}
+                                  </Button>
+                                </>
+                              )}
+
+                              {/* Link to source */}
+                              {item.source_url && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  asChild
+                                  title="Open source"
+                                >
+                                  <a href={item.source_url} target="_blank" rel="noopener noreferrer">
+                                    <ExternalLink className="h-4 w-4" />
+                                  </a>
                                 </Button>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -462,11 +608,19 @@ export default function CaptureInboxPage() {
           </div>
         )}
 
-        {/* Item Detail Dialog */}
+        {/* Preview Dialog */}
         <InboxItemDetail
           item={selectedItem}
           open={showDetailDialog}
           onOpenChange={setShowDetailDialog}
+        />
+
+        {/* Entity Mapping Dialog */}
+        <EntityMappingDialog
+          open={showMappingDialog}
+          onOpenChange={setShowMappingDialog}
+          inboxItem={mappingItem}
+          onAccept={handleMappingAccept}
         />
       </div>
     </div>
