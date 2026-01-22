@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-22)
 
 **Core value:** Single dashboard showing health and status across all team tools without switching contexts
-**Current focus:** v1.1 Web Capture Framework — Phase 7: Extension Backend Integration
+**Current focus:** v1.1 Web Capture Framework — Phase 7 Complete, Ready for Phase 8
 
 ## Current Position
 
-Phase: 7 of 9 (Extension Core) - In progress
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-01-22 — Completed 07-02-PLAN.md (Generic Extractor Content Script)
+Phase: 7 of 9 (Extension Core) - Complete
+Plan: 3 of 3 in current phase
+Status: Phase complete
+Last activity: 2026-01-22 — Completed 07-03-PLAN.md (Popup UI and Badge Status)
 
-Progress: [========| ] 75% (6/9 phases, 2/3 plans in phase 7)
+Progress: [=========|] 78% (7/9 phases complete)
 
 ## Performance Metrics
 
@@ -25,11 +25,12 @@ Progress: [========| ] 75% (6/9 phases, 2/3 plans in phase 7)
 
 **Current Milestone (v1.1):**
 - Estimated plans: 9
-- Completed: 4 (Phase 6 + Phase 7 plans 1-2)
+- Completed: 5 (Phase 6: 2, Phase 7: 3)
 - 06-01: 2m 6s (database schema)
 - 06-02: 3m 22s (backend services)
 - 07-01: 3m 6s (capture rule fetching)
 - 07-02: 3m 29s (generic extractor content script)
+- 07-03: 3m 38s (popup UI and badge status)
 
 ## Accumulated Context
 
@@ -60,6 +61,8 @@ v1.1 decisions from execution:
 - D-0702-01: Manual capture only, no auto-capture on page load (user control)
 - D-0702-02: Orange badge (FF9800) for pending inbox count
 - D-0702-03: Generic extractor uses <all_urls> in web_accessible_resources
+- D-0703-01: Badge color priority - pending count (orange) takes precedence over sync status
+- D-0703-02: Cached pending count for instant popup display, refreshed on capture
 
 ### Pending Todos
 
@@ -88,24 +91,45 @@ None.
 - GET/POST /api/capture-inbox, POST /:id/accept, POST /:id/reject, POST /bulk-accept, POST /bulk-reject
 - GET/POST/DELETE /api/entity-mappings, GET /lookup/:source
 
-## Phase 7 Progress
+## Phase 7 Completion Summary
 
-**Plan 07-01:** Capture Rule Fetching (completed 2026-01-22)
+**Completed:** 2026-01-22
+**Duration:** ~10 minutes (3 plans)
+
+**Plan 07-01:** Capture Rule Fetching
 - Rule fetching from backend API
 - chrome.storage caching with 30-min refresh
 - Dynamic content script registration via scripting API
 
-**Plan 07-02:** Generic Extractor Content Script (completed 2026-01-22)
+**Plan 07-02:** Generic Extractor Content Script
 - Rule-based DOM extraction (text/html/attribute/href/src types)
 - Complete capture flow to backend inbox
 - Pending inbox badge with count display
 
-**Plan 07-03:** Popup UI (next)
-- Capture controls in extension popup
-- Inbox preview with pending count
+**Plan 07-03:** Popup UI and Badge Status
+- Rebranded popup to "P&E Web Capture"
+- Pending inbox count section with View Inbox link
+- Capture This Page and Refresh Rules buttons
+- GET_PENDING_COUNT and MANUAL_CAPTURE handlers
+- updatePendingBadge with orange badge
+
+**Extension Artifacts:**
+- `extension/content/generic-extractor.js` - Rule-based DOM extractor
+- `extension/popup/popup.html` - Updated popup UI
+- `extension/popup/popup.js` - Capture and badge handlers
+- `extension/service-worker.js` - Capture framework message routing
+- `extension/lib/storage.js` - Capture rules and pending count storage
+- `extension/lib/api.js` - Capture API client methods
 
 ## Session Continuity
 
-Last session: 2026-01-22T08:59:13Z
-Stopped at: Completed 07-02-PLAN.md, ready for 07-03
+Last session: 2026-01-22T08:59:19Z
+Stopped at: Completed Phase 7 (Extension Core)
 Resume file: None
+
+## Next Steps
+
+Ready for Phase 8: Frontend Management
+- Capture inbox page in web app
+- Rule management UI
+- Entity mapping interface
