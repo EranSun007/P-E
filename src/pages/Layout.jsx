@@ -24,7 +24,8 @@ import {
   ListTodo,
   TrendingUp,
   MessageSquare,
-  Rocket
+  Rocket,
+  Inbox
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { User as UserEntity } from "@/api/entities";
@@ -143,6 +144,12 @@ export default function Layout({ children, currentPageName }) {
       icon: Bug,
       href: createPageUrl("Jira"),
       current: currentPageName === "JiraIssues"
+    },
+    {
+      name: "Capture Inbox",
+      icon: Inbox,
+      href: createPageUrl("CaptureInbox"),
+      current: currentPageName === "CaptureInbox"
     }
   ];
 

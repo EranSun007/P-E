@@ -55,6 +55,9 @@ const Analytics = lazy(() => retryImport(() => import(/* webpackChunkName: "page
 const Feedback = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-feedback" */ "./Feedback"), 3, 1000));
 const Releases = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-releases" */ "./Releases"), 3, 1000));
 
+// Capture Framework Pages
+const CaptureInbox = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-capture-inbox" */ "./CaptureInbox"), 3, 1000));
+
 const PAGES = {
     
     Tasks: Tasks,
@@ -98,6 +101,9 @@ const PAGES = {
 
     Releases: Releases,
 
+    // Capture Framework Pages
+    CaptureInbox: CaptureInbox,
+
 }
 
 function _getCurrentPage(url) {
@@ -132,46 +138,49 @@ function PagesContent() {
         <Layout currentPageName={currentPage}>
             <PageChunkErrorBoundary pageName={currentPage}>
                 <Suspense fallback={loadingFallback}>
-                    <Routes>            
-                        
+                    <Routes>
+
                             <Route path="/" element={<Tasks />} />
-                        
-                        
-                        <Route path="/Tasks" element={<Tasks />} />
-                        
-                        <Route path="/Calendar" element={<Calendar />} />
-                        
-                        <Route path="/Metrics" element={<Metrics />} />
-                        
-                        <Route path="/Stakeholders" element={<Stakeholders />} />
-                        
-                        <Route path="/Projects" element={<Projects />} />
-                        
-                        <Route path="/Settings" element={<Settings />} />
-                        
-                        <Route path="/Team" element={<Team />} />
-                        
-                        <Route path="/ProjectDetails" element={<ProjectDetails />} />
-                        
-                        <Route path="/TeamMemberProfile" element={<TeamMemberProfile />} />
-                        
-                        <Route path="/Peers" element={<Peers />} />
-                        
-                        <Route path="/PeerProfile" element={<PeerProfile />} />
 
-                        <Route path="/Duties" element={<Duties />} />
 
-                        <Route path="/GitHub" element={<GitHubRepos />} />
+                        <Route path="/tasks" element={<Tasks />} />
 
-                        <Route path="/Jira" element={<JiraIssues />} />
+                        <Route path="/calendar" element={<Calendar />} />
+
+                        <Route path="/metrics" element={<Metrics />} />
+
+                        <Route path="/stakeholders" element={<Stakeholders />} />
+
+                        <Route path="/projects" element={<Projects />} />
+
+                        <Route path="/settings" element={<Settings />} />
+
+                        <Route path="/team" element={<Team />} />
+
+                        <Route path="/projectdetails" element={<ProjectDetails />} />
+
+                        <Route path="/teammemberprofile" element={<TeamMemberProfile />} />
+
+                        <Route path="/peers" element={<Peers />} />
+
+                        <Route path="/peerprofile" element={<PeerProfile />} />
+
+                        <Route path="/duties" element={<Duties />} />
+
+                        <Route path="/github" element={<GitHubRepos />} />
+
+                        <Route path="/jira" element={<JiraIssues />} />
 
                         {/* Product Mode Pages */}
-                        <Route path="/Services" element={<Services />} />
-                        <Route path="/Roadmap" element={<Roadmap />} />
-                        <Route path="/Backlog" element={<Backlog />} />
-                        <Route path="/Analytics" element={<Analytics />} />
-                        <Route path="/Feedback" element={<Feedback />} />
-                        <Route path="/Releases" element={<Releases />} />
+                        <Route path="/services" element={<Services />} />
+                        <Route path="/roadmap" element={<Roadmap />} />
+                        <Route path="/backlog" element={<Backlog />} />
+                        <Route path="/analytics" element={<Analytics />} />
+                        <Route path="/feedback" element={<Feedback />} />
+                        <Route path="/releases" element={<Releases />} />
+
+                        {/* Capture Framework Routes */}
+                        <Route path="/capture-inbox" element={<CaptureInbox />} />
 
                     </Routes>
                 </Suspense>
