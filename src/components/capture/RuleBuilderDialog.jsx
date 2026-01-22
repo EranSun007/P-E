@@ -1,6 +1,7 @@
 // src/components/capture/RuleBuilderDialog.jsx
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Save, Loader2, AlertCircle } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, AlertCircle, Info, TestTube } from "lucide-react";
+import { PRESET_TEMPLATES, TEMPLATE_OPTIONS } from './PresetTemplates';
 import {
   Dialog,
   DialogContent,
@@ -85,6 +86,21 @@ export default function RuleBuilderDialog({ open, onOpenChange, rule, onSave }) 
       setError(null);
     }
   }, [rule, open]);
+
+  // Template application function
+  const applyTemplate = (templateKey) => {
+    if (!templateKey || templateKey === 'none') return;
+
+    const template = PRESET_TEMPLATES[templateKey];
+    if (!template) return;
+
+    setFormData({
+      name: template.name,
+      url_pattern: template.url_pattern,
+      enabled: true
+    });
+    setSelectors([...template.selectors]);
+  };
 
   // Selector management functions
   const addSelector = () => {
@@ -197,6 +213,31 @@ export default function RuleBuilderDialog({ open, onOpenChange, rule, onSave }) 
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
+          )}
+
+          {/* Template Selection - only show for new rules */}
+          {!rule && (
+            <div className="space-y-2 mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+              <Label className="text-sm font-medium text-blue-800">
+                Start from Template (Optional)
+              </Label>
+              <Select onValueChange={applyTemplate}>
+                <SelectTrigger className="bg-white">
+                  <SelectValue placeholder="Select a preset template..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No template</SelectItem>
+                  {TEMPLATE_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-blue-600">
+                Templates provide starting selectors. Customize them for your specific site.
+              </p>
+            </div>
           )}
 
           {/* Rule Name */}
@@ -322,6 +363,9 @@ export default function RuleBuilderDialog({ open, onOpenChange, rule, onSave }) 
                 placeholder="e.g., .build-row .status"
                 className="font-mono text-xs"
               />
+              <p className="text-xs text-gray-500">
+                CSS selector (e.g., ".class", "#id", "[data-attr]")
+              </p>
             </div>
 
             {/* Attribute (shown only when type is 'attribute') */}
@@ -361,6 +405,21 @@ export default function RuleBuilderDialog({ open, onOpenChange, rule, onSave }) 
               Add Selector
             </Button>
           </div>
+
+          {/* Testing Instructions */}
+          <Alert className="bg-amber-50 border-amber-200">
+            <TestTube className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800 text-sm">
+              <strong>To test your selectors:</strong>
+              <ol className="list-decimal ml-4 mt-1 space-y-1">
+                <li>Save this rule first</li>
+                <li>Navigate to a page matching the URL pattern</li>
+                <li>Click the P&E extension icon</li>
+                <li>Click "Capture This Page" to test extraction</li>
+                <li>Check Capture Inbox for results</li>
+              </ol>
+            </AlertDescription>
+          </Alert>
         </div>
 
         <DialogFooter>
