@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-22)
 
 **Core value:** Single dashboard showing health and status across all team tools without switching contexts
-**Current focus:** v1.1 Web Capture Framework — Phase 7 Complete, Ready for Phase 8
+**Current focus:** v1.1 Web Capture Framework — Phase 8 In Progress (Plan 1 Complete)
 
 ## Current Position
 
-Phase: 7 of 9 (Extension Core) - Complete
-Plan: 3 of 3 in current phase
-Status: Phase complete
-Last activity: 2026-01-22 — Completed 07-03-PLAN.md (Popup UI and Badge Status)
+Phase: 8 of 9 (Inbox and Mapping UI) - In Progress
+Plan: 1 of 2 in current phase
+Status: Plan 08-01 complete, ready for 08-02
+Last activity: 2026-01-22 — Completed 08-01-PLAN.md (Capture Inbox Foundation)
 
-Progress: [=========|] 78% (7/9 phases complete)
+Progress: [=========|] 78% (7/9 phases complete, 6/9 plans in v1.1)
 
 ## Performance Metrics
 
@@ -25,12 +25,13 @@ Progress: [=========|] 78% (7/9 phases complete)
 
 **Current Milestone (v1.1):**
 - Estimated plans: 9
-- Completed: 5 (Phase 6: 2, Phase 7: 3)
+- Completed: 6 (Phase 6: 2, Phase 7: 3, Phase 8: 1)
 - 06-01: 2m 6s (database schema)
 - 06-02: 3m 22s (backend services)
 - 07-01: 3m 6s (capture rule fetching)
 - 07-02: 3m 29s (generic extractor content script)
 - 07-03: 3m 38s (popup UI and badge status)
+- 08-01: 4m (capture inbox foundation)
 
 ## Accumulated Context
 
@@ -63,6 +64,7 @@ v1.1 decisions from execution:
 - D-0702-03: Generic extractor uses <all_urls> in web_accessible_resources
 - D-0703-01: Badge color priority - pending count (orange) takes precedence over sync status
 - D-0703-02: Cached pending count for instant popup display, refreshed on capture
+- D-0801-01: Default filter to 'pending' status to show actionable items first
 
 ### Pending Todos
 
@@ -121,15 +123,31 @@ None.
 - `extension/lib/storage.js` - Capture rules and pending count storage
 - `extension/lib/api.js` - Capture API client methods
 
+## Phase 8 Progress
+
+**Plan 08-01 (Complete):** Capture Inbox Foundation
+- CaptureInbox and EntityMapping API clients
+- InboxItemDetail preview component
+- CaptureInbox page with table, filtering, preview, basic accept/reject
+- Files: apiClient.js, entities.js, CaptureInbox.jsx, index.jsx, Layout.jsx, InboxItemDetail.jsx
+- Duration: 4 minutes
+- Commits: 4f813ecd, 1381dcf8, ece63bc1
+
+**Plan 08-02 (Next):** Entity Mapping and Bulk Operations
+- EntityMappingDialog with type selection and auto-suggest
+- InboxBulkActions toolbar with confirmation dialogs
+- CaptureInbox with checkbox selection and bulk operations
+- Files: EntityMappingDialog.jsx, InboxBulkActions.jsx, CaptureInbox.jsx (update)
+
 ## Session Continuity
 
-Last session: 2026-01-22T08:59:19Z
-Stopped at: Completed Phase 7 (Extension Core)
+Last session: 2026-01-22T14:52:00Z
+Stopped at: Completed 08-01-PLAN.md
 Resume file: None
 
 ## Next Steps
 
-Ready for Phase 8: Frontend Management
-- Capture inbox page in web app
-- Rule management UI
-- Entity mapping interface
+Ready for Plan 08-02 execution:
+```
+/gsd:execute-plan 08-02
+```
