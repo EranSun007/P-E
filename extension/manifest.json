@@ -58,6 +58,12 @@
         "content/extractors/detail.js"
       ],
       "matches": ["https://jira.tools.sap/*"]
+    },
+    {
+      "resources": [
+        "content/generic-extractor.js"
+      ],
+      "matches": ["<all_urls>"]
     }
   ]
 }
