@@ -96,7 +96,7 @@ Plans:
 
 **Milestone Goal:** Evolve the Jira-specific extension into a configurable multi-site capture framework with data staging and entity mapping.
 
-- [ ] **Phase 6: Backend Foundation** - Database schema, services, and REST API for capture rules, inbox, and mappings
+- [x] **Phase 6: Backend Foundation** - Database schema, services, and REST API for capture rules, inbox, and mappings
 - [ ] **Phase 7: Extension Core** - Dynamic rule loading, generic extractor, and staging capture flow
 - [ ] **Phase 8: Inbox and Mapping UI** - Review workflow and entity mapping interface
 - [ ] **Phase 9: Rule Builder UI** - Create and test capture rules via web app
@@ -114,8 +114,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Database schema and migration (capture_rules, capture_inbox, entity_mappings)
-- [ ] 06-02-PLAN.md — CaptureService and REST API routes
+- [x] 06-01-PLAN.md — Database schema and migration (capture_rules, capture_inbox, entity_mappings)
+- [x] 06-02-PLAN.md — CaptureService and REST API routes
 
 ### Phase 7: Extension Core
 **Goal**: Extension dynamically loads capture rules and sends extracted data to inbox
@@ -179,7 +179,7 @@ v1.1: 6 -> 7 (depends on 6), 8 (depends on 6), 9 (depends on 6+7)
 | 3. Content Script | v1.0 | 2/2 | Complete | 2026-01-21 |
 | 4. Extension UI | v1.0 | 1/1 | Complete | 2026-01-21 |
 | 5. Web App Integration | v1.0 | 2/2 | Complete | 2026-01-21 |
-| 6. Backend Foundation | v1.1 | 0/2 | Planned | - |
+| 6. Backend Foundation | v1.1 | 2/2 | Complete | 2026-01-22 |
 | 7. Extension Core | v1.1 | 0/3 | Not started | - |
 | 8. Inbox and Mapping UI | v1.1 | 0/2 | Not started | - |
 | 9. Rule Builder UI | v1.1 | 0/2 | Not started | - |

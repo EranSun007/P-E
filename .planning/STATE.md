@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-22)
 
 ## Current Position
 
-Phase: 6 of 9 (Backend Foundation) - COMPLETE
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-01-22 — Completed 06-02-PLAN.md (Backend Services)
+Phase: 7 of 9 (Extension Core) - Ready to plan
+Plan: 0 of 3 in current phase
+Status: Ready to plan
+Last activity: 2026-01-22 — Completed Phase 6 (Backend Foundation)
 
-Progress: [======|   ] 63% (12/19 total plans)
+Progress: [=======|  ] 67% (6/9 phases complete across milestones)
 
 ## Performance Metrics
 
@@ -25,7 +25,7 @@ Progress: [======|   ] 63% (12/19 total plans)
 
 **Current Milestone (v1.1):**
 - Estimated plans: 9
-- Completed: 2
+- Completed: 2 (Phase 6)
 - 06-01: 2m 6s (database schema)
 - 06-02: 3m 22s (backend services)
 
@@ -64,8 +64,25 @@ None.
 - New sites (Grafana, Jenkins) will need selector discovery during Phase 9
 - Shadow DOM on some target sites may limit extraction (document as limitation)
 
+## Phase 6 Completion Summary
+
+**Completed:** 2026-01-22
+**Duration:** ~5.5 minutes (2 plans)
+
+**Artifacts Created:**
+- `server/db/018_capture_framework.sql` (68 lines) - 3 tables with JSONB columns
+- `server/services/CaptureService.js` (423 lines, 17 methods) - Full CRUD + workflows
+- `server/routes/captureRules.js` (142 lines, 5 routes)
+- `server/routes/captureInbox.js` (199 lines, 7 routes)
+- `server/routes/entityMappings.js` (156 lines, 5 routes)
+
+**APIs Now Available:**
+- GET/POST/PUT/DELETE /api/capture-rules
+- GET/POST /api/capture-inbox, POST /:id/accept, POST /:id/reject, POST /bulk-accept, POST /bulk-reject
+- GET/POST/DELETE /api/entity-mappings, GET /lookup/:source
+
 ## Session Continuity
 
-Last session: 2026-01-22 08:19 UTC
-Stopped at: Completed 06-02-PLAN.md (Phase 6 complete)
+Last session: 2026-01-22
+Stopped at: Completed Phase 6, ready for Phase 7 planning
 Resume file: None
