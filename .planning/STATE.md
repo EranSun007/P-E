@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-22)
 
 ## Current Position
 
-Phase: 8 of 9 (Inbox and Mapping UI) - Complete
-Plan: 2 of 2 in current phase
-Status: Phase 8 complete, ready for Phase 9
-Last activity: 2026-01-22 — Completed 08-02-PLAN.md (Entity Mapping and Bulk Operations)
+Phase: 9 of 9 (Rule Builder UI) - In progress
+Plan: 1 of 2 in current phase
+Status: Phase 9 started, 09-01 complete
+Last activity: 2026-01-22 — Completed 09-01-PLAN.md (Rule Builder UI)
 
-Progress: [=========|] 89% (8/9 phases complete, 7/9 plans in v1.1)
+Progress: [=========|] 94% (8/9 phases complete, 8/9 plans in v1.1)
 
 ## Performance Metrics
 
@@ -25,7 +25,7 @@ Progress: [=========|] 89% (8/9 phases complete, 7/9 plans in v1.1)
 
 **Current Milestone (v1.1):**
 - Estimated plans: 9
-- Completed: 7 (Phase 6: 2, Phase 7: 3, Phase 8: 2)
+- Completed: 8 (Phase 6: 2, Phase 7: 3, Phase 8: 2, Phase 9: 1)
 - 06-01: 2m 6s (database schema)
 - 06-02: 3m 22s (backend services)
 - 07-01: 3m 6s (capture rule fetching)
@@ -33,6 +33,7 @@ Progress: [=========|] 89% (8/9 phases complete, 7/9 plans in v1.1)
 - 07-03: 3m 38s (popup UI and badge status)
 - 08-01: 4m (capture inbox foundation)
 - 08-02: 4m (entity mapping and bulk operations)
+- 09-01: 5m (rule builder UI)
 
 ## Accumulated Context
 
@@ -70,6 +71,10 @@ v1.1 decisions from execution:
 - D-0802-02: Selection uses JavaScript Set for O(1) operations
 - D-0802-03: Only pending items are selectable (accepted/rejected items disabled)
 - D-0802-04: Clear selection on bulk action success to prevent stale state
+- D-0901-01: Dynamic selector array follows TaskCreationForm subtasks pattern
+- D-0901-02: Attribute field conditionally shown only when type=attribute
+- D-0901-03: Enable/disable toggle updates rule in-place (no confirmation)
+- D-0901-04: Search filters by name and URL pattern client-side
 
 ### Pending Todos
 
@@ -155,15 +160,37 @@ None.
 - `src/components/capture/InboxItemDetail.jsx` - Inbox item preview component
 - `src/pages/CaptureInbox.jsx` - Main inbox page with filtering, selection, bulk actions
 
+## Phase 9 Completion Summary
+
+**Completed:** 2026-01-22
+**Plan 09-01 Duration:** 5 minutes
+
+**Artifacts Created:**
+- `src/components/capture/RuleBuilderDialog.jsx` (400 lines) - Dialog form with dynamic selector array
+- `src/pages/CaptureRules.jsx` (342 lines) - Rules list page with CRUD operations
+- `src/api/apiClient.js` (updated) - CaptureRule client added
+- `src/api/entities.js` (updated) - CaptureRule export added
+
+**Features Delivered:**
+- Web-based rule creation and editing with dialog form
+- Dynamic selector array management (add/remove with validation)
+- 5 extraction types: text, html, attribute, href, src
+- Enable/disable toggle for quick rule activation
+- Search and filter by name or URL pattern
+- Full CRUD operations with confirmation dialogs
+- Navigation entry in sidebar
+
+**Commits:** d1749b45, d2c83b53, 1f9c9813
+
 ## Session Continuity
 
-Last session: 2026-01-22T15:04:00Z
-Stopped at: Completed 08-02-PLAN.md
+Last session: 2026-01-22T13:28:00Z
+Stopped at: Completed 09-01-PLAN.md (Rule Builder UI)
 Resume file: None
 
 ## Next Steps
 
-Ready for Phase 9 (Extension Site Support) planning:
-```
-/gsd:plan-phase 09
-```
+Ready for Plan 09-02 (Site-Specific Support):
+- Create rules for Grafana, Jenkins, Jira
+- Test rule creation flow
+- Verify extension refreshes rules after UI changes
