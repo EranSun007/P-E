@@ -1,134 +1,173 @@
-# Research Summary: Browser Extension + Backend Sync Architecture
+# Project Research Summary
 
-**Domain:** Chrome Extension with Backend Integration for Jira Ticket Sync
-**Researched:** 2026-01-21
-**Overall confidence:** HIGH
+**Project:** P&E Manager v1.1 - Web Capture Framework
+**Domain:** Browser Extension + Configurable Web Scraping + Data Staging
+**Researched:** 2026-01-22
+**Confidence:** HIGH
 
 ## Executive Summary
 
-The browser extension + backend sync architecture for P&E Manager's Jira integration follows a proven multi-layer pattern already successfully implemented in the codebase through the GitHub integration. The architecture separates concerns across four layers:
+The v1.1 Web Capture Framework evolves the existing hardcoded Jira extension into a configurable, multi-site data capture system. The critical insight from research: **this is primarily a schema design problem, not a library problem**. The existing stack (Express/PostgreSQL/React/Zod) provides everything needed. No new runtime dependencies are required. The architecture should preserve the working v1.0 Jira flow while adding configurability layers on top through new database tables, service classes, and a generic extraction engine.
 
-1. **Content Script Layer** - DOM observation and data extraction from Jira web pages
-2. **Extension Runtime Layer** - Message routing, storage management, and background sync coordination via Service Worker (Manifest V3)
-3. **Backend API Layer** - Express.js REST endpoints with authentication and multi-tenancy enforcement
-4. **Database Layer** - PostgreSQL with user_id isolation, following the established schema patterns
+The recommended approach is a layered architecture with three new core components: **Capture Rules** (JSONB-stored extraction configurations), **Data Staging/Inbox** (review workflow before entity mapping), and **Entity Mappings** (user-defined rules linking captured data to P&E entities). The extension evolves from static content scripts to dynamic registration via Chrome's `scripting` API, with a generic extractor replacing site-specific hardcoded code. Backwards compatibility with the existing Jira flow is preserved throughout.
 
-The architecture is battle-tested: the GitHub integration demonstrates the exact same pattern (token storage → service worker → backend API → PostgreSQL), providing a clear blueprint to follow. The extension will capture Jira ticket data from DOM, queue it in chrome.storage.local, batch sync to the Express.js backend, and persist in PostgreSQL with strict user_id filtering for multi-tenancy.
-
-Key architectural insight: Extension service workers are ephemeral (Manifest V3), so all state must persist in chrome.storage. Backend handles authentication via JWT tokens (same as web app), enforces multi-tenancy at the service layer, and uses UPSERT operations for idempotent syncing.
+The most significant risks are **configuration complexity explosion** (users struggling to configure CSS selectors), **selector brittleness multiplied across sites** (maintenance nightmare), and **data staging becoming a graveyard** (items piling up unreviewed). Mitigation strategies include: preset-based configuration with tiered complexity, multi-selector fallback chains with health monitoring, and trust-based auto-approval rules that limit human review to genuinely uncertain captures.
 
 ## Key Findings
 
-**Stack:** Chrome Extension (Manifest V3) + Express.js + PostgreSQL, mirroring GitHub integration pattern
-**Architecture:** Four-layer separation: Content Script → Service Worker → Backend API → Database
-**Critical insight:** Service workers terminate when idle - all state must persist in chrome.storage, not variables
+### Recommended Stack
+
+No new npm packages required. All additions are schema and code changes to the existing stack.
+
+**Core technologies (already in place):**
+- **PostgreSQL JSONB**: Store extraction rules as structured JSON — native feature, indexed, queryable
+- **Zod 3.25.76**: Schema validation for rules on both frontend and backend — already integrated
+- **react-hook-form 7.60.0**: Dynamic rule builder forms via `useFieldArray` — already installed
+- **Chrome Extension MV3**: Extend with `scripting` permission for dynamic content script registration
+
+**Explicitly NOT adding:**
+- Puppeteer/Playwright (extension already has DOM access)
+- Cheerio (live DOM exists, no need to parse HTML strings)
+- Dedicated rule engines (simple selector-to-field mapping suffices)
+- Redis/Message queues (volume doesn't justify complexity)
+
+### Expected Features
+
+**Must have (v1.1 MVP):**
+- Site URL Pattern — foundation for multi-site
+- CSS Selector Rules — core extraction logic
+- Field Name Mapping — structure captured data
+- Test Rule UI — users cannot debug without preview
+- Capture Inbox — central review workflow
+- Accept/Reject Actions — core review workflow
+- Target Entity Selection — connect to existing data
+- Multi-Site Support — dynamic host permissions
+
+**Should have (competitive):**
+- Rule Templates — pre-built rules for Grafana/Jenkins
+- Bulk Accept — efficiency for high volume
+- Duplicate Detection — prevent duplicates
+- Conditional Rules — filter unwanted captures
+
+**Defer (v2+):**
+- Visual Selector Helper — 10x complexity for point-and-click builder
+- Data Transformation plugins — add when patterns emerge
+- Auto-Accept Rules — trust must be earned first
+- AI Selector Generation — unreliable approach
+
+### Architecture Approach
+
+The architecture preserves v1.0 patterns while adding configurability layers. Three new database tables (`capture_rules`, `capture_inbox`, `entity_mappings`) store user-defined extraction configurations. The extension gains dynamic content script registration via `chrome.scripting.registerContentScripts()` based on rules fetched from backend. A new generic extractor (`generic-extractor.js`) replaces site-specific hardcoded extractors, using rule-defined selectors. The existing Jira flow remains untouched for backwards compatibility.
+
+**Major components:**
+1. **CaptureRuleService** — CRUD for extraction rules, validation, extension sync
+2. **CaptureInboxService** — data staging, approve/reject workflow, entity creation
+3. **EntityMappingService** — field mapping definitions, transform application
+4. **generic-extractor.js** — rule-driven DOM extraction, runs in content script context
+5. **Dynamic registration** — service worker manages content script registration per rule
+
+### Critical Pitfalls
+
+1. **Configuration Complexity Explosion** — Build presets with tiered configuration (Level 0: works out of box, Level 1: change URL, Level 2: override selectors, Level 3: expert custom mappings). Never require CSS selector knowledge for basic usage.
+
+2. **Selector Brittleness Multiplied Across Sites** — Implement multi-selector fallback chains (3+ strategies per critical field), selector health monitoring with alerts, and version-specific selector sets. Graceful degradation: Site A broken should not affect Sites B, C, D.
+
+3. **Data Staging Becomes Graveyard** — Implement trust tiers (HIGH_TRUST auto-approves, LOW_TRUST requires individual review). Items pending >30 days get auto-action. Inline review in main UI, not separate staging screen.
+
+4. **Entity Mapping N x M Explosion** — Use canonical intermediate format. All sources normalize TO common schema, system maps FROM common schema. State mapping tables instead of if/else code.
+
+5. **Multi-Site Extension Architecture** — Single extension with lazy-loaded site-specific extractors, not N separate extensions or one monolith loading all code everywhere.
 
 ## Implications for Roadmap
 
 Based on research, suggested phase structure:
 
-1. **Backend Foundation** (Database + Service + Routes)
-   - Addresses: Multi-tenancy, data persistence, authentication
-   - Avoids: Building extension before backend exists (no API to call)
-   - Rationale: Mirrors GitHub integration, can test with curl before extension complexity
-   - Dependencies: None (uses existing auth middleware, database connection)
+### Phase 1: Backend Foundation
+**Rationale:** Services and database must exist before extension or frontend can interact with them.
+**Delivers:** Database schema (capture_rules, capture_inbox, entity_mappings tables), CaptureRuleService, CaptureInboxService, EntityMappingService, REST routes
+**Addresses:** Core infrastructure enabling all features
+**Avoids:** Building frontend/extension without working backend (integration chaos)
 
-2. **Extension Core** (Service Worker + Storage)
-   - Addresses: Message routing, backend API integration, storage management
-   - Avoids: UI complexity before data flow works
-   - Rationale: Service worker is the hub - must work before content script/UI can function
-   - Dependencies: Backend API must exist
+### Phase 2: Extension Core
+**Rationale:** Dynamic registration depends on backend API; must complete before generic extractor can function.
+**Delivers:** manifest.json updates (scripting permission), service worker rule sync, STAGE_CAPTURE message handler, Api.js additions
+**Addresses:** Multi-site support, dynamic content script registration
+**Avoids:** Monolithic extension (Pitfall 5)
 
-3. **Content Script** (DOM Scraping)
-   - Addresses: Jira ticket data extraction, page observation
-   - Avoids: Fragile selectors, DOM structure changes
-   - Rationale: Needs service worker to send extracted data to
-   - Dependencies: Service worker must handle messages
+### Phase 3: Generic Extractor
+**Rationale:** Depends on extension core for message handling; core extraction capability needed before UI.
+**Delivers:** generic-extractor.js, selector execution engine, transform functions
+**Addresses:** CSS Selector Rules, Field Name Mapping
+**Avoids:** Selector brittleness (with fallback chains built in from start)
 
-4. **Extension UI** (Popup + Options)
-   - Addresses: Manual sync triggers, configuration, status display
-   - Avoids: Building UI before data flow works
-   - Rationale: User interface is last - depends on working backend and service worker
-   - Dependencies: Service worker, backend API
+### Phase 4: Inbox UI
+**Rationale:** Depends on backend services; essential review workflow needed before rule builder.
+**Delivers:** CaptureInbox page, pending items list, approve/reject workflow, entity type selection
+**Addresses:** Capture Inbox, Accept/Reject Actions, Target Entity Selection
+**Avoids:** Staging graveyard (with trust tiers and aging policies)
 
-5. **Web App Integration** (Frontend Components)
-   - Addresses: Viewing synced tickets in P&E Manager, settings management
-   - Avoids: Tight coupling (extension works standalone first)
-   - Rationale: Extension can function independently, web app enhancement is separate concern
-   - Dependencies: Backend API (not extension itself)
+### Phase 5: Rule Builder UI
+**Rationale:** Users need to see captured data working before investing in rule configuration.
+**Delivers:** CaptureRules page, rule creation form, URL pattern builder, selector tester
+**Addresses:** Site URL Pattern, Test Rule UI, Rule Enable/Disable
+**Avoids:** Configuration complexity (with presets and tiered UI)
 
-**Phase ordering rationale:**
-- Backend-first enables testing without extension complexity (curl/Postman)
-- Service worker must exist before content script has anywhere to send data
-- Content script must extract data before UI can trigger syncs
-- UI depends on working data flow
-- Web app integration is independent of extension (both consume same backend API)
+### Phase 6: Advanced Features
+**Rationale:** Polish after core loop is complete.
+**Delivers:** Entity mapping configuration UI, auto-apply rules, bulk approval, polling configuration
+**Addresses:** Field-to-Property Mapping, Bulk Accept, Rule Templates
 
-**Sequential dependencies prevent parallelization:**
-- Phase 2 depends on Phase 1 (backend must exist)
-- Phase 3 depends on Phase 2 (service worker must receive messages)
-- Phase 4 depends on Phase 2 (service worker handles UI requests)
-- Phase 5 depends on Phase 1 only (backend API)
+### Phase Ordering Rationale
 
-**Can parallelize:**
-- Phase 4 + Phase 5 (UI and web app both depend on Phase 2/1, but not each other)
+- **Backend-first:** Extension and frontend both depend on API endpoints existing
+- **Extension before UI:** Users need data flowing before configuration UI matters
+- **Inbox before Rules:** "See it working" validates approach before "configure it yourself"
+- **Jira preserved throughout:** No breaking changes, v1.0 flow continues working
 
-**Research flags for phases:**
-- Phase 3: Likely needs deeper research (Jira DOM selectors change frequently, requires live testing)
-- Phase 1, 2, 4, 5: Standard patterns, unlikely to need additional research (follow GitHub integration exactly)
+### Research Flags
+
+**Phases likely needing deeper research during planning:**
+- **Phase 3 (Generic Extractor):** DOM structure varies by target site — recommend live inspection of SAP Grafana/Jenkins instances
+- **Phase 4 (Inbox UI):** User workflow preferences unclear — recommend user interviews on review workflow
+
+**Phases with standard patterns (skip research-phase):**
+- **Phase 1 (Backend Foundation):** Well-established service pattern from existing codebase
+- **Phase 2 (Extension Core):** Chrome scripting API is documented, pattern is clear
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Architecture | HIGH | Direct copy of GitHub integration pattern (already in production) |
-| Backend patterns | HIGH | Express + PostgreSQL patterns proven in codebase |
-| Extension structure | HIGH | Manifest V3 architecture is standard, well-documented |
-| DOM scraping | MEDIUM | Jira selectors will require live testing, structure changes over time |
-| Multi-tenancy | HIGH | Pattern established across all 11 entities + GitHub integration |
-| Authentication | HIGH | JWT pattern already working for GitHub, reuse for Jira |
+| Stack | HIGH | Verified all needed features exist in current stack — no new dependencies |
+| Features | MEDIUM | Based on domain knowledge; no user research conducted |
+| Architecture | HIGH | Based on working v1.0 implementation and Chrome extension documentation |
+| Pitfalls | MEDIUM-HIGH | Drawn from v1.0 experience and domain expertise; per-site DOM stability needs live verification |
 
-## Gaps to Address
+**Overall confidence:** HIGH
 
-**Phase-Specific Research Needed:**
+The recommendation to add no new dependencies is strongly supported by codebase analysis. Architecture patterns extend existing working code. Main uncertainty is per-site selector stability which can only be validated during implementation.
 
-1. **Phase 3 (Content Script):**
-   - Jira DOM structure inspection (requires live Jira access)
-   - Selector identification for ticket fields (key, summary, status, assignee, etc.)
-   - MutationObserver configuration for dynamic content
-   - Handling Jira's React-based DOM (data-testid attributes vs CSS classes)
+### Gaps to Address
 
-2. **Phase 4 (Extension UI):**
-   - Icon design (16px, 48px, 128px)
-   - UX flow for initial setup (how user provides auth token)
-   - Error messaging for sync failures
+- **DOM structure of target sites:** Need live inspection of SAP internal Grafana, Jenkins, Concourse, Dynatrace to validate selector approaches
+- **User configuration experience:** No user feedback on v1.0 Jira configuration — should survey during Phase 5
+- **Shadow DOM limitations:** Some target sites may use Shadow DOM; document as limitation or research piercing strategies
+- **Multi-site performance:** Extension loading extractors for multiple sites — needs performance testing
 
-**No Additional Research Needed:**
-- Backend implementation (follow GitHubService.js exactly)
-- Service worker patterns (standard Manifest V3)
-- Database schema (follows established conventions)
-- Authentication flow (reuse existing JWT middleware)
-- Frontend integration (follows existing API client patterns)
+## Sources
 
-**Topics Deferred to Implementation:**
-- Specific Jira DOM selectors (cannot research without live access)
-- Extension icons/branding (design decision, not architecture)
-- Sync frequency tuning (requires usage data)
-- Performance optimization specifics (requires load testing)
+### Primary (HIGH confidence)
+- **Existing v1.0 codebase** — `/Users/i306072/Documents/GitHub/P-E/extension/` for extension patterns, `/server/` for service patterns
+- **package.json analysis** — Verified versions: react-hook-form 7.60.0, zod 3.25.76, pg 8.11.3
+- **Chrome Extension Documentation** — scripting API, content script registration, Manifest V3 patterns
 
-## Ready for Roadmap
+### Secondary (MEDIUM confidence)
+- **Domain expertise** — Web scraping patterns, ETL staging workflows, data mapping patterns
+- **CLAUDE.md project context** — Service layer patterns, multi-tenancy enforcement
 
-Research complete. Architecture document provides:
-- Clear component boundaries and responsibilities
-- Data flow patterns for all sync scenarios
-- Build order with dependency chains
-- Patterns to follow (multi-tenancy, idempotent sync, service worker lifecycle)
-- Anti-patterns to avoid (token storage, long-running tasks, DOM access)
-- Database schema matching GitHub integration style
-- Error handling and retry strategies
-- Security considerations
-- Testing approach
+### Tertiary (LOW confidence)
+- **Per-site DOM stability** — Inferred from framework knowledge; needs live verification for SAP instances
 
-**Recommended next step:** Create milestone roadmap with 5 phases listed above, using ARCHITECTURE.md to structure tasks within each phase.
-
-**Key insight for roadmap creator:** Backend-first approach de-risks extension development. Backend can be tested independently, and the GitHub integration already proves the pattern works. Extension complexity (service worker termination, content script isolation, message passing) is isolated to Phases 2-4, which build on proven backend foundation.
+---
+*Research completed: 2026-01-22*
+*Ready for roadmap: yes*

@@ -1,581 +1,810 @@
-# Domain Pitfalls: Browser Extension + DOM Scraping + Backend Sync
+# Domain Pitfalls: Configurable Web Capture Framework
 
-**Domain:** Chrome extension scraping corporate Jira (DOM-based, no API)
-**Researched:** 2026-01-21
-**Confidence:** MEDIUM (based on domain expertise, WebSearch unavailable)
+**Domain:** Multi-site configurable capture extension with data staging
+**Researched:** 2026-01-22
+**Confidence:** MEDIUM-HIGH (based on v1.0 Jira extension experience + domain expertise)
+
+---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites or major production issues.
-
-### Pitfall 1: Manifest V3 Service Worker Lifecycle Misunderstanding
-
-**What goes wrong:** Background scripts in Manifest V3 are service workers that terminate after 30 seconds of inactivity. Developers treat them like persistent background pages (Manifest V2), storing state in global variables or assuming continuous execution. When the service worker terminates, all in-memory state is lost, timers are cancelled, and polling stops.
-
-**Why it happens:**
-- Migration from Manifest V2 mental model
-- Chrome DevTools showing service worker as "active" during development (doesn't reflect production behavior)
-- Assuming `setInterval()` will keep service worker alive
-
-**Consequences:**
-- Polling stops unexpectedly after 30 seconds
-- Lost scraping state (which boards were being monitored)
-- Duplicate data syncs when service worker restarts
-- Race conditions between service worker termination and network requests
-
-**Prevention:**
-1. Use `chrome.alarms` API for polling (persists across service worker restarts)
-2. Store all state in `chrome.storage.local` or `chrome.storage.session`
-3. Implement idempotent sync operations (handle duplicate syncs gracefully)
-4. Design for stateless service workers - every wake-up should recover state from storage
-
-**Detection:**
-- Extension stops polling after leaving Jira tab idle for minutes
-- Console logs disappear after 30 seconds of inactivity
-- `chrome.alarms` not firing after service worker restart
-- Duplicate data appearing in backend after service worker reactivation
-
-**Phase:** Phase 1 (Architecture) - Service worker lifecycle must be core to design
+Mistakes that cause rewrites, major production issues, or block multi-site scaling.
 
 ---
 
-### Pitfall 2: Brittle CSS/DOM Selectors
+### Pitfall 1: Configuration Complexity Explosion
 
-**What goes wrong:** Scrapers rely on fragile selectors like `.css-12345`, `div:nth-child(3)`, or hardcoded data attributes that Jira changes without notice. Corporate Jira updates break scraping silently - extension keeps running but returns empty/incorrect data.
+**Severity:** CRITICAL
+**Phase to address:** Phase 1 (Configuration Architecture)
 
-**Why it happens:**
-- Using auto-generated class names (e.g., CSS modules, styled-components hashes)
-- Relying on DOM structure (child/sibling relationships) instead of semantic markers
-- Not understanding that corporate Jira customizations differ from cloud Jira
-- Single-point-of-failure selectors with no fallback strategy
-
-**Consequences:**
-- Silent data loss (scraper returns empty results, no error thrown)
-- Incorrect data mapping (scraping wrong fields after DOM restructure)
-- Extension works in dev (Jira version X) but fails in production (Jira version Y)
-- Costly emergency maintenance when Atlassian pushes updates
-
-**Prevention:**
-1. **Selector strategy hierarchy:**
-   - Primary: `data-*` attributes (most stable)
-   - Secondary: Semantic HTML + ARIA attributes (`role`, `aria-label`)
-   - Tertiary: Structural patterns (fallback only)
-   - NEVER: Auto-generated class names alone
-
-2. **Multi-selector fallback chains:**
-```javascript
-// BAD
-const title = document.querySelector('.css-1234 > span');
-
-// GOOD
-const title =
-  document.querySelector('[data-testid="issue-title"]') ||
-  document.querySelector('[aria-label*="issue"] h1') ||
-  document.querySelector('.issue-view-header h1');
-```
-
-3. **Validation layer:**
-   - Every scrape validates expected data shape
-   - Missing fields trigger warnings
-   - Track selector success rates in backend
-
-4. **Version detection:**
-   - Detect Jira version from meta tags or DOM markers
-   - Store known-working selector sets per version
-   - Graceful degradation when version unrecognized
-
-**Detection:**
-- Empty arrays returned where data should exist
-- Null/undefined values in scraped objects
-- Backend showing 0 updates when Jira board has activity
-- Error logs: "Cannot read property X of null"
-- Selector success rate drops below threshold
-
-**Phase:** Phase 2 (Scraping Logic) - Needs robust selector architecture from start
-
----
-
-### Pitfall 3: DOM Not Ready / SPA Navigation Race Conditions
-
-**What goes wrong:** Jira is a React SPA that loads content asynchronously. Scrapers run immediately on `DOMContentLoaded` but the actual board data hasn't rendered yet. Navigation between boards doesn't trigger full page loads, causing scrapers to miss new content or scrape stale data.
+**What goes wrong:** Teams build "infinitely configurable" extraction systems where users can define any selector, any field mapping, any transformation. The configuration UI becomes unusable, the extraction logic becomes unmaintainable, and users can't actually configure anything without developer assistance.
 
 **Why it happens:**
-- Assuming traditional page load lifecycle (static HTML)
-- Not accounting for React hydration delays
-- Missing SPA navigation events (pushState/replaceState)
-- Race conditions between AJAX requests completing and DOM updates
+- Overestimating user sophistication ("they'll write CSS selectors")
+- Fear of hardcoding anything ("what if they need different fields?")
+- Treating configuration as a substitute for architecture decisions
+- Confusing "flexible" with "good"
 
 **Consequences:**
-- Scraper captures loading states ("Loading...") as real data
-- Missed updates when users navigate between boards
-- Inconsistent scraping results (sometimes works, sometimes empty)
-- Duplicated scraping logic across content script and navigation handlers
+- Users struggle to create working configurations
+- Invalid configurations crash extraction silently
+- Debugging becomes nearly impossible (which config caused this?)
+- Configuration schema changes break existing configs
+- Developer time shifts from features to config support
+
+**Warning signs:**
+- Configuration schema exceeds 50 fields
+- Users ask "how do I configure X?" more than "does it work?"
+- Need a tutorial video to explain configuration
+- Finding bugs requires reproducing user's exact config
+- Config validation logic exceeds extraction logic
 
 **Prevention:**
-1. **Wait for content strategies:**
+
+1. **Start with presets, not blank forms:**
 ```javascript
-// Use MutationObserver to detect when content actually loads
-const waitForSelector = (selector, timeout = 5000) => {
-  return new Promise((resolve, reject) => {
-    if (document.querySelector(selector)) {
-      return resolve(document.querySelector(selector));
-    }
-
-    const observer = new MutationObserver(() => {
-      if (document.querySelector(selector)) {
-        observer.disconnect();
-        resolve(document.querySelector(selector));
-      }
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-
-    setTimeout(() => {
-      observer.disconnect();
-      reject(new Error('Timeout waiting for selector'));
-    }, timeout);
-  });
-};
-```
-
-2. **SPA navigation detection:**
-   - Listen to `popstate` events
-   - Intercept History API (`pushState`, `replaceState`)
-   - Watch URL changes via `chrome.webNavigation.onHistoryStateUpdated`
-
-3. **Idempotency checks:**
-   - Hash scraped content, only sync if changed
-   - Track last-scraped board ID/timestamp
-   - Deduplicate within backend
-
-4. **Retry with exponential backoff:**
-   - First attempt may hit loading state
-   - Retry 2-3 times with increasing delays (500ms, 1s, 2s)
-
-**Detection:**
-- Scraped data contains "Loading..." text
-- Empty results on first navigation, populated on second
-- Console warnings: "Selector not found"
-- Backend receives duplicate identical payloads
-- Scraping works when page is refreshed but not on SPA navigation
-
-**Phase:** Phase 2 (Scraping Logic) - Critical for reliability
-
----
-
-### Pitfall 4: Memory Leaks from Unmanaged MutationObservers
-
-**What goes wrong:** MutationObservers watch the DOM for changes but are never disconnected. Each page navigation or scraping attempt creates new observers that accumulate in memory. Over time (hours/days), the extension consumes gigabytes of RAM, causing browser slowdown and crashes.
-
-**Why it happens:**
-- Creating observers in content scripts without cleanup
-- Not disconnecting observers after scraping completes
-- Re-scraping on every DOM mutation (infinite loop)
-- Multiple content script injections creating duplicate observers
-
-**Consequences:**
-- Browser memory usage grows unbounded (GB+ after hours)
-- Tab freezes or crashes
-- Extension disabled by Chrome for excessive resource usage
-- User complaints about browser performance
-
-**Prevention:**
-1. **Always disconnect observers:**
-```javascript
-let observer = null;
-
-function startScraping() {
-  // Cleanup previous observer if exists
-  if (observer) {
-    observer.disconnect();
-  }
-
-  observer = new MutationObserver((mutations) => {
-    // Scraping logic
-    scrapeBoard();
-  });
-
-  observer.observe(target, config);
-}
-
-function cleanup() {
-  if (observer) {
-    observer.disconnect();
-    observer = null;
-  }
-}
-
-// Cleanup on navigation away
-window.addEventListener('beforeunload', cleanup);
-```
-
-2. **Debounce mutation callbacks:**
-   - DOM mutations fire hundreds of times per second
-   - Debounce to run scraping max once per 500ms-1s
-
-3. **Use specific observe targets:**
-   - Don't observe `document.body` with `subtree: true` unless necessary
-   - Target specific containers (board container, issue list)
-
-4. **Content script lifecycle management:**
-   - Track if content script already injected
-   - Prevent duplicate injections
-   - Use `run_at: "document_idle"` in manifest
-
-**Detection:**
-- Chrome Task Manager shows extension using 500MB+ memory
-- Memory profiler shows MutationObserver count growing unbounded
-- Browser tab becomes sluggish after extension runs for hours
-- Console shows "too many mutations" warnings
-
-**Phase:** Phase 2 (Scraping Logic) - Must be addressed during implementation
-
----
-
-### Pitfall 5: Backend Sync Without Deduplication/Conflict Resolution
-
-**What goes wrong:** Extension sends every scraped payload to backend without checking if data already exists or has changed. Race conditions between multiple tabs, duplicate scrapes, and service worker restarts cause:
-- Duplicate records in database (same Jira issue inserted 5 times)
-- Conflicting updates (older scrape overwrites newer data)
-- Backend overwhelmed with redundant API calls
-- Data integrity issues (inconsistent state between Jira and backend)
-
-**Why it happens:**
-- Assuming extension is single-threaded (ignoring multi-tab scenarios)
-- No client-side caching or diffing before sync
-- Backend using POST instead of upsert logic
-- Not using Jira issue keys as idempotent identifiers
-
-**Consequences:**
-- Database bloat (10x actual data size)
-- "Duplicate key" errors from backend
-- Stale data displayed to users (old scrape overwrites new)
-- Backend performance degradation from unnecessary writes
-- Audit trail corrupted (can't determine source of truth)
-
-**Prevention:**
-1. **Client-side deduplication:**
-```javascript
-// Hash scraped data, only sync if changed
-const currentHash = hashObject(scrapedData);
-const previousHash = await chrome.storage.local.get('lastSyncHash');
-
-if (currentHash !== previousHash.lastSyncHash) {
-  await syncToBackend(scrapedData);
-  await chrome.storage.local.set({ lastSyncHash: currentHash });
-}
-```
-
-2. **Backend upsert logic:**
-```javascript
-// Use Jira issue key as unique identifier
-const upsertIssue = async (issueData) => {
-  const sql = `
-    INSERT INTO jira_issues (jira_key, title, status, updated_date)
-    VALUES ($1, $2, $3, $4)
-    ON CONFLICT (jira_key)
-    DO UPDATE SET
-      title = EXCLUDED.title,
-      status = EXCLUDED.status,
-      updated_date = EXCLUDED.updated_date
-    WHERE jira_issues.updated_date < EXCLUDED.updated_date;
-  `;
-  await query(sql, [issueData.key, issueData.title, issueData.status, new Date()]);
-};
-```
-
-3. **Optimistic locking with timestamps:**
-   - Backend compares `scraped_at` timestamp with existing record
-   - Only update if scraped version is newer
-   - Return conflict status to extension
-
-4. **Multi-tab coordination:**
-   - Use `chrome.storage.local` with mutex pattern
-   - One tab becomes "leader" for syncing
-   - Others defer to leader or use exponential backoff
-
-5. **Batch sync with diffs:**
-   - Don't sync every field change
-   - Collect changes, compute diff, send batch update
-   - Include "deleted" issues (removed from board)
-
-**Detection:**
-- Database has multiple rows with same Jira issue key
-- Backend logs show identical payloads sent seconds apart
-- Users report seeing duplicate issues in UI
-- Database `updated_date` timestamps don't match Jira modification times
-- Backend API rate limits triggered
-
-**Phase:** Phase 3 (Backend Sync) - Core sync architecture
-
----
-
-### Pitfall 6: Content Security Policy (CSP) Violations
-
-**What goes wrong:** Corporate Jira has strict CSP that blocks extension's content scripts from executing inline scripts, accessing certain APIs, or making network requests. Extension installs successfully but fails silently at runtime.
-
-**Why it happens:**
-- Not declaring required permissions in manifest
-- Attempting inline script execution in content scripts
-- Using dynamic code execution (forbidden by CSP)
-- Making requests to backend without `host_permissions`
-
-**Consequences:**
-- Content scripts fail to inject
-- Network requests to backend blocked by CSP
-- Console errors: "Refused to execute inline script"
-- Extension appears broken with no visible errors to user
-
-**Prevention:**
-1. **Manifest V3 permission declarations:**
-```json
+// BAD: User must configure everything
 {
-  "permissions": [
-    "storage",
-    "alarms",
-    "scripting"
-  ],
-  "host_permissions": [
-    "https://jira.tools.sap/*"
-  ],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
+  siteName: "",
+  selectors: {
+    container: "",
+    items: "",
+    title: "",
+    status: "",
+    // ... 20 more fields
+  }
+}
+
+// GOOD: Site-specific presets with optional overrides
+{
+  preset: "grafana-dashboard",  // Loads tested defaults
+  overrides: {
+    // Only fields that differ from preset
+    titleSelector: ".custom-title"  // Override specific field
   }
 }
 ```
 
-2. **Avoid inline scripts:**
-   - All scripts must be external files
-   - No `onclick="..."` handlers
-   - Use event listeners: `element.addEventListener()`
+2. **Tiered configuration model:**
+   - **Level 0 (default):** Works with preset, zero config
+   - **Level 1 (basic):** Change instance URL, enable/disable
+   - **Level 2 (advanced):** Override specific selectors
+   - **Level 3 (expert):** Custom field mappings (hidden by default)
 
-3. **Use message passing for network requests:**
-   - Content scripts can't bypass CSP
-   - Send message to background script
-   - Background script makes backend API call (not subject to page CSP)
+3. **Visual selector builder:**
+   - User clicks element on page, system generates selector
+   - Show extracted data preview immediately
+   - Validate selectors before saving
 
-4. **Test in actual corporate environment:**
-   - Dev environment may have relaxed CSP
-   - Production Jira at `jira.tools.sap` may differ significantly
+4. **Configuration versioning:**
+   - Each config has version number
+   - Breaking changes require migration path
+   - Old configs continue working (deprecated, not broken)
 
 **Detection:**
-- Console errors: "Refused to load/execute due to CSP"
-- Network requests show CORS errors
-- Extension permissions warning during installation
-- Features work in local Jira but fail in corporate instance
+- Survey users: "Did you need help configuring?"
+- Track: Configuration save attempts vs successful extractions
+- Monitor: Support tickets about configuration
 
-**Phase:** Phase 1 (Architecture) - Manifest configuration upfront
+---
+
+### Pitfall 2: Selector Brittleness Multiplied Across Sites
+
+**Severity:** CRITICAL
+**Phase to address:** Phase 2 (Site-Specific Extractors)
+
+**What goes wrong:** The v1.0 Jira extension has selector stability issues with ONE site. Multi-site capture multiplies this problem - each site has different DOM patterns, different update cycles, different stability levels. When Grafana updates their UI, selectors break. When Jenkins updates, different selectors break. Maintenance becomes impossible.
+
+**Why it happens:**
+- Each internal tool (Grafana, Jenkins, Concourse, Dynatrace) uses different frontend frameworks
+- Internal tools may be customized versions (SAP-specific builds)
+- Update cycles are unpredictable and uncoordinated
+- No data-testid attributes on internal tools
+- React/Angular/Vue each produce different DOM structures
+
+**Consequences from v1.0 Jira extension:**
+```javascript
+// Current hardcoded selectors that break:
+const BOARD_SELECTORS = {
+  boardContainer: '[data-test-id="software-board.board"]',  // Breaks on updates
+  issueCard: '[data-test-id*="card-container"]',           // Inconsistent
+  // Fallback chain helps but doesn't solve root cause
+};
+```
+
+**Warning signs:**
+- "Extraction stopped working" reports spike after tool updates
+- Different sites break at different times (whack-a-mole)
+- Need dedicated developer time for "selector maintenance"
+- Users don't know extraction broke until they check staging
+
+**Prevention:**
+
+1. **Selector stability tier system:**
+```javascript
+const SELECTOR_TIERS = {
+  // Tier 1: Most stable - use first
+  stable: [
+    'data-testid',
+    'data-cy',
+    'aria-label',
+    'id with semantic name'
+  ],
+
+  // Tier 2: Moderately stable
+  moderate: [
+    'href patterns',
+    'semantic HTML tags',
+    'ARIA roles'
+  ],
+
+  // Tier 3: Fragile - last resort with fallback
+  fragile: [
+    'CSS classes',
+    'DOM structure',
+    'nth-child'
+  ]
+};
+```
+
+2. **Multi-selector fallback chains (already in v1.0, expand):**
+```javascript
+// Require 3+ fallback strategies per critical field
+const extractTitle = (element) => {
+  return element.querySelector('[data-testid*="title"]')?.textContent ||
+         element.querySelector('[aria-label*="title"]')?.textContent ||
+         element.querySelector('h1, h2, .title')?.textContent ||
+         element.getAttribute('title') ||
+         null;  // Explicit null for missing data
+};
+```
+
+3. **Selector health monitoring:**
+   - Track selector success rate per site per selector
+   - Alert when success rate drops below 95%
+   - Dashboard showing selector health across all sites
+   - Automatic fallback to secondary selectors when primary fails
+
+4. **Version/DOM fingerprinting:**
+```javascript
+// Detect tool version to use appropriate selector set
+const detectGrafanaVersion = () => {
+  const versionMeta = document.querySelector('meta[name="grafana-version"]');
+  const bodyClass = document.body.className;
+
+  if (versionMeta) return versionMeta.content;
+  if (bodyClass.includes('grafana-10')) return '10.x';
+  if (bodyClass.includes('grafana-9')) return '9.x';
+  return 'unknown';
+};
+
+// Load version-specific selectors
+const selectors = GRAFANA_SELECTORS[version] || GRAFANA_SELECTORS.fallback;
+```
+
+5. **Graceful degradation per site:**
+   - Site A broken? Still capture from sites B, C, D
+   - Partial extraction is better than no extraction
+   - Clear indication which sites have issues
+
+**Detection:**
+- Per-site extraction success rate dashboard
+- Automated alerts on selector failure
+- Weekly selector health reports
+
+---
+
+### Pitfall 3: Data Staging Becomes Data Graveyard
+
+**Severity:** CRITICAL
+**Phase to address:** Phase 3 (Data Staging/Inbox)
+
+**What goes wrong:** Team builds "staging area" for captured data before it enters the main system. Users are supposed to review and approve items. In practice: items pile up, nobody reviews them, staging becomes a dumping ground. Users either ignore staging entirely (defeating the purpose) or rubber-stamp approve everything (also defeating the purpose).
+
+**Why it happens:**
+- Review workflow is friction, not value
+- No clear criteria for what needs review vs auto-approve
+- Staging UI is separate from main workflow
+- Volume exceeds human review capacity
+- "Review later" becomes "never review"
+
+**Consequences:**
+- 1000+ items in staging, 0 reviewed
+- Users bypass staging (direct import) losing data quality
+- Duplicates and errors enter main system via bulk approve
+- Staging becomes technical debt itself
+- Team debates: "remove staging? it's not working"
+
+**Warning signs:**
+- Staging item count grows unbounded
+- Average time-in-staging exceeds 7 days
+- Most items approved in bulk, not individually
+- Users ask to "skip staging"
+- Staging UI rarely opened
+
+**Prevention:**
+
+1. **Trust tiers, not blanket staging:**
+```javascript
+const CAPTURE_TRUST_LEVELS = {
+  HIGH_TRUST: {
+    // Auto-approved, no staging
+    conditions: ['selector_confidence > 95%', 'matches_known_entity'],
+    action: 'direct_import'
+  },
+  MEDIUM_TRUST: {
+    // Brief review, grouped
+    conditions: ['selector_confidence > 80%', 'partial_entity_match'],
+    action: 'batch_review'  // Review 10 at a time
+  },
+  LOW_TRUST: {
+    // Individual review required
+    conditions: ['selector_confidence < 80%', 'new_entity_type'],
+    action: 'individual_review'
+  },
+  NO_TRUST: {
+    // Discard or manual correction
+    conditions: ['selector_failed', 'data_validation_failed'],
+    action: 'quarantine'
+  }
+};
+```
+
+2. **Inline review, not separate staging:**
+   - Show pending items in main UI with "pending" badge
+   - One-click approve from anywhere
+   - Review happens where data is used, not separate screen
+
+3. **Auto-approve rules:**
+```javascript
+// If captured data matches existing entity by key, auto-merge
+const autoApproveRules = [
+  {
+    name: 'exact_match',
+    condition: (captured, existing) =>
+      captured.issueKey === existing.issueKey,
+    action: 'merge_update'
+  },
+  {
+    name: 'trusted_source',
+    condition: (captured) =>
+      captured.source === 'jenkins' &&
+      captured.confidence > 90,
+    action: 'auto_import'
+  }
+];
+```
+
+4. **Aging + auto-actions:**
+   - Items pending > 7 days: prompt for action
+   - Items pending > 30 days: auto-archive or auto-approve based on trust
+   - Never let staging grow unbounded
+
+5. **Review metrics visibility:**
+   - Show: "23 items awaiting review (5 high-priority)"
+   - Gamification: "You reviewed 10 items today"
+   - SLA: "Items should be reviewed within 48 hours"
+
+**Detection:**
+- Track average time-in-staging
+- Track review rate (items reviewed / items captured)
+- Track bulk-approve vs individual-approve ratio
+- Survey: "Do you review staged items?"
+
+---
+
+### Pitfall 4: Entity Mapping Becomes N x M Problem
+
+**Severity:** HIGH
+**Phase to address:** Phase 4 (Entity Mapping)
+
+**What goes wrong:** Each site (N) produces different data shapes. The main system has different entity types (M). Team attempts to build generic mappers for all combinations. N x M mapping combinations explode. Jenkins build status doesn't map to Jira status which doesn't map to Grafana alert state.
+
+**Why it happens:**
+- Semantic mismatch: "status" means different things per tool
+- Field cardinality differs: Grafana has tags[], Jira has single assignee
+- Temporal differences: Jenkins has build timestamps, Jira has update timestamps
+- Identifiers are incompatible: UUIDs vs issue keys vs build numbers
+
+**Consequences:**
+- Mapping code is larger than extraction code
+- Edge cases in mapping cause data corruption
+- Users manually fix mappings constantly
+- Different sites have different data quality
+- "Why is this Grafana alert showing as a Jira task?"
+
+**Warning signs:**
+- Mapping functions exceed 100 lines
+- Many if/else branches for source type
+- Users report "wrong data in wrong place"
+- Entity types proliferate to handle sources
+- Need lookup tables for status mappings
+
+**Prevention:**
+
+1. **Canonical intermediate format:**
+```typescript
+// All sources map TO this, system maps FROM this
+interface CapturedItem {
+  // Universal fields
+  id: string;              // Generated or extracted
+  source: 'grafana' | 'jenkins' | 'concourse' | 'dynatrace';
+  sourceUrl: string;       // Link back to source
+  capturedAt: Date;
+
+  // Normalized fields (source-agnostic semantics)
+  title: string;
+  description?: string;
+  state: 'active' | 'resolved' | 'pending' | 'unknown';
+  severity?: 'critical' | 'high' | 'medium' | 'low';
+  assignees?: string[];    // Array to handle both single and multiple
+  timestamp: Date;         // Most relevant timestamp (created, updated, triggered)
+
+  // Source-specific data (preserved as-is)
+  sourceData: Record<string, unknown>;
+}
+```
+
+2. **Source-specific normalizers:**
+```javascript
+// Each source has ONE normalizer to canonical format
+const normalizers = {
+  grafana: (raw) => ({
+    title: raw.alertName,
+    state: mapGrafanaState(raw.state),  // 'alerting' -> 'active'
+    severity: mapGrafanaSeverity(raw.labels?.severity),
+    timestamp: new Date(raw.activeAt),
+    sourceData: raw  // Preserve original
+  }),
+
+  jenkins: (raw) => ({
+    title: `Build #${raw.number}: ${raw.displayName}`,
+    state: mapJenkinsResult(raw.result),  // 'SUCCESS' -> 'resolved'
+    timestamp: new Date(raw.timestamp),
+    sourceData: raw
+  })
+};
+```
+
+3. **Explicit state mapping tables (not code):**
+```javascript
+const STATE_MAPPINGS = {
+  grafana: {
+    'alerting': 'active',
+    'pending': 'pending',
+    'ok': 'resolved',
+    'nodata': 'unknown',
+    'paused': 'resolved'
+  },
+  jenkins: {
+    'SUCCESS': 'resolved',
+    'FAILURE': 'active',
+    'UNSTABLE': 'active',
+    'ABORTED': 'unknown',
+    'NOT_BUILT': 'pending'
+  }
+  // Easy to add new sources or adjust mappings
+};
+```
+
+4. **Validation at mapping boundaries:**
+```javascript
+const validateCapturedItem = (item) => {
+  const errors = [];
+
+  if (!item.title) errors.push('Missing title');
+  if (!['active', 'resolved', 'pending', 'unknown'].includes(item.state)) {
+    errors.push(`Invalid state: ${item.state}`);
+  }
+  if (!item.timestamp || isNaN(item.timestamp.getTime())) {
+    errors.push('Invalid timestamp');
+  }
+
+  return { valid: errors.length === 0, errors };
+};
+```
+
+5. **Unmappable data handling:**
+   - Preserve in sourceData, don't force into wrong field
+   - UI can display sourceData for advanced users
+   - Log unmapped fields for future mapping improvements
+
+**Detection:**
+- Track mapping errors per source
+- Track unmapped field frequency
+- Compare data quality scores per source
+
+---
+
+### Pitfall 5: Multi-Site Extension Becomes Multi-Extension Chaos
+
+**Severity:** HIGH
+**Phase to address:** Phase 1 (Extension Architecture)
+
+**What goes wrong:** Team builds separate extensions for each site (Grafana extension, Jenkins extension, Concourse extension) OR builds one monolithic extension that loads all code for all sites regardless of which site user visits. Both approaches fail at scale.
+
+**Why it happens:**
+- Separate extensions: Easier initially, diverge over time
+- Monolithic extension: Simpler architecture, bloated performance
+- Chrome extension architecture makes code-splitting non-obvious
+- Content scripts are per-match pattern, not per-feature
+
+**Consequences (separate extensions):**
+- Inconsistent UI across extensions
+- Duplicated boilerplate (storage, auth, sync logic)
+- Users manage multiple extensions
+- Bug fixes need N deployments
+- Configuration scattered
+
+**Consequences (monolithic extension):**
+- 500KB+ extension size (slow load)
+- All site code runs regardless of current site
+- Memory footprint multiplied
+- CSP conflicts between sites
+- Testing requires all sites accessible
+
+**Warning signs:**
+- Extension size > 200KB
+- Content script runs on sites it doesn't understand
+- Multiple manifest.json files
+- "This extension slows down my browser"
+- Debugging requires clearing ALL extension data
+
+**Prevention:**
+
+1. **Single extension, dynamic content scripts:**
+```json
+// manifest.json - Register ALL potential sites
+{
+  "host_permissions": [
+    "https://*.grafana.internal/*",
+    "https://jenkins.internal/*",
+    "https://concourse.internal/*",
+    "https://dynatrace.internal/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://*.grafana.internal/*"],
+      "js": ["content/loader.js"],  // Tiny loader
+      "run_at": "document_idle"
+    },
+    // ... per-site entries with same loader
+  ]
+}
+```
+
+2. **Lazy-load site-specific extractors:**
+```javascript
+// content/loader.js - Minimal, runs on all sites
+(async function() {
+  const siteType = detectSiteType(window.location.hostname);
+  if (!siteType) return;  // Not a recognized site
+
+  // Dynamically load only the needed extractor
+  const extractorPath = `extractors/${siteType}.js`;
+  await import(chrome.runtime.getURL(extractorPath));
+})();
+```
+
+3. **Shared core, site-specific modules:**
+```
+extension/
+  manifest.json
+  service-worker.js       # Shared: storage, sync, messaging
+  content/
+    loader.js             # Shared: site detection, dynamic loading
+    extractors/
+      grafana.js          # Site-specific: Grafana extraction
+      jenkins.js          # Site-specific: Jenkins extraction
+      base.js             # Shared: extraction utilities
+  lib/
+    storage.js            # Shared
+    api.js               # Shared
+  popup/
+    popup.html           # Shared UI
+    popup.js
+```
+
+4. **Configuration-driven site registration:**
+```javascript
+// Sites defined in config, not hardcoded in manifest
+const REGISTERED_SITES = {
+  grafana: {
+    hostPattern: /.*\.grafana\.internal$/,
+    extractorModule: 'grafana',
+    displayName: 'Grafana',
+    icon: 'grafana.png'
+  },
+  jenkins: {
+    hostPattern: /jenkins\.internal$/,
+    extractorModule: 'jenkins',
+    displayName: 'Jenkins',
+    icon: 'jenkins.png'
+  }
+  // Easy to add new sites without manifest changes
+};
+```
+
+5. **Per-site enable/disable:**
+   - Users can disable sites they don't use
+   - Disabled sites: content script doesn't load extractor
+   - Reduces memory and potential conflicts
+
+**Detection:**
+- Monitor extension size per release
+- Track per-site memory usage
+- User survey: "Which sites do you use?"
 
 ---
 
 ## Moderate Pitfalls
 
-Mistakes that cause delays or technical debt.
-
-### Pitfall 7: Polling Too Aggressively
-
-**What goes wrong:** Extension polls Jira every 5-10 seconds, consuming CPU, battery, and network bandwidth unnecessarily.
-
-**Prevention:**
-- Start with conservative polling (5 minutes)
-- Use exponential backoff if no changes detected
-- Only poll when user has Jira tab active (use `chrome.tabs.query` + `active: true`)
-- Consider user-configurable polling interval
-
-**Detection:**
-- High CPU usage in background
-- Battery drain complaints
-- Network traffic shows constant requests
-
-**Phase:** Phase 3 (Backend Sync) - Optimize after MVP
+Mistakes that cause delays, technical debt, or degraded UX.
 
 ---
 
-### Pitfall 8: No Offline Handling
+### Pitfall 6: Cross-Site Identity Confusion
 
-**What goes wrong:** Extension crashes or loses data when network is unavailable. Backend sync failures are not retried.
+**Severity:** MODERATE
+**Phase to address:** Phase 4 (Entity Mapping)
+
+**What goes wrong:** Same person appears as "john.smith" in Jira, "jsmith@company.com" in Jenkins, "John Smith" in Grafana. System can't correlate these are the same person. Workload views show duplicates. Team member assignments are fragmented.
 
 **Prevention:**
-- Queue failed syncs in `chrome.storage.local`
-- Retry queue on network reconnection (`online` event)
-- Show offline indicator in popup
-- Implement exponential backoff for failed requests
+- User identity mapping table (Jira ID <-> Jenkins ID <-> Display Name)
+- Fuzzy matching with manual confirmation
+- "Same person?" UI for disambiguation
+- Store all source identifiers on team member record
 
 **Detection:**
-- Extension stops working on spotty WiFi
-- Data loss after network interruptions
-- Backend missing data that was scraped
-
-**Phase:** Phase 4 (Resilience) - After core sync working
+- Duplicate names with slight variations in UI
+- Users report "I show up twice"
+- Entity counts exceed expected
 
 ---
 
-### Pitfall 9: Missing Error Observability
+### Pitfall 7: Rate Limiting and Extraction Throttling
 
-**What goes wrong:** Extension fails silently in production. Users report "not working" but no logs available.
+**Severity:** MODERATE
+**Phase to address:** Phase 2 (Site-Specific Extractors)
+
+**What goes wrong:** Extension extracts data too aggressively. Internal tools notice load. IT/DevOps complains about "rogue scraping." Extension gets blocked or user gets warnings.
 
 **Prevention:**
-- Log all errors to `chrome.storage.local` with timestamps
-- Implement error reporting to backend (opt-in)
-- Surface error count in extension popup
-- Include Jira version, selector success rates in diagnostics
+- Conservative default throttling (1 extraction per 5 minutes per site)
+- Exponential backoff on errors
+- Respect robots.txt patterns even for internal tools
+- User-configurable extraction frequency with sane limits
+- "Idle detection" - only extract when user is actively viewing
 
 **Detection:**
-- User complaints with no reproducible steps
-- "Works on my machine" debugging loops
-- No visibility into production failure modes
-
-**Phase:** Phase 4 (Resilience) - Before wider rollout
+- HTTP 429 responses from targets
+- Complaints from tool administrators
+- Extraction suddenly stops working (IP blocked)
 
 ---
 
-### Pitfall 10: Scope Creep: Trying to Scrape Everything
+### Pitfall 8: Configuration UI Doesn't Match Mental Model
 
-**What goes wrong:** Attempting to scrape all Jira fields, comments, attachments, history in MVP. Complexity explodes, selectors break constantly.
+**Severity:** MODERATE
+**Phase to address:** Phase 3 (Configuration UI)
+
+**What goes wrong:** Configuration UI organized by technical concepts (selectors, mappings, transformations) rather than user tasks (capture from Grafana, send alerts to inbox, ignore low-priority items).
 
 **Prevention:**
-- Start with minimal viable fields (title, status, assignee, board)
-- Expand incrementally based on user feedback
-- Document "out of scope" fields explicitly
-- Prioritize fields least likely to change DOM structure
+- Task-oriented configuration: "Set up Grafana capture" not "Configure selectors"
+- Wizard-style onboarding for first-time setup
+- Preview extracted data during configuration
+- "Test this configuration" button with real data
 
 **Detection:**
-- Scraping code becomes unmaintainable (1000+ lines)
-- Constant selector breakage
-- Performance issues from over-scraping
+- Users abandon configuration mid-flow
+- Support tickets: "I don't understand configuration"
+- Configuration left at defaults despite not working
 
-**Phase:** Phase 2 (Scraping Logic) - Scope definition
+---
+
+### Pitfall 9: No Visibility Into Capture Health
+
+**Severity:** MODERATE
+**Phase to address:** Phase 2 (Extraction Core)
+
+**What goes wrong:** Extension silently succeeds or fails. Users don't know if capture is working until they check the main app and notice stale data. Problems accumulate undetected.
+
+**Prevention:**
+- Badge showing capture status on extension icon
+- Last successful capture timestamp per site
+- Error summary: "Jenkins: 3 failures in last hour"
+- Push notification for persistent failures
+- Weekly health report email (optional)
+
+**Detection:**
+- Users report stale data days after extraction broke
+- Support tickets start with "I didn't know it wasn't working"
+
+---
+
+### Pitfall 10: Breaking Changes in Configuration Schema
+
+**Severity:** MODERATE
+**Phase to address:** Phase 1 (Configuration Architecture)
+
+**What goes wrong:** Team ships config schema v1. Later, schema changes break existing user configs. Migration is incomplete. Users face cryptic errors or lost configurations.
+
+**Prevention:**
+- Config schema versioning from day 1
+- Forward migration for all schema changes
+- Never delete fields, deprecate then remove after N versions
+- Config validation with helpful error messages
+- Test suite for config migrations
+
+**Detection:**
+- Errors after extension update
+- Users report "my configuration is gone"
+- Config validation failures in logs
 
 ---
 
 ## Minor Pitfalls
 
-Mistakes that cause annoyance but are fixable.
-
-### Pitfall 11: No User Feedback During Scraping
-
-**What goes wrong:** Users don't know if extension is working. Silent failures look like success.
-
-**Prevention:**
-- Show badge count with scraped issue count
-- Display last sync timestamp in popup
-- Visual indicator when scraping active
-- Error messages when scraping fails
-
-**Phase:** Phase 5 (Polish) - UX improvements
+Annoyances that are fixable without major rework.
 
 ---
 
-### Pitfall 12: Hardcoded Jira URL
+### Pitfall 11: Inconsistent Field Naming Across Sites
 
-**What goes wrong:** Extension hardcoded to `jira.tools.sap`, can't be used for other Jira instances.
+**What goes wrong:** Same concept has different names: "priority" (Jira), "severity" (Grafana), "importance" (internal). UI is confusing, queries don't work as expected.
 
 **Prevention:**
-- Make Jira base URL configurable
-- Auto-detect from current tab URL
-- Support multiple Jira instances per user
-
-**Phase:** Phase 5 (Polish) - If reusability desired
+- Canonical field vocabulary document
+- Map site-specific terms to canonical terms
+- UI shows canonical names with "from X" tooltips
 
 ---
 
-### Pitfall 13: No Data Versioning in Backend
+### Pitfall 12: Extraction Timing Misalignment
 
-**What goes wrong:** Backend schema changes break existing data. No migration path.
+**What goes wrong:** Jenkins build completes at 10:00, extraction runs at 10:05, Grafana alert fires at 10:03, extraction runs at 10:10. Related events captured with different timestamps, correlation is lost.
 
 **Prevention:**
-- Version API responses (`{ version: 1, data: {...} }`)
-- Backend supports multiple schema versions
-- Extension sends version number with syncs
-- Plan migration strategy for schema changes
+- Capture source timestamp, not extraction timestamp
+- Display source timestamps prominently
+- Event correlation based on source time windows
 
-**Phase:** Phase 3 (Backend Sync) - API design
+---
+
+### Pitfall 13: Tab Management Overhead
+
+**What goes wrong:** Extension needs active tab on target site to extract. Users must keep Grafana, Jenkins, etc. tabs open. Browser becomes cluttered. Or: extraction only works when tab is visited.
+
+**Prevention:**
+- Background extraction where possible (service worker + webRequest)
+- Document which sites require active tab
+- Tab rotation strategy for multi-site capture
+- Consider: "focus tab briefly to extract" automation
 
 ---
 
 ## Phase-Specific Warnings
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Manifest configuration | CSP violations, missing permissions | Phase 1: Declare all permissions upfront, test in corporate Jira |
-| Service worker architecture | Treating as persistent background page | Phase 1: Design stateless, use chrome.alarms, storage APIs |
-| Scraping logic | Brittle selectors, DOM not ready | Phase 2: Fallback chains, MutationObserver, validation layer |
-| Backend sync | Duplicate data, no conflict resolution | Phase 3: Upsert logic, client-side deduplication, timestamps |
-| Polling strategy | Too aggressive, battery drain | Phase 3: Start conservative (5 min), optimize later |
-| Error handling | Silent failures in production | Phase 4: Logging, error reporting, diagnostics panel |
-| Multi-tab coordination | Race conditions, duplicate syncs | Phase 4: Leader election or mutex pattern |
-| Performance | Memory leaks from observers | Phase 2: Always disconnect, debounce, specific targets |
+| Phase | Topic | Likely Pitfall | Mitigation |
+|-------|-------|----------------|------------|
+| Phase 1 | Config architecture | Complexity explosion | Presets + tiered configuration |
+| Phase 1 | Extension architecture | Monolith vs. N extensions | Single extension, lazy-load extractors |
+| Phase 2 | Selector stability | Multi-site selector maintenance | Fallback chains + health monitoring |
+| Phase 2 | Site-specific extractors | DOM differences per tool | Version detection + graceful degradation |
+| Phase 3 | Data staging | Staging becomes graveyard | Trust tiers + auto-approve rules |
+| Phase 3 | Configuration UI | Technical vs. task-oriented | Wizard + preview + test buttons |
+| Phase 4 | Entity mapping | N x M mapping explosion | Canonical intermediate format |
+| Phase 4 | Identity mapping | Cross-site identity confusion | Identity mapping table + fuzzy match |
+| Phase 5 | Observability | Silent failures | Per-site health dashboard |
+| Phase 5 | Updates | Config schema breaking changes | Versioning + forward migration |
 
 ---
 
-## Corporate Jira-Specific Warnings
+## Multi-Site Specific Warnings
 
-### Atlassian Updates Break Selectors
+### DOM Variability by Tool
 
-**Frequency:** Monthly Jira Cloud updates, quarterly on-premise updates
+| Tool | Frontend Stack | DOM Stability | Notes |
+|------|---------------|---------------|-------|
+| Grafana | React + Angular | Medium | Version-specific selectors needed |
+| Jenkins | Java + Jelly templates | High | Classic HTML, stable patterns |
+| Concourse | Elm | Medium-High | Consistent but uncommon patterns |
+| Dynatrace | Angular | Low-Medium | Frequent UI updates |
+| Jira | React (Cloud) | Low | Updates break selectors regularly |
 
-**Mitigation:**
-- Subscribe to Atlassian developer changelogs
-- Automated tests that scrape staging Jira
-- Fallback selector chains
-- Version detection and compatibility matrix
+**Recommendation:** Prioritize Jenkins (most stable), then Grafana, then Concourse. Dynatrace and Jira require most maintenance.
 
-### Custom Jira Configurations
+### Data Model Differences
 
-Corporate Jira often has:
-- Custom fields (different DOM structure)
-- Custom workflows (status values differ)
-- Renamed default fields
-- Plugins that modify DOM
+| Tool | Primary Entity | Identifier | State Model |
+|------|---------------|------------|-------------|
+| Grafana | Alert | alertId + org | alerting/pending/ok/nodata/paused |
+| Jenkins | Build | job/build# | SUCCESS/FAILURE/UNSTABLE/ABORTED |
+| Concourse | Build | pipeline/job/build | succeeded/failed/errored/aborted |
+| Dynatrace | Problem | problemId | open/resolved |
+| Jira | Issue | issueKey | Custom per workflow |
 
-**Mitigation:**
-- Make field mappings configurable
-- Detect custom fields dynamically
-- Graceful degradation for unsupported customizations
+**Recommendation:** Build normalizers early. State mapping tables are easier to maintain than code.
 
-### Network Restrictions
+---
 
-Corporate networks may:
-- Block external API calls from browser extensions
-- Require VPN for backend connectivity
-- Have proxy servers that modify requests
+## Lessons from v1.0 Jira Extension
 
-**Mitigation:**
-- Backend hosted on same corporate network (or accessible via VPN)
-- CORS properly configured
-- Test in actual corporate network environment
+The current Jira extension demonstrates several patterns and anti-patterns relevant to multi-site expansion:
+
+**What worked:**
+- Fallback selector chains (board.js has 2-3 selectors per field)
+- Page type detection from URL patterns
+- MutationObserver with debouncing
+- CustomEvent communication between page context and content script
+- Sync throttling (30 second minimum between syncs)
+
+**What needs improvement for multi-site:**
+- Selectors are hardcoded per page type (not configurable)
+- No selector health monitoring
+- No visual selector builder
+- No per-site enable/disable
+- Monolithic content script loads all extractors
+- Configuration only via options page (not in-context)
+
+**Code patterns to extract and generalize:**
+```javascript
+// From board.js - reusable pattern
+function findElements(selectorChains) {
+  for (const selectors of selectorChains) {
+    const elements = document.querySelectorAll(selectors);
+    if (elements.length > 0) {
+      return Array.from(elements);
+    }
+  }
+  return [];
+}
+```
 
 ---
 
 ## Confidence Assessment
 
-| Category | Confidence | Notes |
+| Category | Confidence | Basis |
 |----------|------------|-------|
-| Service Worker Lifecycle | HIGH | Well-documented Manifest V3 limitation |
-| DOM Scraping Brittleness | HIGH | Universal web scraping challenge |
-| SPA Navigation | HIGH | React-based apps have consistent patterns |
-| Memory Leaks | HIGH | Common MutationObserver pitfall |
-| Backend Sync | MEDIUM | Depends on specific backend architecture |
-| CSP Violations | MEDIUM | Corporate Jira CSP not verified (no WebSearch) |
-| Corporate Jira Specifics | LOW | Based on general enterprise Jira knowledge |
+| Configuration complexity | HIGH | Universal software UX problem |
+| Selector brittleness | HIGH | Direct v1.0 experience |
+| Staging workflow | HIGH | Common pattern failure mode |
+| Entity mapping | MEDIUM-HIGH | Domain expertise, some verification needed |
+| Multi-extension architecture | MEDIUM | Chrome extension patterns established |
+| Cross-site identity | MEDIUM | Depends on source tools |
+| Per-tool DOM stability | LOW-MEDIUM | Needs live verification for SAP instances |
 
 ---
 
 ## Sources
 
-**Note:** WebSearch tool unavailable during research. This document is based on:
-- Domain expertise: Browser extension development (Manifest V3)
-- Domain expertise: Web scraping and SPA interaction patterns
-- Domain expertise: Backend sync patterns for distributed clients
-- General knowledge: Corporate Atlassian Jira deployment patterns
+**Primary:**
+- v1.0 Jira extension implementation (`/Users/i306072/Documents/GitHub/P-E/extension/`)
+- Existing research files (`/Users/i306072/Documents/GitHub/P-E/.planning/research/`)
+- Chrome Extension Manifest V3 documentation (from training data)
 
-**Verification recommended:**
-- Test actual CSP policies on `jira.tools.sap`
-- Verify Jira version and customizations in target environment
-- Confirm network restrictions for extension → backend communication
-- Review Atlassian documentation for DOM structure stability commitments
+**Verification needed:**
+- DOM structure of SAP internal Grafana, Jenkins, Concourse, Dynatrace instances
+- Actual selector stability across tool versions
+- User feedback on v1.0 Jira configuration experience
 
-**Confidence level:** MEDIUM overall due to lack of verified sources for corporate Jira specifics, but HIGH for general browser extension + scraping patterns.
+**Recommendations for phase-specific research:**
+- Phase 2: Live DOM inspection of each target tool
+- Phase 3: User interviews on data review workflow preferences
+- Phase 4: Entity model analysis of each source tool
+
+---
+
+## Quality Gate Verification
+
+- [x] Pitfalls are specific to configurable capture (not generic advice)
+- [x] Multi-site complexity addressed (Pitfalls 2, 4, 5, 6)
+- [x] Data staging/review pitfalls covered (Pitfall 3)
+- [x] Prevention strategies are actionable (code examples, specific approaches)
+- [x] Phase assignments provided for each pitfall
+- [x] Severity indicators included (CRITICAL, HIGH, MODERATE, MINOR)
+- [x] Warning signs documented for early detection
+- [x] Lessons from v1.0 Jira extension incorporated

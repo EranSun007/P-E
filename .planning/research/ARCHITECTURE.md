@@ -1,1028 +1,1277 @@
-# Architecture Patterns: Browser Extension + Backend Sync
+# Architecture: Configurable Web Capture Framework
 
-**Domain:** Chrome Extension with Backend Integration
-**Researched:** 2026-01-21
-**Overall Confidence:** HIGH (based on established patterns in codebase + Manifest V3 knowledge)
+**Domain:** Browser Extension + Backend Integration
+**Research Focus:** Evolution from hardcoded Jira capture to configurable multi-site framework
+**Researched:** 2026-01-22
+**Overall Confidence:** HIGH (based on existing v1.0 implementation + Chrome Manifest V3 documentation)
+
+---
 
 ## Executive Summary
 
-Browser extensions that sync with backend APIs follow a multi-layered architecture with clear separation between:
-1. **Content layer** - DOM access and page interaction
-2. **Extension runtime** - Message passing, storage, background tasks
-3. **Backend API layer** - Data persistence and cross-device sync
-4. **Database layer** - Multi-tenant storage
+The configurable web capture framework evolves the existing Jira extension (v1.0) into a rule-based system supporting multiple sites. Key architectural changes:
 
-For the Jira integration, this architecture will mirror the existing GitHub integration pattern already successfully implemented in P&E Manager.
+1. **Rules stored in backend** — Not hardcoded in extension
+2. **Dynamic content script registration** — Via `chrome.scripting.registerContentScripts()` API
+3. **Generic extraction engine** — Selector-based, not site-specific code
+4. **Data staging layer** — Inbox table with review workflow before entity mapping
+5. **Entity mapping system** — User-defined rules linking captured data to P&E entities
 
-## Recommended Architecture
+This preserves the working v1.0 architecture while adding configurability layers.
+
+---
+
+## Current Architecture (v1.0 Baseline)
+
+### Component Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         JIRA WEB PAGE (jira.tools.sap)                       │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │  content.js (hardcoded page detection)                                   ││
+│  │    └── detectPageType(url) → BOARD | BACKLOG | DETAIL | UNKNOWN         ││
+│  │    └── loadExtractor(pageType) → board.js | backlog.js | detail.js      ││
+│  │    └── extractAndSync() → sends data to service worker                   ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+└────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ chrome.runtime.sendMessage()
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        CHROME EXTENSION RUNTIME                              │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │  service-worker.js                                                       ││
+│  │    └── handleSyncIssues(issues) → POST to backend                        ││
+│  │    └── Storage module → chrome.storage.local for auth/state              ││
+│  │    └── Api module → backend communication with retry                     ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+└────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ fetch() with Bearer token
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      EXPRESS.JS BACKEND (SAP BTP)                            │
+│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
+│  │  jira.js (routes)      │   │  JiraService.js                            ││
+│  │    POST /sync          │ → │    syncIssues(userId, issues)              ││
+│  │    GET  /              │ → │    listIssues(userId, filters)             ││
+│  │    POST /mappings      │ → │    createMapping(userId, ...)              ││
+│  └────────────────────────┘   └────────────────────────────────────────────┘│
+└────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            POSTGRESQL                                        │
+│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
+│  │  jira_issues           │   │  jira_team_mappings                        ││
+│  │    user_id             │   │    jira_assignee_id → team_member_id       ││
+│  │    issue_key (unique)  │   │                                             ││
+│  │    summary, status...  │   │                                             ││
+│  └────────────────────────┘   └────────────────────────────────────────────┘│
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### v1.0 Hardcoded Elements (to be replaced)
+
+| Location | Hardcoded Element | Purpose |
+|----------|-------------------|---------|
+| `manifest.json` | `"matches": ["https://jira.tools.sap/*"]` | Only Jira site enabled |
+| `content.js` | `detectPageType()` switch | Page type detection |
+| `content.js` | `getExtractorPath()` switch | Extractor selection |
+| `content.js` | `getContainerSelector()` switch | DOM container selectors |
+| `extractors/board.js` | `BOARD_SELECTORS` object | 15+ hardcoded CSS selectors |
+| `extractors/backlog.js` | `BACKLOG_SELECTORS` object | 15+ hardcoded CSS selectors |
+| `extractors/detail.js` | `DETAIL_SELECTORS` object | 15+ hardcoded CSS selectors |
+| `JiraService.js` | Upsert to `jira_issues` | Direct entity storage |
+
+---
+
+## Target Architecture (v1.1 Configurable)
 
 ### System Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    JIRA WEB PAGE (jira.com)                  │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │  Content Script (content.js)                           │ │
-│  │  - DOM observation/scraping                            │ │
-│  │  - Extract ticket data                                 │ │
-│  │  - Inject UI elements                                  │ │
-│  └─────────────┬──────────────────────────────────────────┘ │
-└────────────────┼────────────────────────────────────────────┘
-                 │ chrome.runtime.sendMessage()
-                 ↓
-┌─────────────────────────────────────────────────────────────┐
-│              CHROME EXTENSION RUNTIME                        │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │  Service Worker (background.js) - Manifest V3          │ │
-│  │  - Message routing                                     │ │
-│  │  - API authentication                                  │ │
-│  │  - Periodic sync coordination                          │ │
-│  │  - chrome.storage management                           │ │
-│  └─────────────┬──────────────────────────────────────────┘ │
-│                │                                             │
-│  ┌────────────┴────────────────────────────────────────────┐│
-│  │  Popup UI (popup.html/jsx)                              ││
-│  │  - Manual sync trigger                                  ││
-│  │  - Configuration                                        ││
-│  │  - Status display                                       ││
-│  └─────────────┬──────────────────────────────────────────┘ │
-└────────────────┼────────────────────────────────────────────┘
-                 │ fetch() with auth headers
-                 ↓
-┌─────────────────────────────────────────────────────────────┐
-│           EXPRESS.JS BACKEND (SAP BTP)                       │
-│  ┌────────────────────────────────────────────────────────┐ │
-│  │  Routes (server/routes/jira.js)                        │ │
-│  │  - POST /api/jira/sync                                 │ │
-│  │  - GET /api/jira/tickets                               │ │
-│  │  - POST /api/jira/tickets                              │ │
-│  │  - DELETE /api/jira/tickets/:id                        │ │
-│  └─────────────┬──────────────────────────────────────────┘ │
-│                │                                             │
-│  ┌────────────┴────────────────────────────────────────────┐│
-│  │  Service (server/services/JiraService.js)               ││
-│  │  - Data validation                                      ││
-│  │  - Multi-tenancy enforcement (user_id filter)           ││
-│  │  - Business logic                                       ││
-│  └─────────────┬──────────────────────────────────────────┘ │
-└────────────────┼────────────────────────────────────────────┘
-                 │ SQL queries
-                 ↓
-┌─────────────────────────────────────────────────────────────┐
-│              POSTGRESQL DATABASE                             │
-│  - jira_tickets (user_id, ticket_key, summary, etc.)        │
-│  - jira_sync_history (last_synced_at, status, errors)       │
-│  - user_settings (jira_instance_url, preferences)           │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         ANY CONFIGURED WEBSITE                               │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │  generic-content.js (rule-driven)                                        ││
+│  │    └── Rules fetched from backend on activation                          ││
+│  │    └── matchRule(url) → finds applicable capture rule                    ││
+│  │    └── extractByRule(rule) → generic selector-based extraction          ││
+│  │    └── sendToStaging() → sends to staging endpoint                       ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+└────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ chrome.runtime.sendMessage()
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        CHROME EXTENSION RUNTIME                              │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │  service-worker.js (enhanced)                                            ││
+│  │    └── fetchCaptureRules() → GET /api/capture-rules                      ││
+│  │    └── updateContentScriptRegistrations() → dynamic script registration  ││
+│  │    └── handleStagedCapture(data) → POST /api/capture-inbox               ││
+│  │    └── LEGACY: handleSyncIssues() → preserved for Jira compatibility     ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+└────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │ fetch() with Bearer token
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      EXPRESS.JS BACKEND (SAP BTP)                            │
+│                                                                              │
+│  NEW COMPONENTS                                                              │
+│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
+│  │  captureRules.js       │   │  CaptureRuleService.js                     ││
+│  │    GET  /              │ → │    listRules(userId) → active rules        ││
+│  │    POST /              │ → │    createRule(userId, ruleData)            ││
+│  │    PUT  /:id           │ → │    updateRule(userId, id, updates)         ││
+│  │    DELETE /:id         │ → │    deleteRule(userId, id)                  ││
+│  └────────────────────────┘   └────────────────────────────────────────────┘│
+│                                                                              │
+│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
+│  │  captureInbox.js       │   │  CaptureInboxService.js                    ││
+│  │    GET  /              │ → │    listPending(userId) → review queue      ││
+│  │    POST /              │ → │    stageCapture(userId, data)              ││
+│  │    PUT  /:id/approve   │ → │    approveAndMap(userId, id, mapping)      ││
+│  │    PUT  /:id/reject    │ → │    rejectCapture(userId, id)               ││
+│  │    DELETE /:id         │ → │    deleteCapture(userId, id)               ││
+│  └────────────────────────┘   └────────────────────────────────────────────┘│
+│                                                                              │
+│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
+│  │  entityMappings.js     │   │  EntityMappingService.js                   ││
+│  │    GET  /              │ → │    listMappings(userId)                    ││
+│  │    POST /              │ → │    createMapping(userId, mappingData)      ││
+│  │    PUT  /:id           │ → │    updateMapping(userId, id, updates)      ││
+│  │    DELETE /:id         │ → │    deleteMapping(userId, id)               ││
+│  └────────────────────────┘   └────────────────────────────────────────────┘│
+│                                                                              │
+│  PRESERVED (backwards compatibility)                                         │
+│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
+│  │  jira.js (unchanged)   │   │  JiraService.js (unchanged)                ││
+│  │    POST /sync          │ → │    syncIssues() - direct path for Jira     ││
+│  └────────────────────────┘   └────────────────────────────────────────────┘│
+└────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            POSTGRESQL                                        │
+│                                                                              │
+│  NEW TABLES                                                                  │
+│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
+│  │  capture_rules         │   │  capture_inbox                             ││
+│  │    user_id             │   │    user_id                                 ││
+│  │    name                │   │    rule_id (FK)                            ││
+│  │    url_pattern         │   │    source_url                              ││
+│  │    selectors (JSONB)   │   │    captured_data (JSONB)                   ││
+│  │    enabled             │   │    status (pending|approved|rejected)      ││
+│  │    site_type           │   │    approved_at, mapped_entity_type         ││
+│  └────────────────────────┘   └────────────────────────────────────────────┘│
+│                                                                              │
+│  ┌────────────────────────┐                                                 │
+│  │  entity_mappings       │                                                 │
+│  │    user_id             │                                                 │
+│  │    rule_id (FK)        │                                                 │
+│  │    source_field        │                                                 │
+│  │    target_entity       │                                                 │
+│  │    target_field        │                                                 │
+│  │    transform           │                                                 │
+│  └────────────────────────┘                                                 │
+│                                                                              │
+│  PRESERVED                                                                   │
+│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
+│  │  jira_issues           │   │  jira_team_mappings                        ││
+│  │    (unchanged)         │   │    (unchanged)                             ││
+│  └────────────────────────┘   └────────────────────────────────────────────┘│
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Component Boundaries
+---
 
-### Extension Components
+## Component Details
 
-| Component | Responsibility | Access | Lifespan |
-|-----------|---------------|--------|----------|
-| **Content Script** | DOM scraping, page observation, data extraction | Full DOM access, no cross-origin fetch | Per-page load |
-| **Service Worker** | Message hub, API calls, alarm scheduling, storage | Cross-origin fetch, chrome.* APIs | Event-driven (terminates when idle) |
-| **Popup** | User interface, manual triggers, settings | Limited (must message service worker for data) | Opened/closed by user |
-| **Options Page** | Extension configuration | Similar to popup | Rarely accessed |
+### 1. Capture Rules (NEW)
 
-### Backend Components (Matches GitHub Pattern)
+**Purpose:** Store user-defined extraction rules that tell the extension what to capture from which sites.
 
-| Component | Responsibility | Communicates With |
-|-----------|---------------|-------------------|
-| **Auth Middleware** | Verify JWT, extract user_id | All protected routes |
-| **Routes** | HTTP endpoint definitions, validation | Service layer |
-| **Service** | Business logic, multi-tenancy, data transformation | Database via connection pool |
-| **Database** | Data persistence with user_id isolation | Service layer only |
-
-## Data Flow Patterns
-
-### Pattern 1: Manual Sync from Extension Popup
-
-**Trigger:** User clicks "Sync Now" button in extension popup
-
-```
-1. popup.js: User clicks sync button
-   ↓
-2. popup.js: chrome.runtime.sendMessage({ action: 'syncJira' })
-   ↓
-3. background.js: Receives message in chrome.runtime.onMessage
-   ↓
-4. background.js: Reads auth token from chrome.storage.local
-   ↓
-5. background.js: fetch('https://backend.btp/api/jira/sync', {
-     headers: { Authorization: 'Bearer <token>' }
-   })
-   ↓
-6. backend/routes/jira.js: authMiddleware validates JWT
-   ↓
-7. backend/services/JiraService.js: Processes sync request
-   ↓
-8. PostgreSQL: INSERT/UPDATE jira_tickets WHERE user_id = <extracted_from_jwt>
-   ↓
-9. Response: { success: true, synced_count: 5 }
-   ↓
-10. background.js: chrome.runtime.sendMessage({ action: 'syncComplete', data })
-   ↓
-11. popup.js: Updates UI with sync results
-```
-
-### Pattern 2: Automatic DOM Observation (Content Script)
-
-**Trigger:** User navigates to Jira ticket page
-
-```
-1. content.js: MutationObserver detects DOM changes
-   ↓
-2. content.js: Extracts ticket data from DOM
-   {
-     key: 'PROJ-123',
-     summary: 'Fix login bug',
-     status: 'In Progress',
-     assignee: 'john.doe',
-     priority: 'High'
-   }
-   ↓
-3. content.js: chrome.runtime.sendMessage({
-     action: 'ticketViewed',
-     ticket: { ... }
-   })
-   ↓
-4. background.js: Receives ticket data
-   ↓
-5. background.js: Stores in chrome.storage.local (temporary cache)
-   ↓
-6. background.js: Queues for backend sync
-   ↓
-7. [Later] background.js: Batch sends to backend
-   ↓
-8. backend: Stores in PostgreSQL with user_id
-```
-
-### Pattern 3: Periodic Background Sync
-
-**Trigger:** chrome.alarms API (every 15 minutes)
-
-```
-1. background.js: chrome.alarms.onAlarm.addListener((alarm) => {
-     if (alarm.name === 'jiraSyncAlarm') { ... }
-   })
-   ↓
-2. background.js: Check if user has Jira token configured
-   ↓
-3. background.js: Collect cached tickets from chrome.storage.local
-   ↓
-4. background.js: POST batch to /api/jira/sync
-   ↓
-5. backend: Processes batch, deduplicates by ticket key
-   ↓
-6. PostgreSQL: UPSERT with ON CONFLICT (user_id, ticket_key)
-   ↓
-7. background.js: Clear synced items from cache
-   ↓
-8. background.js: Update sync timestamp
-```
-
-### Pattern 4: Backend to Frontend Web App
-
-**Trigger:** User opens P&E Manager web app
-
-```
-1. Frontend: useEffect(() => { loadJiraTickets(); }, [])
-   ↓
-2. Frontend: fetch('/api/jira/tickets', {
-     headers: { Authorization: 'Bearer <session_token>' }
-   })
-   ↓
-3. backend/routes/jira.js: GET /api/jira/tickets
-   ↓
-4. backend/services/JiraService.js:
-   SELECT * FROM jira_tickets WHERE user_id = $1
-   ↓
-5. Response: [{ key, summary, status, ... }]
-   ↓
-6. Frontend: Displays tickets in UI
-```
-
-## Authentication Flow
-
-### Extension → Backend Authentication
-
-**Storage Location:** `chrome.storage.local.get('authToken')`
-
-**Token Lifecycle:**
-
-```
-1. User logs into P&E Manager web app
-   ↓
-2. Web app receives JWT token from backend
-   ↓
-3. Web app triggers postMessage() to extension (if installed)
-   ↓
-4. Extension content script: window.addEventListener('message', (e) => {
-     if (e.data.type === 'PE_AUTH_TOKEN') {
-       chrome.runtime.sendMessage({
-         action: 'saveAuthToken',
-         token: e.data.token
-       });
-     }
-   })
-   ↓
-5. Service worker: chrome.storage.local.set({ authToken: token })
-   ↓
-6. All backend requests include: Authorization: Bearer <authToken>
-```
-
-**Alternative (Simpler Initial Approach):** Extension popup opens Settings page in web app, user copies auth token from web app, pastes into extension settings (similar to GitHub PAT pattern).
-
-### Jira Instance Configuration
-
-**Storage:** `chrome.storage.sync` for cross-device sync
-**Keys:**
-- `jira_instance_url` - e.g., "https://yourcompany.atlassian.net"
-- `jira_project_keys` - e.g., ["PROJ", "ENG", "SUPPORT"]
-- `auto_sync_enabled` - boolean
-- `sync_interval_minutes` - 15, 30, 60
-
-## Database Schema (Follows GitHub Pattern)
-
-### Table: jira_tickets
+**Database Schema:**
 
 ```sql
-CREATE TABLE jira_tickets (
+CREATE TABLE capture_rules (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id VARCHAR(100) NOT NULL,
 
-  -- Jira identifiers
-  ticket_key VARCHAR(50) NOT NULL,        -- PROJ-123
-  jira_instance_url VARCHAR(512) NOT NULL, -- https://company.atlassian.net
+  -- Rule identification
+  name VARCHAR(255) NOT NULL,                    -- "Grafana Dashboard Metrics"
+  description TEXT,                              -- User notes
 
-  -- Ticket data
-  summary TEXT,
-  description TEXT,
-  status VARCHAR(100),
-  ticket_type VARCHAR(50),                -- Bug, Story, Task, Epic
-  priority VARCHAR(50),
-  assignee VARCHAR(255),
-  reporter VARCHAR(255),
+  -- URL matching
+  url_pattern VARCHAR(1024) NOT NULL,            -- "https://grafana.example.com/d/*"
+  site_type VARCHAR(50),                         -- grafana, jenkins, concourse, dynatrace, custom
 
-  -- Dates
-  created_at TIMESTAMP,
-  updated_at TIMESTAMP,
-  resolved_at TIMESTAMP,
+  -- Extraction configuration
+  selectors JSONB NOT NULL,                      -- Field selector definitions
+  container_selector VARCHAR(512),               -- Optional: wait for this element
+  extraction_mode VARCHAR(50) DEFAULT 'single',  -- single, list, table
+
+  -- Behavior
+  enabled BOOLEAN DEFAULT true,
+  auto_capture BOOLEAN DEFAULT false,            -- Capture on page load vs manual trigger
+  capture_interval_seconds INTEGER,              -- For polling (null = no polling)
 
   -- Metadata
-  project_key VARCHAR(50),
-  labels JSONB DEFAULT '[]',
-  components JSONB DEFAULT '[]',
-  fix_versions JSONB DEFAULT '[]',
+  created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-  -- Sync metadata
-  last_synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  source VARCHAR(50) DEFAULT 'extension',  -- extension, api, manual
+  UNIQUE(user_id, name)
+);
 
-  -- Optional link to P&E project
-  project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+CREATE INDEX idx_capture_rules_user_id ON capture_rules(user_id);
+CREATE INDEX idx_capture_rules_enabled ON capture_rules(user_id, enabled);
+```
+
+**Selectors JSONB Structure:**
+
+```json
+{
+  "fields": [
+    {
+      "name": "dashboard_name",
+      "selector": "h1.dashboard-title, [data-testid=\"dashboard-title\"]",
+      "attribute": "textContent",
+      "required": true
+    },
+    {
+      "name": "panel_value",
+      "selector": ".panel-content .stat-value",
+      "attribute": "textContent",
+      "transform": "parseNumber",
+      "multiple": true
+    },
+    {
+      "name": "timestamp",
+      "selector": "[data-testid=\"time-range\"]",
+      "attribute": "data-from",
+      "transform": "parseDate"
+    }
+  ],
+  "identifier": "dashboard_name"
+}
+```
+
+**Service Interface:**
+
+```javascript
+class CaptureRuleService {
+  async listRules(userId)                              // All rules for user
+  async listEnabledRules(userId)                       // Only enabled rules (for extension)
+  async createRule(userId, ruleData)                   // Create new rule
+  async updateRule(userId, ruleId, updates)            // Modify rule
+  async deleteRule(userId, ruleId)                     // Remove rule
+  async testRule(userId, ruleId, sampleHtml)           // Validate selectors against sample
+}
+```
+
+### 2. Capture Inbox (NEW)
+
+**Purpose:** Stage captured data for user review before mapping to entities.
+
+**Database Schema:**
+
+```sql
+CREATE TABLE capture_inbox (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id VARCHAR(100) NOT NULL,
+
+  -- Source tracking
+  rule_id UUID REFERENCES capture_rules(id) ON DELETE SET NULL,
+  source_url VARCHAR(2048) NOT NULL,
+  source_title VARCHAR(512),
+
+  -- Captured data
+  captured_data JSONB NOT NULL,                  -- Raw extracted fields
+  captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  -- Review workflow
+  status VARCHAR(20) DEFAULT 'pending',          -- pending, approved, rejected
+  reviewed_at TIMESTAMP,
+
+  -- Mapping result (after approval)
+  mapped_entity_type VARCHAR(50),                -- task, project, note, metric
+  mapped_entity_id UUID,                         -- FK to created entity
+
+  -- Deduplication
+  content_hash VARCHAR(64),                      -- SHA-256 of captured_data
 
   created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-  UNIQUE(user_id, jira_instance_url, ticket_key)
+  UNIQUE(user_id, content_hash)                  -- Prevent exact duplicates
 );
 
-CREATE INDEX idx_jira_tickets_user_id ON jira_tickets(user_id);
-CREATE INDEX idx_jira_tickets_key ON jira_tickets(ticket_key);
-CREATE INDEX idx_jira_tickets_status ON jira_tickets(status);
-CREATE INDEX idx_jira_tickets_assignee ON jira_tickets(assignee);
+CREATE INDEX idx_capture_inbox_user_status ON capture_inbox(user_id, status);
+CREATE INDEX idx_capture_inbox_rule ON capture_inbox(rule_id);
+CREATE INDEX idx_capture_inbox_captured_at ON capture_inbox(captured_at);
 ```
 
-### Table: jira_sync_history
+**Service Interface:**
+
+```javascript
+class CaptureInboxService {
+  async listPending(userId, options)                   // Get items awaiting review
+  async stageCapture(userId, ruleId, data)             // Add new captured data
+  async approveAndMap(userId, captureId, mapping)      // Approve and create entity
+  async rejectCapture(userId, captureId)               // Mark as rejected
+  async bulkApprove(userId, captureIds, mappingRule)   // Batch approval
+  async getStats(userId)                               // Counts by status
+}
+```
+
+**Approval Flow:**
+
+```
+Extension captures data
+        │
+        ▼
+POST /api/capture-inbox
+        │
+        ▼
+┌───────────────────┐
+│   capture_inbox   │   status = 'pending'
+│   (staging table) │
+└───────────────────┘
+        │
+        │  User reviews in Inbox UI
+        ▼
+┌───────────────────┐
+│  Approve action   │   User selects entity type + field mapping
+└───────────────────┘
+        │
+        ▼
+EntityMappingService.applyMapping(captureData, mapping)
+        │
+        ▼
+┌───────────────────┐
+│  Target entity    │   e.g., tasks, projects, notes
+│  table            │
+└───────────────────┘
+        │
+        ▼
+Update capture_inbox:
+  status = 'approved'
+  mapped_entity_type = 'task'
+  mapped_entity_id = <new_task_id>
+```
+
+### 3. Entity Mappings (NEW)
+
+**Purpose:** Define how captured fields map to P&E Manager entities.
+
+**Database Schema:**
 
 ```sql
-CREATE TABLE jira_sync_history (
+CREATE TABLE entity_mappings (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id VARCHAR(100) NOT NULL,
 
-  sync_type VARCHAR(50),               -- manual, automatic, extension
-  tickets_synced INTEGER DEFAULT 0,
-  tickets_created INTEGER DEFAULT 0,
-  tickets_updated INTEGER DEFAULT 0,
+  -- Association
+  rule_id UUID REFERENCES capture_rules(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,                    -- "Grafana → Task"
 
-  status VARCHAR(50),                  -- success, partial, failed
-  error_message TEXT,
+  -- Target entity
+  target_entity VARCHAR(50) NOT NULL,            -- task, project, note, metric
 
-  started_at TIMESTAMP,
-  completed_at TIMESTAMP,
+  -- Field mappings
+  field_mappings JSONB NOT NULL,                 -- Source → target field rules
 
-  created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  -- Default values
+  defaults JSONB,                                -- Static values to apply
+
+  -- Auto-apply settings
+  auto_apply BOOLEAN DEFAULT false,              -- Skip inbox for this mapping
+
+  created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE(user_id, rule_id, name)
 );
 
-CREATE INDEX idx_jira_sync_user_id ON jira_sync_history(user_id);
-CREATE INDEX idx_jira_sync_started_at ON jira_sync_history(started_at);
+CREATE INDEX idx_entity_mappings_user ON entity_mappings(user_id);
+CREATE INDEX idx_entity_mappings_rule ON entity_mappings(rule_id);
 ```
 
-### Reuse: user_settings table (already exists from GitHub integration)
-
-```sql
--- Already exists, just add new keys:
--- 'jira_instance_url'
--- 'jira_auto_sync'
--- 'jira_sync_interval'
--- 'jira_project_filter'
-```
-
-## Manifest V3 Configuration
-
-### manifest.json Structure
+**Field Mappings JSONB Structure:**
 
 ```json
 {
-  "manifest_version": 3,
-  "name": "P&E Jira Sync",
-  "version": "1.0.0",
-  "description": "Sync Jira tickets to P&E Manager",
+  "mappings": [
+    {
+      "source": "dashboard_name",
+      "target": "title",
+      "transform": null
+    },
+    {
+      "source": "panel_value",
+      "target": "description",
+      "transform": "template",
+      "template": "Metric value: {{value}}"
+    },
+    {
+      "source": "timestamp",
+      "target": "due_date",
+      "transform": "parseDate"
+    }
+  ]
+}
+```
 
+**Service Interface:**
+
+```javascript
+class EntityMappingService {
+  async listMappings(userId)                           // All mappings
+  async listMappingsForRule(userId, ruleId)            // Mappings for specific rule
+  async createMapping(userId, mappingData)             // Create new mapping
+  async updateMapping(userId, mappingId, updates)      // Modify mapping
+  async deleteMapping(userId, mappingId)               // Remove mapping
+  async applyMapping(captureData, mappingId)           // Execute mapping → create entity
+}
+```
+
+---
+
+## Extension Changes
+
+### 4. Dynamic Content Script Registration (MODIFY service-worker.js)
+
+**Current:** Content scripts declared statically in manifest.json
+**Target:** Dynamic registration based on backend rules
+
+**Chrome API Used:** `chrome.scripting.registerContentScripts()`
+
+```javascript
+// service-worker.js additions
+
+/**
+ * Fetch capture rules from backend and register content scripts
+ */
+async function updateContentScriptRegistrations() {
+  const rules = await Api.getCaptureRules();
+
+  // Unregister all dynamic scripts first
+  const registered = await chrome.scripting.getRegisteredContentScripts();
+  const dynamicIds = registered
+    .filter(s => s.id.startsWith('capture-rule-'))
+    .map(s => s.id);
+
+  if (dynamicIds.length > 0) {
+    await chrome.scripting.unregisterContentScripts({ ids: dynamicIds });
+  }
+
+  // Register new scripts for enabled rules
+  const scriptsToRegister = rules
+    .filter(rule => rule.enabled)
+    .map(rule => ({
+      id: `capture-rule-${rule.id}`,
+      matches: [rule.url_pattern],
+      js: ['content/generic-extractor.js'],
+      runAt: 'document_idle',
+      world: 'ISOLATED'
+    }));
+
+  if (scriptsToRegister.length > 0) {
+    await chrome.scripting.registerContentScripts(scriptsToRegister);
+  }
+
+  // Cache rules for content script access
+  await chrome.storage.local.set({ captureRules: rules });
+}
+
+// Refresh registrations on extension startup
+chrome.runtime.onStartup.addListener(updateContentScriptRegistrations);
+chrome.runtime.onInstalled.addListener(updateContentScriptRegistrations);
+
+// Message handler for rule refresh
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'REFRESH_RULES') {
+    updateContentScriptRegistrations()
+      .then(() => sendResponse({ success: true }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+});
+```
+
+**Manifest Changes:**
+
+```json
+{
   "permissions": [
     "storage",
-    "alarms",
-    "activeTab"
+    "activeTab",
+    "webNavigation",
+    "scripting"           // NEW: Required for dynamic registration
   ],
 
   "host_permissions": [
-    "https://*.atlassian.net/*",
-    "https://pe-manager-backend.cfapps.eu01-canary.hana.ondemand.com/*"
+    "https://jira.tools.sap/*",
+    "https://*.grafana.com/*",           // NEW: Example additional sites
+    "https://*.jenkins.io/*",
+    "https://pe-manager-backend.cfapps.eu01-canary.hana.ondemand.com/*",
+    "http://localhost:3001/*"
   ],
-
-  "background": {
-    "service_worker": "background.js",
-    "type": "module"
-  },
 
   "content_scripts": [
+    // PRESERVED: Jira hardcoded for backwards compatibility
     {
-      "matches": [
-        "https://*.atlassian.net/browse/*",
-        "https://*.atlassian.net/jira/software/projects/*"
-      ],
-      "js": ["content.js"],
-      "run_at": "document_idle"
+      "matches": ["https://jira.tools.sap/*"],
+      "js": ["content/content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
     }
-  ],
-
-  "action": {
-    "default_popup": "popup.html",
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    }
-  },
-
-  "options_page": "options.html"
+    // Dynamic scripts registered via chrome.scripting API
+  ]
 }
 ```
 
-## Build Order & Dependencies
+### 5. Generic Extractor Content Script (NEW)
 
-### Phase 1: Foundation (Backend First)
+**Purpose:** Rule-driven extraction that works with any site's selectors.
 
-**Why backend first:** Allows testing with manual data before extension complexity.
-
-1. **Database schema** - `017_jira_integration.sql`
-   - jira_tickets table
-   - jira_sync_history table
-   - Triggers for auto-timestamps
-
-2. **Backend service** - `server/services/JiraService.js`
-   - CRUD operations following multi-tenancy pattern
-   - Sync history tracking
-   - Deduplication logic (UPSERT on ticket_key)
-
-3. **Backend routes** - `server/routes/jira.js`
-   - POST /api/jira/tickets (create/update)
-   - GET /api/jira/tickets (list with filters)
-   - POST /api/jira/sync (batch sync endpoint)
-   - DELETE /api/jira/tickets/:id
-
-**Test with:** curl or Postman to verify API works before building extension.
-
-### Phase 2: Extension Core (Service Worker)
-
-**Why service worker next:** Core message routing and storage before UI.
-
-4. **Service worker** - `extension/background.js`
-   - Message routing (chrome.runtime.onMessage)
-   - chrome.storage.local management
-   - Backend API client with auth headers
-   - Alarm scheduling for periodic sync
-
-5. **Storage schema**
-   - authToken (string)
-   - jiraInstanceUrl (string)
-   - pendingTickets (array) - tickets waiting to sync
-   - lastSyncTimestamp (number)
-
-**Test with:** Extension loaded unpacked, use chrome.runtime.sendMessage() from console.
-
-### Phase 3: Content Script (DOM Scraping)
-
-**Why after service worker:** Needs service worker to handle messages.
-
-6. **Content script** - `extension/content.js`
-   - DOM selectors for Jira ticket fields
-   - MutationObserver for dynamic content
-   - Message sending to service worker
-   - Error handling for DOM structure changes
-
-**Test with:** Navigate to Jira tickets, verify extraction in console logs.
-
-### Phase 4: UI Components
-
-**Why last:** User interface depends on working data flow.
-
-7. **Popup UI** - `extension/popup.html` + `popup.js`
-   - Manual sync trigger button
-   - Connection status display
-   - Configuration inputs (Jira URL)
-   - Sync history log
-
-8. **Options page** - `extension/options.html`
-   - Advanced settings
-   - Project filter configuration
-   - Sync interval selection
-
-### Phase 5: Frontend Integration (Web App)
-
-**Why after extension works:** Extension can work standalone first.
-
-9. **Frontend API client** - Add JiraTicket to `src/api/entities.js`
-
-10. **Frontend components** - `src/components/jira/`
-    - JiraSettings.jsx (similar to GitHubSettings.jsx)
-    - JiraTicketList.jsx
-    - JiraTicketCard.jsx
-
-11. **Frontend page** - `src/pages/JiraTickets.jsx`
-
-## Patterns to Follow
-
-### Pattern 1: Multi-Tenancy Enforcement
-
-**CRITICAL:** All database queries MUST filter by user_id.
+**File:** `extension/content/generic-extractor.js`
 
 ```javascript
-// ✅ CORRECT - Always include user_id filter
-async listTickets(userId, filters = {}) {
-  const sql = `
-    SELECT * FROM jira_tickets
-    WHERE user_id = $1
-    ORDER BY updated_at DESC
-  `;
-  return await query(sql, [userId]);
-}
-
-// ❌ WRONG - Missing user_id allows data leakage
-async listTickets(filters = {}) {
-  const sql = 'SELECT * FROM jira_tickets ORDER BY updated_at DESC';
-  return await query(sql);
-}
-```
-
-### Pattern 2: Idempotent Sync
-
-**Use UPSERT to handle duplicate syncs:**
-
-```javascript
-async syncTicket(userId, ticketData) {
-  const sql = `
-    INSERT INTO jira_tickets (
-      user_id, jira_instance_url, ticket_key,
-      summary, status, assignee, updated_at
-    )
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
-    ON CONFLICT (user_id, jira_instance_url, ticket_key)
-    DO UPDATE SET
-      summary = $4,
-      status = $5,
-      assignee = $6,
-      updated_at = $7,
-      last_synced_at = CURRENT_TIMESTAMP
-    RETURNING *
-  `;
-
-  return await query(sql, [
-    userId,
-    ticketData.instanceUrl,
-    ticketData.key,
-    ticketData.summary,
-    ticketData.status,
-    ticketData.assignee,
-    ticketData.updatedAt
-  ]);
-}
-```
-
-### Pattern 3: Service Worker Lifecycle (Manifest V3)
-
-**Service workers terminate when idle - use chrome.storage for persistence:**
-
-```javascript
-// ❌ WRONG - Variables don't persist across service worker restarts
-let authToken = null;
-let pendingTickets = [];
-
-// ✅ CORRECT - Store in chrome.storage
-async function getAuthToken() {
-  const { authToken } = await chrome.storage.local.get('authToken');
-  return authToken;
-}
-
-async function addPendingTicket(ticket) {
-  const { pendingTickets = [] } = await chrome.storage.local.get('pendingTickets');
-  pendingTickets.push(ticket);
-  await chrome.storage.local.set({ pendingTickets });
-}
-```
-
-### Pattern 4: Content Script Isolation
-
-**Content scripts can't use chrome.storage directly - must message service worker:**
-
-```javascript
-// content.js - Extract ticket data and send to service worker
-function extractTicketData() {
-  const ticketKey = document.querySelector('[data-testid="issue.views.issue-base.foundation.breadcrumbs.current-issue.item"]')?.textContent;
-  const summary = document.querySelector('[data-testid="issue.views.issue-base.foundation.summary.heading"]')?.textContent;
-
-  chrome.runtime.sendMessage({
-    action: 'ticketViewed',
-    ticket: {
-      key: ticketKey,
-      summary: summary,
-      url: window.location.href
-    }
-  });
-}
-
-// background.js - Receive and store
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'ticketViewed') {
-    addPendingTicket(message.ticket).then(() => {
-      sendResponse({ success: true });
-    });
-    return true; // Required for async sendResponse
-  }
-});
-```
-
-### Pattern 5: Token Storage Strategy
-
-**Follow GitHub pattern: Store auth token in user_settings, reference from extension:**
-
-```javascript
-// Backend: UserSettingsService.js (already exists)
-async getJiraInstanceUrl(userId) {
-  return this.get(userId, 'jira_instance_url');
-}
-
-async setJiraInstanceUrl(userId, url) {
-  return this.set(userId, 'jira_instance_url', url);
-}
-
-// Extension: Store backend auth token
-chrome.storage.local.set({
-  authToken: '<jwt_from_webapp>',
-  backendUrl: 'https://pe-manager-backend.cfapps.eu01-canary.hana.ondemand.com'
-});
-```
-
-## Communication Patterns
-
-### Extension Internal Communication
-
-```javascript
-// Popup → Service Worker
-chrome.runtime.sendMessage(
-  { action: 'syncNow' },
-  (response) => console.log(response)
-);
-
-// Content Script → Service Worker
-chrome.runtime.sendMessage(
-  { action: 'ticketData', data: {...} }
-);
-
-// Service Worker → Popup (if open)
-chrome.runtime.sendMessage(
-  { action: 'syncProgress', progress: 75 }
-);
-```
-
-### Extension → Backend Communication
-
-```javascript
-// Service worker makes authenticated requests
-async function syncToBackend(tickets) {
-  const { authToken } = await chrome.storage.local.get('authToken');
-  const { backendUrl } = await chrome.storage.local.get('backendUrl');
-
-  const response = await fetch(`${backendUrl}/api/jira/sync`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authToken}`
-    },
-    body: JSON.stringify({ tickets })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Sync failed: ${response.status}`);
-  }
-
-  return response.json();
-}
-```
-
-### Web App → Backend Communication
-
-```javascript
-// Reuses existing apiClient pattern
-import { JiraTicket } from '@/api/entities';
-
-// In component
-const tickets = await JiraTicket.list();
-const ticket = await JiraTicket.create({
-  key: 'PROJ-123',
-  summary: 'Bug fix'
-});
-```
-
-## Anti-Patterns to Avoid
-
-### Anti-Pattern 1: Storing Sensitive Data in chrome.storage.sync
-
-**Problem:** chrome.storage.sync uploads to Google servers, not encrypted.
-
-```javascript
-// ❌ WRONG - Exposes auth token to Google sync
-chrome.storage.sync.set({ authToken: 'sensitive-token' });
-
-// ✅ CORRECT - Use chrome.storage.local for sensitive data
-chrome.storage.local.set({ authToken: 'sensitive-token' });
-```
-
-### Anti-Pattern 2: Long-Running Service Worker Tasks
-
-**Problem:** Service workers auto-terminate after 30 seconds of inactivity.
-
-```javascript
-// ❌ WRONG - May terminate mid-sync
-async function syncAllTickets() {
-  const tickets = await fetchAllTicketsFromJira(); // Takes 2 minutes
-  await sendToBackend(tickets);
-}
-
-// ✅ CORRECT - Batch and queue
-async function syncAllTickets() {
-  const tickets = await fetchAllTicketsFromJira();
-  const batches = chunk(tickets, 10);
-
-  for (const batch of batches) {
-    await sendBatch(batch);
-    await delay(100); // Prevent termination
-  }
-}
-```
-
-### Anti-Pattern 3: Direct DOM Manipulation from Service Worker
-
-**Problem:** Service workers have no DOM access.
-
-```javascript
-// ❌ WRONG - Service worker can't access DOM
-chrome.runtime.onMessage.addListener((msg) => {
-  document.querySelector('.ticket').textContent = msg.data;
-});
-
-// ✅ CORRECT - Send message back to content script
-chrome.tabs.sendMessage(tabId, {
-  action: 'updateTicket',
-  data: msg.data
-});
-```
-
-### Anti-Pattern 4: Ignoring CORS in Extension
-
-**Problem:** Extensions still need host_permissions for cross-origin requests.
-
-```json
-// ❌ WRONG - Missing host_permissions
-{
-  "permissions": ["storage"],
-  "background": { "service_worker": "background.js" }
-}
-
-// ✅ CORRECT - Declare host_permissions
-{
-  "permissions": ["storage"],
-  "host_permissions": [
-    "https://backend.example.com/*"
-  ],
-  "background": { "service_worker": "background.js" }
-}
-```
-
-## Scalability Considerations
-
-### At 100 tickets/user
-
-**Approach:** Direct sync on each ticket view
-
-- Content script sends ticket immediately
-- Service worker syncs to backend instantly
-- No batching needed
-
-### At 1000 tickets/user
-
-**Approach:** Batch and queue
-
-- Content script queues tickets in chrome.storage.local
-- Service worker syncs batches every 15 minutes
-- Backend uses UPSERT to deduplicate
-
-### At 10K+ tickets/user
-
-**Approach:** Differential sync
-
-- Track last_synced_at per ticket
-- Only sync tickets updated since last sync
-- Backend API accepts `since` parameter:
-  `GET /api/jira/tickets?since=2026-01-20T10:00:00Z`
-- Consider pagination: `GET /api/jira/tickets?page=1&limit=100`
-
-## Error Handling Strategy
-
-### Extension Error Handling
-
-```javascript
-// Graceful degradation in content script
-function extractTicketData() {
-  try {
-    const key = document.querySelector(SELECTOR_KEY)?.textContent;
-    if (!key) {
-      console.warn('Jira ticket key not found - page structure may have changed');
-      return null;
-    }
-    return { key, ... };
-  } catch (error) {
-    console.error('Failed to extract ticket data:', error);
-    chrome.runtime.sendMessage({
-      action: 'logError',
-      error: error.message
-    });
-    return null;
-  }
-}
-```
-
-### Backend Error Handling
-
-```javascript
-// Consistent error responses
-router.post('/api/jira/sync', async (req, res) => {
-  try {
-    const result = await JiraService.sync(req.user.id, req.body.tickets);
-    res.json(result);
-  } catch (error) {
-    console.error('Jira sync error:', error);
-    res.status(500).json({
-      error: error.message,
-      code: 'SYNC_FAILED'
+/**
+ * Generic Extractor - Rule-driven DOM extraction
+ *
+ * Loaded dynamically by chrome.scripting.registerContentScripts()
+ * for URLs matching user-defined capture rules.
+ */
+
+(function() {
+  'use strict';
+
+  console.log('[PE-Capture] Generic extractor loaded for:', window.location.href);
+
+  let currentRule = null;
+
+  /**
+   * Find matching rule for current URL
+   */
+  async function findMatchingRule() {
+    const { captureRules = [] } = await chrome.storage.local.get('captureRules');
+
+    return captureRules.find(rule => {
+      if (!rule.enabled) return false;
+
+      // Convert glob pattern to regex
+      const pattern = rule.url_pattern
+        .replace(/\*/g, '.*')
+        .replace(/\?/g, '.');
+      const regex = new RegExp(`^${pattern}$`);
+
+      return regex.test(window.location.href);
     });
   }
-});
-```
 
-### Retry Logic
+  /**
+   * Extract data using rule's selectors
+   */
+  function extractByRule(rule) {
+    const { selectors } = rule;
+    const extracted = {};
 
-```javascript
-// Service worker retry with exponential backoff
-async function syncWithRetry(tickets, maxRetries = 3) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    for (const field of selectors.fields) {
+      try {
+        if (field.multiple) {
+          const elements = document.querySelectorAll(field.selector);
+          extracted[field.name] = Array.from(elements).map(el =>
+            extractValue(el, field)
+          );
+        } else {
+          const element = document.querySelector(field.selector);
+          extracted[field.name] = element ? extractValue(element, field) : null;
+        }
+      } catch (error) {
+        console.warn(`[PE-Capture] Failed to extract ${field.name}:`, error);
+        extracted[field.name] = null;
+      }
+    }
+
+    return extracted;
+  }
+
+  /**
+   * Extract value from element based on field config
+   */
+  function extractValue(element, field) {
+    let value;
+
+    switch (field.attribute) {
+      case 'textContent':
+        value = element.textContent?.trim();
+        break;
+      case 'innerHTML':
+        value = element.innerHTML;
+        break;
+      case 'href':
+        value = element.href;
+        break;
+      default:
+        value = element.getAttribute(field.attribute);
+    }
+
+    if (field.transform && value) {
+      value = applyTransform(value, field.transform);
+    }
+
+    return value;
+  }
+
+  /**
+   * Apply transform function to extracted value
+   */
+  function applyTransform(value, transform) {
+    switch (transform) {
+      case 'parseNumber':
+        return parseFloat(value.replace(/[^0-9.-]/g, ''));
+      case 'parseDate':
+        return new Date(value).toISOString();
+      case 'trim':
+        return value.trim();
+      case 'lowercase':
+        return value.toLowerCase();
+      default:
+        return value;
+    }
+  }
+
+  /**
+   * Send extracted data to service worker for staging
+   */
+  async function sendToStaging(data) {
+    if (!currentRule || Object.values(data).every(v => v === null)) {
+      console.log('[PE-Capture] No data to capture');
+      return;
+    }
+
+    const payload = {
+      rule_id: currentRule.id,
+      source_url: window.location.href,
+      source_title: document.title,
+      captured_data: data
+    };
+
     try {
-      return await syncToBackend(tickets);
-    } catch (error) {
-      if (attempt === maxRetries) throw error;
+      const response = await chrome.runtime.sendMessage({
+        type: 'STAGE_CAPTURE',
+        payload
+      });
 
-      const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
-      await new Promise(resolve => setTimeout(resolve, delay));
+      if (response.success) {
+        console.log('[PE-Capture] Data staged successfully');
+      } else {
+        console.error('[PE-Capture] Staging failed:', response.error);
+      }
+    } catch (error) {
+      console.error('[PE-Capture] Failed to send to service worker:', error);
     }
   }
+
+  /**
+   * Initialize extraction
+   */
+  async function init() {
+    currentRule = await findMatchingRule();
+
+    if (!currentRule) {
+      console.log('[PE-Capture] No matching rule for this URL');
+      return;
+    }
+
+    console.log('[PE-Capture] Using rule:', currentRule.name);
+
+    // Wait for container element if specified
+    if (currentRule.container_selector) {
+      await waitForElement(currentRule.container_selector);
+    }
+
+    // Perform extraction
+    if (currentRule.auto_capture) {
+      const data = extractByRule(currentRule);
+      await sendToStaging(data);
+    }
+
+    // Set up polling if configured
+    if (currentRule.capture_interval_seconds) {
+      setInterval(async () => {
+        const data = extractByRule(currentRule);
+        await sendToStaging(data);
+      }, currentRule.capture_interval_seconds * 1000);
+    }
+  }
+
+  /**
+   * Wait for element to appear
+   */
+  function waitForElement(selector, timeout = 15000) {
+    return new Promise((resolve) => {
+      const element = document.querySelector(selector);
+      if (element) {
+        resolve(element);
+        return;
+      }
+
+      const observer = new MutationObserver(() => {
+        const el = document.querySelector(selector);
+        if (el) {
+          observer.disconnect();
+          resolve(el);
+        }
+      });
+
+      observer.observe(document.body, { childList: true, subtree: true });
+
+      setTimeout(() => {
+        observer.disconnect();
+        resolve(null);
+      }, timeout);
+    });
+  }
+
+  // Listen for manual extraction trigger
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === 'TRIGGER_EXTRACTION') {
+      (async () => {
+        if (!currentRule) {
+          currentRule = await findMatchingRule();
+        }
+        if (currentRule) {
+          const data = extractByRule(currentRule);
+          await sendToStaging(data);
+          sendResponse({ success: true, data });
+        } else {
+          sendResponse({ success: false, error: 'No matching rule' });
+        }
+      })();
+      return true;
+    }
+  });
+
+  // Initialize
+  init();
+})();
+```
+
+### 6. Service Worker Additions (MODIFY service-worker.js)
+
+**New message handlers for configurable capture:**
+
+```javascript
+// Add to handleMessage() switch statement
+
+case 'STAGE_CAPTURE':
+  return await handleStageCapture(message.payload);
+
+case 'GET_CAPTURE_RULES':
+  return await handleGetCaptureRules();
+
+case 'TRIGGER_EXTRACTION':
+  // Forward to active tab's content script
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab) {
+    return await chrome.tabs.sendMessage(tab.id, message);
+  }
+  return { success: false, error: 'No active tab' };
+
+// New handlers
+
+async function handleStageCapture(payload) {
+  const isConfigured = await Storage.isConfigured();
+  if (!isConfigured) {
+    return { success: false, error: 'Extension not configured' };
+  }
+
+  try {
+    const result = await Api.stageCapture(payload);
+    return { success: true, data: result };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleGetCaptureRules() {
+  const { captureRules = [] } = await chrome.storage.local.get('captureRules');
+  return { success: true, data: captureRules };
 }
 ```
 
-## Security Considerations
+---
 
-### 1. Token Storage
+## Backend Routes
 
-- **Extension:** chrome.storage.local (device-only, not synced)
-- **Backend:** user_settings table (encrypted at rest via BTP)
-- **Never:** Log tokens, send in GET parameters, store in chrome.storage.sync
+### 7. New API Endpoints
 
-### 2. Content Script Injection
+**File:** `server/routes/captureRules.js`
 
-- **Only inject on Jira domains:** Use `matches` in manifest.json
-- **Validate DOM structure:** Check for expected elements before scraping
-- **Sanitize extracted data:** Prevent XSS from malicious ticket content
+```javascript
+import express from 'express';
+import CaptureRuleService from '../services/CaptureRuleService.js';
+import { authMiddleware } from '../middleware/auth.js';
 
-### 3. Backend Authentication
+const router = express.Router();
+router.use(authMiddleware);
 
-- **Every request:** Validate JWT token via authMiddleware
-- **Extract user_id from JWT:** Never trust client-provided user_id
-- **CORS whitelist:** Only allow extension and web app origins
+// GET /api/capture-rules - List all rules (for UI)
+router.get('/', async (req, res) => {
+  const rules = await CaptureRuleService.listRules(req.user.id);
+  res.json(rules);
+});
 
-### 4. Multi-Tenancy
+// GET /api/capture-rules/enabled - List enabled rules (for extension)
+router.get('/enabled', async (req, res) => {
+  const rules = await CaptureRuleService.listEnabledRules(req.user.id);
+  res.json(rules);
+});
 
-- **All queries filter by user_id:** No user should see another's data
-- **Database indexes on user_id:** Prevent full table scans
-- **Test with multiple users:** Verify isolation in staging
+// POST /api/capture-rules - Create rule
+router.post('/', async (req, res) => {
+  const rule = await CaptureRuleService.createRule(req.user.id, req.body);
+  res.status(201).json(rule);
+});
 
-## Performance Optimizations
+// PUT /api/capture-rules/:id - Update rule
+router.put('/:id', async (req, res) => {
+  const rule = await CaptureRuleService.updateRule(req.user.id, req.params.id, req.body);
+  res.json(rule);
+});
 
-### Extension Performance
+// DELETE /api/capture-rules/:id - Delete rule
+router.delete('/:id', async (req, res) => {
+  await CaptureRuleService.deleteRule(req.user.id, req.params.id);
+  res.status(204).send();
+});
 
-1. **Debounce DOM observations:** Don't trigger on every DOM mutation
-   ```javascript
-   let debounceTimer;
-   observer.observe(target, {
-     childList: true,
-     subtree: true
-   });
+export default router;
+```
 
-   function handleMutation() {
-     clearTimeout(debounceTimer);
-     debounceTimer = setTimeout(() => {
-       extractAndSync();
-     }, 500); // Wait 500ms of inactivity
-   }
-   ```
+**File:** `server/routes/captureInbox.js`
 
-2. **Lazy load content script:** Use `run_at: "document_idle"` in manifest
+```javascript
+import express from 'express';
+import CaptureInboxService from '../services/CaptureInboxService.js';
+import { authMiddleware } from '../middleware/auth.js';
 
-3. **Minimize chrome.storage writes:** Batch updates instead of per-ticket writes
+const router = express.Router();
+router.use(authMiddleware);
 
-### Backend Performance
+// GET /api/capture-inbox - List pending items
+router.get('/', async (req, res) => {
+  const { status = 'pending', limit = 50, offset = 0 } = req.query;
+  const items = await CaptureInboxService.listItems(req.user.id, { status, limit, offset });
+  res.json(items);
+});
 
-1. **Database indexes:** Already planned on user_id, ticket_key, status
+// GET /api/capture-inbox/stats - Get counts by status
+router.get('/stats', async (req, res) => {
+  const stats = await CaptureInboxService.getStats(req.user.id);
+  res.json(stats);
+});
 
-2. **Batch inserts:** Use single INSERT with multiple rows instead of loop
-   ```javascript
-   const values = tickets.map((t, i) =>
-     `($${i*6+1}, $${i*6+2}, $${i*6+3}, $${i*6+4}, $${i*6+5}, $${i*6+6})`
-   ).join(',');
+// POST /api/capture-inbox - Stage new capture (from extension)
+router.post('/', async (req, res) => {
+  const capture = await CaptureInboxService.stageCapture(req.user.id, req.body);
+  res.status(201).json(capture);
+});
 
-   const sql = `INSERT INTO jira_tickets (user_id, ticket_key, ...) VALUES ${values}`;
-   ```
+// PUT /api/capture-inbox/:id/approve - Approve and map to entity
+router.put('/:id/approve', async (req, res) => {
+  const { mapping } = req.body;
+  const result = await CaptureInboxService.approveAndMap(
+    req.user.id,
+    req.params.id,
+    mapping
+  );
+  res.json(result);
+});
 
-3. **Pagination:** Implement `?page=&limit=` for large ticket lists
+// PUT /api/capture-inbox/:id/reject - Reject capture
+router.put('/:id/reject', async (req, res) => {
+  await CaptureInboxService.rejectCapture(req.user.id, req.params.id);
+  res.status(204).send();
+});
 
-4. **Caching:** Consider Redis for frequently accessed ticket lists (future enhancement)
+// DELETE /api/capture-inbox/:id - Delete capture
+router.delete('/:id', async (req, res) => {
+  await CaptureInboxService.deleteCapture(req.user.id, req.params.id);
+  res.status(204).send();
+});
 
-## Testing Strategy
+export default router;
+```
 
-### Extension Testing
+---
 
-1. **Manual testing:**
-   - Load unpacked extension
-   - Navigate to Jira tickets
-   - Verify extraction in console
-   - Test popup interactions
+## Data Flow Diagrams
 
-2. **Automated testing (future):**
-   - Jest for business logic
-   - Puppeteer for end-to-end
+### Flow 1: Rule Creation and Extension Sync
 
-### Backend Testing
+```
+┌──────────────┐    1. User creates rule    ┌──────────────────┐
+│  Frontend    │ ─────────────────────────► │  Backend         │
+│  (Rule UI)   │    POST /capture-rules     │  (CaptureRule    │
+│              │                            │   Service)       │
+└──────────────┘                            └──────────────────┘
+                                                    │
+                                                    │ 2. Stored in DB
+                                                    ▼
+                                            ┌──────────────────┐
+                                            │  capture_rules   │
+                                            │  table           │
+                                            └──────────────────┘
+┌──────────────┐    3. Extension fetches    ┌──────────────────┐
+│  Extension   │ ◄───────────────────────── │  Backend         │
+│  (Service    │    GET /capture-rules/     │                  │
+│   Worker)    │       enabled              │                  │
+└──────────────┘                            └──────────────────┘
+       │
+       │ 4. chrome.scripting.registerContentScripts()
+       ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Chrome registers content script for rule.url_pattern        │
+│  Next visit to matching URL → generic-extractor.js loads     │
+└──────────────────────────────────────────────────────────────┘
+```
 
-1. **Unit tests:** Service layer (JiraService.js)
-   ```javascript
-   describe('JiraService', () => {
-     it('should enforce user_id in all queries', async () => {
-       const tickets = await JiraService.list('user-1');
-       expect(tickets.every(t => t.user_id === 'user-1')).toBe(true);
-     });
-   });
-   ```
+### Flow 2: Capture and Staging
 
-2. **Integration tests:** API routes with test database
+```
+┌──────────────┐    1. User visits URL     ┌──────────────────┐
+│  Website     │ ─────────────────────────►│  Content Script  │
+│  (Grafana)   │    matching rule pattern  │  (generic-       │
+│              │                           │   extractor.js)  │
+└──────────────┘                           └──────────────────┘
+                                                   │
+                                                   │ 2. Extract by selectors
+                                                   ▼
+                                           ┌──────────────────┐
+                                           │  Extracted data: │
+                                           │  { dashboard:    │
+                                           │    "Prod-API",   │
+                                           │    value: 99.5 } │
+                                           └──────────────────┘
+                                                   │
+                                                   │ 3. chrome.runtime.sendMessage()
+                                                   ▼
+┌──────────────┐    4. POST /capture-inbox ┌──────────────────┐
+│  Service     │ ─────────────────────────►│  Backend         │
+│  Worker      │                           │  (CaptureInbox   │
+│              │                           │   Service)       │
+└──────────────┘                           └──────────────────┘
+                                                   │
+                                                   │ 5. Staged (pending)
+                                                   ▼
+                                           ┌──────────────────┐
+                                           │  capture_inbox   │
+                                           │  status='pending'│
+                                           └──────────────────┘
+```
 
-3. **Multi-tenancy tests:** Verify user isolation
+### Flow 3: Review and Approval
 
-### Regression Testing
+```
+┌──────────────┐    1. Load inbox          ┌──────────────────┐
+│  Frontend    │ ─────────────────────────►│  Backend         │
+│  (Inbox UI)  │    GET /capture-inbox     │                  │
+│              │    ?status=pending        │                  │
+└──────────────┘                           └──────────────────┘
+       │
+       │ 2. Display pending items
+       ▼
+┌──────────────────────────────────────────────────────────────┐
+│  User sees: "Prod-API Dashboard - Grafana - 2 hours ago"     │
+│  [Approve as Task] [Approve as Note] [Reject]                │
+└──────────────────────────────────────────────────────────────┘
+       │
+       │ 3. User clicks "Approve as Task" with mapping
+       ▼
+┌──────────────┐    4. PUT /:id/approve    ┌──────────────────┐
+│  Frontend    │ ─────────────────────────►│  Backend         │
+│              │    { mapping: {           │  (CaptureInbox   │
+│              │      entity: 'task',      │   Service)       │
+│              │      fields: {...}        │                  │
+│              │    }}                     └──────────────────┘
+└──────────────┘                                   │
+                                                   │ 5. Create entity
+                                                   ▼
+                                           ┌──────────────────┐
+                                           │  tasks table     │
+                                           │  (new task)      │
+                                           └──────────────────┘
+                                                   │
+                                                   │ 6. Update inbox
+                                                   ▼
+                                           ┌──────────────────┐
+                                           │  capture_inbox   │
+                                           │  status='approved'│
+                                           │  mapped_entity_id│
+                                           └──────────────────┘
+```
 
-- **Jira DOM changes:** Content script selectors may break when Jira updates
-- **Monitor:** Log extraction failures to backend
-- **Fallback:** Gracefully degrade if selectors fail
+---
 
-## Deployment Checklist
+## Build Order and Dependencies
 
-### Extension Deployment
+### Dependency Graph
 
-1. Build: `npm run build:extension`
-2. Test unpacked in Chrome
-3. Package as .zip
-4. Submit to Chrome Web Store
-5. Provide backend URL in extension options
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           INFRASTRUCTURE                                     │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  018_configurable_capture.sql (migration)                              │  │
+│  │    - capture_rules table                                               │  │
+│  │    - capture_inbox table                                               │  │
+│  │    - entity_mappings table                                             │  │
+│  │    - Indexes and triggers                                              │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                       │
+                                       │ depends on
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           BACKEND SERVICES                                   │
+│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐  │
+│  │  CaptureRuleService │  │  CaptureInboxService│  │EntityMappingService │  │
+│  │                     │  │                     │  │                     │  │
+│  │  - CRUD operations  │  │  - Stage capture    │  │  - Define mappings  │  │
+│  │  - Rule validation  │  │  - Approve/reject   │  │  - Apply mappings   │  │
+│  │                     │  │  - Deduplication    │  │  - Transform data   │  │
+│  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                       │
+                                       │ depends on
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           BACKEND ROUTES                                     │
+│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐  │
+│  │  captureRules.js    │  │  captureInbox.js    │  │  entityMappings.js  │  │
+│  │  /api/capture-rules │  │  /api/capture-inbox │  │  /api/entity-       │  │
+│  │                     │  │                     │  │      mappings       │  │
+│  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                       │
+                    ┌──────────────────┴──────────────────┐
+                    │                                      │
+                    ▼                                      ▼
+┌─────────────────────────────────┐    ┌─────────────────────────────────────┐
+│       EXTENSION CHANGES         │    │         FRONTEND UI                  │
+│  ┌───────────────────────────┐  │    │  ┌─────────────────────────────────┐│
+│  │  service-worker.js mods   │  │    │  │  Rule Builder UI                ││
+│  │  - Dynamic registration   │  │    │  │  - Create/edit capture rules    ││
+│  │  - STAGE_CAPTURE handler  │  │    │  │  - Selector tester              ││
+│  │  - Rule sync              │  │    │  │                                 ││
+│  └───────────────────────────┘  │    │  └─────────────────────────────────┘│
+│  ┌───────────────────────────┐  │    │  ┌─────────────────────────────────┐│
+│  │  generic-extractor.js     │  │    │  │  Inbox UI                       ││
+│  │  - Rule-driven extraction │  │    │  │  - Review pending captures      ││
+│  │  - Selector execution     │  │    │  │  - Approve/reject workflow      ││
+│  │  - Transform application  │  │    │  │  - Entity mapping selection     ││
+│  └───────────────────────────┘  │    │  └─────────────────────────────────┘│
+│  ┌───────────────────────────┐  │    │  ┌─────────────────────────────────┐│
+│  │  manifest.json mods       │  │    │  │  Mapping Editor UI              ││
+│  │  - scripting permission   │  │    │  │  - Field mapping configuration  ││
+│  │  - Host permissions       │  │    │  │  - Transform selection          ││
+│  └───────────────────────────┘  │    │  │  - Auto-apply settings          ││
+└─────────────────────────────────┘    │  └─────────────────────────────────┘│
+                                       └─────────────────────────────────────┘
+```
 
-### Backend Deployment
+### Suggested Phase Order
 
-1. Run migration: `npm run migrate` (adds jira tables)
-2. Deploy to BTP: `cf push pe-manager-backend`
-3. Verify health check: `GET /api/health`
-4. Test endpoints: `curl -H "Authorization: Bearer <token>" /api/jira/tickets`
+**Phase 1: Backend Foundation (Week 1)**
+- Database migration (`018_configurable_capture.sql`)
+- CaptureRuleService
+- CaptureInboxService
+- EntityMappingService
+- REST routes for all three
+- Test with curl/Postman
 
-### Coordination
+**Phase 2: Extension Core (Week 2)**
+- Modify manifest.json (add `scripting` permission)
+- Service worker changes for dynamic registration
+- Service worker changes for STAGE_CAPTURE
+- Api.js additions (getCaptureRules, stageCapture)
+- Test rule sync and dynamic registration
 
-- **Version compatibility:** Extension v1.0 works with backend API v1
-- **Breaking changes:** Version extension and backend together
-- **Rollback plan:** Keep old API endpoints during transition period
+**Phase 3: Generic Extractor (Week 3)**
+- generic-extractor.js implementation
+- Selector execution engine
+- Transform functions
+- Test with sample rule on real site
 
-## Roadmap Implications
+**Phase 4: Inbox UI (Week 4)**
+- CaptureInbox page component
+- Pending items list
+- Approve/reject workflow
+- Entity type selection
+- Field mapping UI
 
-### Phase Structure Recommendation
+**Phase 5: Rule Builder UI (Week 5)**
+- CaptureRules page component
+- Rule creation form
+- URL pattern builder
+- Selector tester (paste HTML, test selectors)
+- Enable/disable toggle
 
-Based on dependency analysis:
-
-1. **Phase 1: Backend Foundation** (1-2 weeks)
-   - Database schema
-   - Service layer
-   - REST API routes
-   - Test with curl/Postman
-
-2. **Phase 2: Extension Core** (1-2 weeks)
-   - Service worker
-   - Storage management
-   - Backend API integration
-   - Test with manual messages
-
-3. **Phase 3: Content Script** (1 week)
-   - DOM scraping
-   - Data extraction
-   - Message passing
-   - Test on real Jira pages
-
-4. **Phase 4: Extension UI** (1 week)
-   - Popup interface
-   - Options page
-   - Status displays
-
-5. **Phase 5: Web App Integration** (1 week)
-   - Frontend API client
-   - Jira page component
-   - Settings integration
+**Phase 6: Advanced Features (Week 6)**
+- Entity mapping configuration UI
+- Auto-apply rules
+- Bulk approval
+- Polling configuration
 
 ### Critical Path
 
 ```
-Database schema → Service layer → Routes → Service worker → Content script → UI
+Migration → Services → Routes → Extension Core → Generic Extractor → Inbox UI
 ```
 
 **Cannot parallelize:**
-- Content script depends on service worker
-- Service worker depends on backend routes
-- Backend routes depend on service layer
-- Service layer depends on database schema
+- Services depend on migration
+- Routes depend on services
+- Extension changes depend on routes (need API endpoints)
+- Generic extractor depends on extension core (message handling)
+- Inbox UI depends on all backend pieces
 
 **Can parallelize:**
-- Popup UI + Options page (both depend on service worker, independent of each other)
-- Frontend web app components (depends on backend routes, independent of extension UI)
+- Rule Builder UI and Inbox UI (both need backend, independent of each other)
+- Entity Mapping UI can start after Phase 4
+
+---
+
+## Migration Path from v1.0
+
+### Backwards Compatibility Strategy
+
+**The existing Jira flow remains untouched:**
+
+1. **Content scripts:** `content.js` + extractors remain for `jira.tools.sap`
+2. **Service worker:** `handleSyncIssues()` preserved for Jira
+3. **Backend:** `/api/jira-issues/sync` unchanged
+4. **Database:** `jira_issues` table unchanged
+
+**New capture system runs in parallel:**
+
+1. Dynamic scripts registered for non-Jira rules only
+2. New data flows to `capture_inbox`, not `jira_issues`
+3. After approval, mapped to appropriate entity tables
+
+### Migration Options
+
+**Option A: Gradual (Recommended)**
+- Keep Jira hardcoded indefinitely
+- New sites use configurable system
+- Eventually create Jira rule + mapping for consistency
+
+**Option B: Full Migration (Future)**
+- Create Jira capture rule that matches existing selectors
+- Create entity mapping: Jira fields → jira_issues table
+- Set auto_apply=true to skip inbox
+- Remove hardcoded Jira content scripts
+- Jira data still goes to jira_issues via mapping
+
+---
+
+## Integration Points with v1.0 Extension
+
+| Component | Status | Integration Notes |
+|-----------|--------|-------------------|
+| `manifest.json` | MODIFY | Add `scripting` permission, expand `host_permissions` |
+| `service-worker.js` | MODIFY | Add rule sync, dynamic registration, STAGE_CAPTURE handler |
+| `lib/storage.js` | MODIFY | Add captureRules cache key |
+| `lib/api.js` | MODIFY | Add getCaptureRules(), stageCapture() methods |
+| `content/content.js` | PRESERVE | Keep for Jira backwards compatibility |
+| `content/extractors/*.js` | PRESERVE | Keep for Jira backwards compatibility |
+| `content/generic-extractor.js` | NEW | Rule-driven extraction engine |
+| `popup/popup.html` | MODIFY | Add rule status indicator |
+
+---
+
+## New vs Modified Components Summary
+
+### New Components
+
+| Component | Type | Location |
+|-----------|------|----------|
+| capture_rules table | Database | migration 018 |
+| capture_inbox table | Database | migration 018 |
+| entity_mappings table | Database | migration 018 |
+| CaptureRuleService.js | Backend Service | server/services/ |
+| CaptureInboxService.js | Backend Service | server/services/ |
+| EntityMappingService.js | Backend Service | server/services/ |
+| captureRules.js | Backend Route | server/routes/ |
+| captureInbox.js | Backend Route | server/routes/ |
+| entityMappings.js | Backend Route | server/routes/ |
+| generic-extractor.js | Extension Content | extension/content/ |
+| CaptureRules.jsx | Frontend Page | src/pages/ |
+| CaptureInbox.jsx | Frontend Page | src/pages/ |
+| RuleBuilder.jsx | Frontend Component | src/components/capture/ |
+| InboxItem.jsx | Frontend Component | src/components/capture/ |
+
+### Modified Components
+
+| Component | Changes |
+|-----------|---------|
+| manifest.json | Add scripting permission, expand host_permissions |
+| service-worker.js | Add dynamic registration, STAGE_CAPTURE handler |
+| lib/storage.js | Add captureRules cache key |
+| lib/api.js | Add getCaptureRules(), stageCapture() methods |
+| server/index.js | Mount new routes |
+| src/pages/Layout.jsx | Add Inbox nav item with badge |
+
+### Preserved Components (No Changes)
+
+| Component | Reason |
+|-----------|--------|
+| content/content.js | Jira backwards compatibility |
+| content/extractors/*.js | Jira backwards compatibility |
+| server/routes/jira.js | Jira backwards compatibility |
+| server/services/JiraService.js | Jira backwards compatibility |
+| jira_issues table | Jira backwards compatibility |
+| jira_team_mappings table | Jira backwards compatibility |
+
+---
 
 ## Sources
 
 **Confidence Level:** HIGH
 
 **Based on:**
-1. Existing GitHub integration pattern in codebase (PRIMARY SOURCE)
-   - `/server/services/GitHubService.js` - Service layer pattern
-   - `/server/routes/github.js` - REST API pattern
-   - `/server/db/016_github_integration.sql` - Database schema pattern
-   - `/src/components/github/GitHubSettings.jsx` - Frontend integration pattern
 
-2. Chrome Extension Manifest V3 architecture (from training data, Jan 2025)
-   - Service worker lifecycle
-   - Content script isolation
-   - Message passing APIs
-   - chrome.storage patterns
+1. **Existing v1.0 Implementation (PRIMARY SOURCE)**
+   - `/extension/manifest.json` - Current manifest structure
+   - `/extension/service-worker.js` - Message handling patterns
+   - `/extension/content/content.js` - Page detection and extraction flow
+   - `/extension/content/extractors/*.js` - Selector-based extraction patterns
+   - `/server/services/JiraService.js` - Service layer patterns
+   - `/server/routes/jira.js` - Route handler patterns
 
-3. Express.js + PostgreSQL patterns already established in P&E Manager
+2. **Chrome Extension Documentation (Verified)**
+   - `chrome.scripting.registerContentScripts()` API for dynamic registration
+   - `chrome.scripting.executeScript()` for programmatic injection
+   - Content script isolated world execution model
+   - Service worker lifecycle and storage patterns
+
+3. **P&E Manager Codebase Patterns (Verified)**
    - Multi-tenancy enforcement via user_id
-   - Auth middleware pattern
    - Service → Routes → Database layering
-   - SAP BTP deployment configuration
+   - Entity abstraction in frontend
+   - PostgreSQL JSONB for flexible schemas
 
-**Notes:**
-- Architecture directly mirrors successful GitHub integration
-- All patterns already proven in production deployment
-- Manifest V3 knowledge current as of training date (Jan 2025)
-- DOM scraping specifics for Jira will require live testing (selectors change)
+**Sources:**
+- [Chrome Content Scripts Documentation](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts)
+- [Chrome Scripting API Reference](https://developer.chrome.com/docs/extensions/reference/api/scripting)
+
+---
+
+*Research generated: 2026-01-22*
