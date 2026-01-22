@@ -98,7 +98,7 @@ Plans:
 
 - [x] **Phase 6: Backend Foundation** - Database schema, services, and REST API for capture rules, inbox, and mappings
 - [x] **Phase 7: Extension Core** - Dynamic rule loading, generic extractor, and staging capture flow
-- [ ] **Phase 8: Inbox and Mapping UI** - Review workflow and entity mapping interface
+- [x] **Phase 8: Inbox and Mapping UI** - Review workflow and entity mapping interface
 - [ ] **Phase 9: Rule Builder UI** - Create and test capture rules via web app
 
 ### Phase 6: Backend Foundation
@@ -147,8 +147,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 08-01-PLAN.md — Capture Inbox page with API client, table, filtering, preview, and basic accept/reject
-- [ ] 08-02-PLAN.md — Entity mapping dialog with auto-suggest and bulk operations
+- [x] 08-01-PLAN.md — Capture Inbox page with API client, table, filtering, preview, and basic accept/reject
+- [x] 08-02-PLAN.md — Entity mapping dialog with auto-suggest and bulk operations
 
 ### Phase 9: Rule Builder UI
 **Goal**: User can create and configure capture rules without editing code
@@ -160,11 +160,11 @@ Plans:
   3. User can test selectors against a live page before saving the rule
   4. User can enable/disable rules without deleting them
   5. Preset templates available for Jenkins, Grafana, Concourse, Dynatrace (jump-start configuration)
-**Plans**: TBD (estimated 2 plans)
+**Plans**: 2 plans
 
 Plans:
-- [ ] 09-01: Rule CRUD form with URL pattern and selectors
-- [ ] 09-02: Selector tester and preset templates
+- [ ] 09-01-PLAN.md — Rule CRUD page with URL pattern and dynamic selector array
+- [ ] 09-02-PLAN.md — Preset templates and selector testing guidance
 
 ## Progress
 
@@ -181,7 +181,7 @@ v1.1: 6 -> 7 (depends on 6), 8 (depends on 6), 9 (depends on 6+7)
 | 5. Web App Integration | v1.0 | 2/2 | Complete | 2026-01-21 |
 | 6. Backend Foundation | v1.1 | 2/2 | Complete | 2026-01-22 |
 | 7. Extension Core | v1.1 | 3/3 | Complete | 2026-01-22 |
-| 8. Inbox and Mapping UI | v1.1 | 0/2 | Planned | - |
+| 8. Inbox and Mapping UI | v1.1 | 2/2 | Complete | 2026-01-22 |
 | 9. Rule Builder UI | v1.1 | 0/2 | Not started | - |
 
 ## v1.1 Requirement Coverage
