@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-22)
 
 **Core value:** Single dashboard showing health and status across all team tools without switching contexts
-**Current focus:** v1.1 Web Capture Framework — Phase 8 In Progress (Plan 1 Complete)
+**Current focus:** v1.1 Web Capture Framework — Phase 8 Complete
 
 ## Current Position
 
-Phase: 8 of 9 (Inbox and Mapping UI) - In Progress
-Plan: 1 of 2 in current phase
-Status: Plan 08-01 complete, ready for 08-02
-Last activity: 2026-01-22 — Completed 08-01-PLAN.md (Capture Inbox Foundation)
+Phase: 8 of 9 (Inbox and Mapping UI) - Complete
+Plan: 2 of 2 in current phase
+Status: Phase 8 complete, ready for Phase 9
+Last activity: 2026-01-22 — Completed 08-02-PLAN.md (Entity Mapping and Bulk Operations)
 
-Progress: [=========|] 78% (7/9 phases complete, 6/9 plans in v1.1)
+Progress: [=========|] 89% (8/9 phases complete, 7/9 plans in v1.1)
 
 ## Performance Metrics
 
@@ -25,13 +25,14 @@ Progress: [=========|] 78% (7/9 phases complete, 6/9 plans in v1.1)
 
 **Current Milestone (v1.1):**
 - Estimated plans: 9
-- Completed: 6 (Phase 6: 2, Phase 7: 3, Phase 8: 1)
+- Completed: 7 (Phase 6: 2, Phase 7: 3, Phase 8: 2)
 - 06-01: 2m 6s (database schema)
 - 06-02: 3m 22s (backend services)
 - 07-01: 3m 6s (capture rule fetching)
 - 07-02: 3m 29s (generic extractor content script)
 - 07-03: 3m 38s (popup UI and badge status)
 - 08-01: 4m (capture inbox foundation)
+- 08-02: 4m (entity mapping and bulk operations)
 
 ## Accumulated Context
 
@@ -65,6 +66,10 @@ v1.1 decisions from execution:
 - D-0703-01: Badge color priority - pending count (orange) takes precedence over sync status
 - D-0703-02: Cached pending count for instant popup display, refreshed on capture
 - D-0801-01: Default filter to 'pending' status to show actionable items first
+- D-0802-01: Auto-suggest uses word-based scoring (exact match > contains > starts with > word match)
+- D-0802-02: Selection uses JavaScript Set for O(1) operations
+- D-0802-03: Only pending items are selectable (accepted/rejected items disabled)
+- D-0802-04: Clear selection on bulk action success to prevent stale state
 
 ### Pending Todos
 
@@ -123,9 +128,12 @@ None.
 - `extension/lib/storage.js` - Capture rules and pending count storage
 - `extension/lib/api.js` - Capture API client methods
 
-## Phase 8 Progress
+## Phase 8 Completion Summary
 
-**Plan 08-01 (Complete):** Capture Inbox Foundation
+**Completed:** 2026-01-22
+**Duration:** ~8 minutes (2 plans)
+
+**Plan 08-01:** Capture Inbox Foundation
 - CaptureInbox and EntityMapping API clients
 - InboxItemDetail preview component
 - CaptureInbox page with table, filtering, preview, basic accept/reject
@@ -133,21 +141,29 @@ None.
 - Duration: 4 minutes
 - Commits: 4f813ecd, 1381dcf8, ece63bc1
 
-**Plan 08-02 (Next):** Entity Mapping and Bulk Operations
+**Plan 08-02:** Entity Mapping and Bulk Operations
 - EntityMappingDialog with type selection and auto-suggest
 - InboxBulkActions toolbar with confirmation dialogs
 - CaptureInbox with checkbox selection and bulk operations
 - Files: EntityMappingDialog.jsx, InboxBulkActions.jsx, CaptureInbox.jsx (update)
+- Duration: 4 minutes
+- Commits: b1a3a116, e21847df, 30c2fdc1
+
+**Frontend Artifacts:**
+- `src/components/capture/EntityMappingDialog.jsx` - Dialog for entity mapping with auto-suggest
+- `src/components/capture/InboxBulkActions.jsx` - Bulk actions toolbar with confirmations
+- `src/components/capture/InboxItemDetail.jsx` - Inbox item preview component
+- `src/pages/CaptureInbox.jsx` - Main inbox page with filtering, selection, bulk actions
 
 ## Session Continuity
 
-Last session: 2026-01-22T14:52:00Z
-Stopped at: Completed 08-01-PLAN.md
+Last session: 2026-01-22T15:04:00Z
+Stopped at: Completed 08-02-PLAN.md
 Resume file: None
 
 ## Next Steps
 
-Ready for Plan 08-02 execution:
+Ready for Phase 9 (Extension Site Support) planning:
 ```
-/gsd:execute-plan 08-02
+/gsd:plan-phase 09
 ```
