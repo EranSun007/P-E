@@ -1,192 +1,74 @@
-# Requirements: P&E Manager Jira Integration
+# Requirements: P&E Manager v1.1 Web Capture Framework
 
-**Generated:** 2026-01-21
+**Generated:** 2026-01-22
 **Status:** Draft
 **Source:** User selections + research findings
 
 ---
 
-## v1 Requirements (MVP)
+## v1.1 Requirements (This Milestone)
 
-### Extension Core (EXT)
+### Rule Configuration (RULE)
 
-- [ ] **EXT-01**: Chrome Extension with Manifest V3 structure
-  - Service worker background script
-  - Content scripts for jira.tools.sap domain
-  - Popup UI for status and settings
-  - Host permissions for https://jira.tools.sap/*
+- [ ] **RULE-01**: User can create capture rule with URL pattern (e.g., `*.grafana.sap/*`)
+- [ ] **RULE-02**: User can define CSS selectors for data extraction in a rule
+- [ ] **RULE-03**: User can name extracted fields (e.g., "build_status", "job_name")
+- [ ] **RULE-04**: User can enable/disable rules without deleting them
+- [ ] **RULE-05**: User can test selectors against a live page before saving rule
+- [ ] **RULE-06**: User can create rules from preset templates (Jenkins, Grafana, Concourse, Dynatrace)
 
-- [ ] **EXT-02**: Automatic background sync while browsing Jira
-  - Content script detects Jira board pages
-  - Polls DOM at configurable interval (default 30s)
-  - Debounces rapid page changes
-  - Service worker coordinates sync timing
+### Data Staging (STAGE)
 
-- [ ] **EXT-03**: Sync status indicator in extension icon
-  - Badge shows sync state (syncing, success, error, stale)
-  - Last sync timestamp in popup
-  - Error details accessible in popup
+- [ ] **STAGE-01**: User can view captured items in an inbox before they enter main system
+- [ ] **STAGE-02**: User can preview raw captured data for each item
+- [ ] **STAGE-03**: User can accept or reject individual captured items
+- [ ] **STAGE-04**: User can select target entity type when accepting (project, team member, service)
+- [ ] **STAGE-05**: User can bulk accept/reject multiple captured items
 
-- [ ] **EXT-04**: DOM scraping for sprint board view
-  - Extract issues from board columns
-  - Capture column/status mapping
-  - Handle dynamic content loading (MutationObserver)
+### Entity Mapping (MAP)
 
-- [ ] **EXT-05**: DOM scraping for backlog view
-  - Extract backlog items with ranking
-  - Capture sprint assignment
-  - Handle pagination/lazy loading
+- [ ] **MAP-01**: User can map captured source identifier to a target entity
+- [ ] **MAP-02**: User can select target entity type (project, team member, service)
+- [ ] **MAP-03**: System auto-suggests mappings based on name similarity
+- [ ] **MAP-04**: User can create reusable mapping rules that auto-apply to future captures
 
-- [ ] **EXT-06**: DOM scraping for issue detail pages
-  - Extract full issue metadata
-  - Capture epic links
-  - Fallback data source when board scraping incomplete
+### Extension Behavior (EXT)
 
-- [ ] **EXT-07**: Core issue data extraction
-  - Issue key (e.g., PROJ-123)
-  - Summary/title
-  - Status
-  - Assignee (name and ID)
-  - Story points
-  - Priority
-  - Issue type (story, bug, task, epic)
-  - Epic link/parent
+- [ ] **EXT-01**: Extension fetches capture rules from backend on startup/refresh
+- [ ] **EXT-02**: Extension activates on sites matching rule URL patterns (dynamic, not hardcoded)
+- [ ] **EXT-03**: Extension sends captured data to staging table (not directly to main tables)
+- [ ] **EXT-04**: Extension badge shows capture count on icon
+- [ ] **EXT-05**: User can trigger manual capture from extension popup
 
-- [ ] **EXT-08**: Extension storage management
-  - Store P&E Manager backend URL
-  - Store authentication token (encrypted)
-  - Cache last sync state for delta detection
-  - Persist across service worker restarts
+### Database Schema (DB)
 
-- [ ] **EXT-09**: Backend API communication
-  - POST scraped data to P&E Manager backend
-  - Handle authentication (JWT token)
-  - Retry logic for failed requests
-  - Offline queue when backend unavailable
+- [ ] **DB-01**: capture_rules table stores rule definitions with URL patterns and selectors (JSONB)
+- [ ] **DB-02**: capture_inbox table stores staged items awaiting review
+- [ ] **DB-03**: entity_mappings table stores source-to-target mappings (generic, not Jira-specific)
+- [ ] **DB-04**: Migration file following existing conventions
 
 ### Backend API (API)
 
-- [ ] **API-01**: Jira issues sync endpoint
-  - POST /api/jira-issues/sync
-  - Accept batch of issues from extension
-  - Validate payload structure
-  - Return sync result with counts
-
-- [ ] **API-02**: Jira issues CRUD endpoints
-  - GET /api/jira-issues - List synced issues
-  - GET /api/jira-issues/:id - Get single issue
-  - DELETE /api/jira-issues/:id - Remove issue
-  - (No PUT - issues are read-only from Jira)
-
-- [ ] **API-03**: Team member mapping endpoints
-  - GET /api/jira-mappings - List Jira->team member mappings
-  - POST /api/jira-mappings - Create/update mapping
-  - DELETE /api/jira-mappings/:id - Remove mapping
-
-- [ ] **API-04**: JiraService following GitHubService pattern
-  - syncIssues(userId, issuesData) - Upsert batch
-  - getIssues(userId, filters) - Query with filtering
-  - getTeamWorkload(userId) - Aggregate by assignee
-  - linkToTeamMember(userId, jiraAssigneeId, teamMemberId)
-
-- [ ] **API-05**: Authentication for extension requests
-  - Reuse existing JWT middleware
-  - Token validation for extension API calls
-  - User ID extraction for multi-tenancy
-
-### Database (DB)
-
-- [ ] **DB-01**: jira_issues table
-  - UUID primary key
-  - user_id for multi-tenancy
-  - issue_key (unique per user)
-  - summary, status, assignee_name, assignee_id
-  - story_points, priority, issue_type
-  - sprint_name, epic_key, jira_url
-  - synced_at timestamp
-  - Indexes on user_id, status, assignee_id
-
-- [ ] **DB-02**: jira_team_mappings table
-  - UUID primary key
-  - user_id for multi-tenancy
-  - jira_assignee_id (unique per user)
-  - team_member_id (FK to team_members)
-  - Auto-timestamps
-
-- [ ] **DB-03**: Migration file following conventions
-  - Version-tracked migration (017_jira_integration.sql)
-  - Idempotent execution
-  - Proper indexes and constraints
-
-### Frontend Integration (UI)
-
-- [ ] **UI-01**: Jira Issues page in P&E Manager
-  - List view of synced issues
-  - Filter by status, assignee, sprint
-  - Sort by priority, points, updated
-  - Link to Jira (open in new tab)
-
-- [ ] **UI-02**: Team workload view
-  - Issues grouped by assignee
-  - Story points sum per person
-  - Status distribution per person
-  - Visual capacity indicator
-
-- [ ] **UI-03**: Link Jira assignees to team members
-  - Auto-suggest based on name matching
-  - Manual override capability
-  - Unlinked assignees highlighted
-  - Bulk linking interface
-
-- [ ] **UI-04**: Extension settings management
-  - Configure P&E Manager backend URL
-  - Manage authentication token
-  - View sync history/status
-  - Manual sync trigger (backup option)
-
-- [ ] **UI-05**: Sync status in P&E Manager
-  - Last sync timestamp display
-  - Sync health indicator
-  - Data freshness warning (if stale)
+- [ ] **API-01**: GET /api/capture-rules - List rules for extension to fetch
+- [ ] **API-02**: POST/PUT/DELETE /api/capture-rules - CRUD for rule management
+- [ ] **API-03**: POST /api/capture-inbox - Receive captured items from extension
+- [ ] **API-04**: GET /api/capture-inbox - List items for inbox UI
+- [ ] **API-05**: POST /api/capture-inbox/:id/accept - Accept item with entity mapping
+- [ ] **API-06**: POST /api/capture-inbox/:id/reject - Reject item
+- [ ] **API-07**: GET/POST /api/entity-mappings - CRUD for mapping rules
 
 ---
 
-## v2 Requirements (Post-MVP)
+## Future Requirements (v1.2+)
 
 ### Deferred Features
 
-- [ ] **v2-01**: Delta sync optimization
-  - Track last-seen state per issue
-  - Only push changed issues
-  - Reduces API payload size
-  - *Rationale: Optimization, not blocking for MVP*
-
-- [ ] **v2-02**: Offline queue with IndexedDB
-  - Queue syncs when backend unavailable
-  - Auto-retry when connection restored
-  - Conflict detection
-  - *Rationale: Edge case, basic error handling sufficient for MVP*
-
-- [ ] **v2-03**: Sprint timeline tracking
-  - Sprint start/end dates
-  - Sprint velocity calculation
-  - Burn-down chart data
-  - *Rationale: Nice-to-have, not core workload view*
-
-- [ ] **v2-04**: Custom field mapping
-  - User-defined field extraction
-  - Config UI for selector mapping
-  - *Rationale: High complexity, standard fields sufficient for MVP*
-
-- [ ] **v2-05**: Workload visualization in extension popup
-  - Mini chart of team capacity
-  - Quick glance without opening P&E Manager
-  - *Rationale: UI polish, can use main app initially*
-
-- [ ] **v2-06**: Export to CSV fallback
-  - Download synced data as CSV
-  - Useful if backend unavailable
-  - *Rationale: Fallback feature, low priority*
+- **v2-01**: Visual selector picker (point-and-click in browser) — High complexity
+- **v2-02**: Selector fallback chains (try A, then B, then C) — Nice-to-have
+- **v2-03**: Edit captured data before accepting — Low priority
+- **v2-04**: Auto-approve rules for trusted sources — After manual workflow proven
+- **v2-05**: Capture history in extension popup — Polish feature
+- **v2-06**: Field-level mapping (which captured field → which entity field) — After basic mapping works
 
 ---
 
@@ -194,44 +76,50 @@
 
 | Feature | Reason |
 |---------|--------|
-| Direct Jira API integration | No API access available (technical constraint) |
-| Write-back to Jira | Read-only sync per PROJECT.md |
-| Real-time webhooks | Extension cannot receive server-push |
-| Multiple Jira instances | Only jira.tools.sap rapidView=33598 |
-| Full issue history/changelog | Too fragile to scrape, current state only |
-| Attachment sync | Binary data, storage concerns |
-| Comments sync | Rich text scraping unreliable |
-| JQL query execution | Requires API access |
-| Multi-board support | Single board scope per PROJECT.md |
+| Visual rule builder (drag-drop) | 10x complexity, declarative rules sufficient |
+| JavaScript in rules | Security risk, CSS selectors enough |
+| Automatic entity creation | Map to existing only, prevents data sprawl |
+| Write-back to source systems | Read-only capture, same as v1.0 |
+| Real-time streaming | Extension captures while browsing |
+| Complex transformations | Capture raw data, simple field naming |
 
 ---
 
 ## Traceability
 
-| REQ-ID | Phase | Tasks | Status |
-|--------|-------|-------|--------|
-| EXT-01 | Phase 2 | - | Pending |
-| EXT-02 | Phase 3 | - | Pending |
-| EXT-03 | Phase 4 | - | Pending |
-| EXT-04 | Phase 3 | - | Pending |
-| EXT-05 | Phase 3 | - | Pending |
-| EXT-06 | Phase 3 | - | Pending |
-| EXT-07 | Phase 3 | - | Pending |
-| EXT-08 | Phase 2 | - | Pending |
-| EXT-09 | Phase 2 | - | Pending |
-| API-01 | Phase 1 | - | Pending |
-| API-02 | Phase 1 | - | Pending |
-| API-03 | Phase 1 | - | Pending |
-| API-04 | Phase 1 | - | Pending |
-| API-05 | Phase 1 | - | Pending |
-| DB-01 | Phase 1 | - | Pending |
-| DB-02 | Phase 1 | - | Pending |
-| DB-03 | Phase 1 | - | Pending |
-| UI-01 | Phase 5 | - | Pending |
-| UI-02 | Phase 5 | - | Pending |
-| UI-03 | Phase 5 | - | Pending |
-| UI-04 | Phase 4 | - | Pending |
-| UI-05 | Phase 5 | - | Pending |
+| REQ-ID | Phase | Status |
+|--------|-------|--------|
+| RULE-01 | TBD | Pending |
+| RULE-02 | TBD | Pending |
+| RULE-03 | TBD | Pending |
+| RULE-04 | TBD | Pending |
+| RULE-05 | TBD | Pending |
+| RULE-06 | TBD | Pending |
+| STAGE-01 | TBD | Pending |
+| STAGE-02 | TBD | Pending |
+| STAGE-03 | TBD | Pending |
+| STAGE-04 | TBD | Pending |
+| STAGE-05 | TBD | Pending |
+| MAP-01 | TBD | Pending |
+| MAP-02 | TBD | Pending |
+| MAP-03 | TBD | Pending |
+| MAP-04 | TBD | Pending |
+| EXT-01 | TBD | Pending |
+| EXT-02 | TBD | Pending |
+| EXT-03 | TBD | Pending |
+| EXT-04 | TBD | Pending |
+| EXT-05 | TBD | Pending |
+| DB-01 | TBD | Pending |
+| DB-02 | TBD | Pending |
+| DB-03 | TBD | Pending |
+| DB-04 | TBD | Pending |
+| API-01 | TBD | Pending |
+| API-02 | TBD | Pending |
+| API-03 | TBD | Pending |
+| API-04 | TBD | Pending |
+| API-05 | TBD | Pending |
+| API-06 | TBD | Pending |
+| API-07 | TBD | Pending |
 
 *Traceability table updated by roadmap generator*
 
@@ -239,24 +127,30 @@
 
 ## Acceptance Criteria Summary
 
+**Rule Configuration works when:**
+1. User creates rule via UI with URL pattern and selectors
+2. Rule appears in list, can be enabled/disabled
+3. Test button shows what would be captured from current page
+4. Preset templates available for Jenkins, Grafana
+
+**Data Staging works when:**
+1. Captured items appear in inbox (not main UI until approved)
+2. User can preview raw data, see source site/rule
+3. Accept sends to entity mapping, reject removes
+4. Bulk operations handle 10+ items at once
+
+**Entity Mapping works when:**
+1. Accepted item prompts for target entity type
+2. Auto-suggest shows likely matches
+3. Created mapping applies to future captures from same source
+4. Mapped data visible in main P&E Manager UI
+
 **Extension works when:**
-1. User installs extension from unpacked source
-2. Extension activates on jira.tools.sap board page
-3. Issues appear in P&E Manager within 60 seconds
-4. Sync status shows in extension icon
-
-**Backend works when:**
-1. Extension can authenticate with JWT
-2. Issues persist in PostgreSQL
-3. Data isolated by user_id
-4. API returns synced issues
-
-**Frontend works when:**
-1. Jira Issues page shows synced data
-2. Team workload aggregates correctly
-3. Assignees linkable to team members
-4. Sync status visible
+1. Extension fetches rules on startup
+2. Activates on sites matching any enabled rule
+3. Captures based on rule selectors, sends to inbox
+4. Badge shows pending capture count
 
 ---
 
-*Requirements generated from user selections and research findings*
+*Requirements generated from user selections and v1.1 research findings*
