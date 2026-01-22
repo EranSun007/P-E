@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-22)
 
 ## Current Position
 
-Phase: 9 of 9 (Rule Builder UI) - In progress
-Plan: 1 of 2 in current phase
-Status: Phase 9 started, 09-01 complete
-Last activity: 2026-01-22 — Completed 09-01-PLAN.md (Rule Builder UI)
+Phase: 9 of 9 (Rule Builder UI) - Complete
+Plan: 2 of 2 in current phase (Wave 2 complete)
+Status: Phase 9 complete
+Last activity: 2026-01-22 — Completed 09-02-PLAN.md (Preset Templates & Testing Guidance)
 
-Progress: [=========|] 94% (8/9 phases complete, 8/9 plans in v1.1)
+Progress: [==========] 100% (9/9 phases complete, 9/9 plans in v1.1)
 
 ## Performance Metrics
 
@@ -25,7 +25,7 @@ Progress: [=========|] 94% (8/9 phases complete, 8/9 plans in v1.1)
 
 **Current Milestone (v1.1):**
 - Estimated plans: 9
-- Completed: 8 (Phase 6: 2, Phase 7: 3, Phase 8: 2, Phase 9: 1)
+- Completed: 9 (Phase 6: 2, Phase 7: 3, Phase 8: 2, Phase 9: 2)
 - 06-01: 2m 6s (database schema)
 - 06-02: 3m 22s (backend services)
 - 07-01: 3m 6s (capture rule fetching)
@@ -34,6 +34,7 @@ Progress: [=========|] 94% (8/9 phases complete, 8/9 plans in v1.1)
 - 08-01: 4m (capture inbox foundation)
 - 08-02: 4m (entity mapping and bulk operations)
 - 09-01: 5m (rule builder UI)
+- 09-02: 2m (preset templates and testing guidance)
 
 ## Accumulated Context
 
@@ -75,6 +76,9 @@ v1.1 decisions from execution:
 - D-0901-02: Attribute field conditionally shown only when type=attribute
 - D-0901-03: Enable/disable toggle updates rule in-place (no confirmation)
 - D-0901-04: Search filters by name and URL pattern client-side
+- D-0902-01: Template dropdown only shown for new rules, not edit mode
+- D-0902-02: Templates provide generic selectors that users customize based on their specific instances
+- D-0902-03: Test instructions reference extension popup workflow (save → navigate → capture → check inbox)
 
 ### Pending Todos
 
@@ -163,34 +167,51 @@ None.
 ## Phase 9 Completion Summary
 
 **Completed:** 2026-01-22
-**Plan 09-01 Duration:** 5 minutes
+**Duration:** 7 minutes (2 plans)
+
+**Plan 09-01 Duration:** 5 minutes (Rule Builder UI)
+**Plan 09-02 Duration:** 2 minutes (Preset Templates & Testing Guidance)
 
 **Artifacts Created:**
-- `src/components/capture/RuleBuilderDialog.jsx` (400 lines) - Dialog form with dynamic selector array
+- `src/components/capture/RuleBuilderDialog.jsx` (440 lines) - Dialog form with dynamic selector array and template dropdown
+- `src/components/capture/PresetTemplates.js` (135 lines) - Preset configurations for 4 CI/CD tools
 - `src/pages/CaptureRules.jsx` (342 lines) - Rules list page with CRUD operations
 - `src/api/apiClient.js` (updated) - CaptureRule client added
 - `src/api/entities.js` (updated) - CaptureRule export added
 
 **Features Delivered:**
 - Web-based rule creation and editing with dialog form
+- Template dropdown with 4 presets (Jenkins, Grafana, Concourse, Dynatrace)
+- Template application function to populate form from presets
 - Dynamic selector array management (add/remove with validation)
 - 5 extraction types: text, html, attribute, href, src
 - Enable/disable toggle for quick rule activation
 - Search and filter by name or URL pattern
 - Full CRUD operations with confirmation dialogs
+- CSS selector help text and 5-step testing guide
 - Navigation entry in sidebar
 
-**Commits:** d1749b45, d2c83b53, 1f9c9813
+**Commits:**
+- 09-01: d1749b45, d2c83b53, 1f9c9813, fbdc957b
+- 09-02: dba37b23, 38182666
 
 ## Session Continuity
 
-Last session: 2026-01-22T13:28:00Z
-Stopped at: Completed 09-01-PLAN.md (Rule Builder UI)
+Last session: 2026-01-22T13:35:02Z
+Stopped at: Completed 09-02-PLAN.md (Preset Templates & Testing Guidance)
 Resume file: None
 
 ## Next Steps
 
-Ready for Plan 09-02 (Site-Specific Support):
-- Create rules for Grafana, Jenkins, Jira
-- Test rule creation flow
-- Verify extension refreshes rules after UI changes
+**v1.1 Web Capture Framework: COMPLETE**
+
+All 9 phases complete:
+- Phase 6: Backend APIs (capture_rules, capture_inbox, entity_mappings)
+- Phase 7: Browser extension (rule fetching, generic extractor, popup UI)
+- Phase 8: Frontend inbox (table view, entity mapping, bulk operations)
+- Phase 9: Rule builder UI (CRUD, templates, testing guidance)
+
+Ready for:
+- Real-world testing with Grafana, Jenkins, Jira, Dynatrace
+- Iterative selector refinement
+- Additional site support based on user needs
