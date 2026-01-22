@@ -1,6 +1,6 @@
 // src/components/capture/RuleBuilderDialog.jsx
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Save, Loader2, AlertCircle, Info, TestTube } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, AlertCircle, TestTube } from "lucide-react";
 import { PRESET_TEMPLATES, TEMPLATE_OPTIONS } from './PresetTemplates';
 import {
   Dialog,
