@@ -189,11 +189,11 @@ Plans:
   4. GET /api/bugs/kpis returns pre-calculated KPIs for week + component
   5. GET /api/bugs/list returns bugs with filtering and pagination
   6. DELETE /api/bugs/uploads/:id cascades to bugs and KPIs
-**Plans**: 2 plans
+**Plans**: 2 plans (Wave 1: 10-01, Wave 2: 10-02)
 
 Plans:
-- [ ] 10-01-PLAN.md — Database schema, migration, and BugService foundation
-- [ ] 10-02-PLAN.md — KPI calculations and REST API routes
+- [ ] 10-01-PLAN.md — Database schema, migration, and BugService foundation (Wave 1)
+- [ ] 10-02-PLAN.md — KPI calculations and REST API routes (Wave 2)
 
 ### Phase 11: CSV Upload
 **Goal**: User can upload JIRA CSV exports with validation and progress feedback
