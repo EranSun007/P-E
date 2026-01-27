@@ -1,4 +1,4 @@
-import { query, pool } from '../db/connection.js';
+import { query, getClient } from '../db/connection.js';
 import { parse } from 'fast-csv';
 import { Readable } from 'stream';
 

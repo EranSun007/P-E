@@ -96,6 +96,11 @@ const MIGRATIONS = [
     version: '018_capture_framework',
     name: 'Create tables for capture rules, inbox, and entity mappings',
     file: '018_capture_framework.sql'
+  },
+  {
+    version: '019_bug_dashboard',
+    name: 'Create tables for DevOps Bug Dashboard (bug uploads, bugs, weekly KPIs)',
+    file: '019_bug_dashboard.sql'
   }
 ];
 
