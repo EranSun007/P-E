@@ -3,7 +3,8 @@
 ## Milestones
 
 - **v1.0 Jira Integration MVP** - Phases 1-5 (shipped 2026-01-21)
-- **v1.1 Web Capture Framework** - Phases 6-9 (in progress)
+- **v1.1 Web Capture Framework** - Phases 6-9 (shipped 2026-01-22)
+- **v1.2 DevOps Bug Dashboard** - Phases 10-12 (in progress)
 
 ## Phases
 
@@ -92,7 +93,8 @@ Plans:
 
 </details>
 
-## v1.1 Web Capture Framework (In Progress)
+<details>
+<summary>v1.1 Web Capture Framework (Phases 6-9) - SHIPPED 2026-01-22</summary>
 
 **Milestone Goal:** Evolve the Jira-specific extension into a configurable multi-site capture framework with data staging and entity mapping.
 
@@ -166,11 +168,72 @@ Plans:
 - [x] 09-01-PLAN.md — Rule CRUD page with URL pattern and dynamic selector array
 - [x] 09-02-PLAN.md — Preset templates and selector testing guidance
 
+</details>
+
+## v1.2 DevOps Bug Dashboard (In Progress)
+
+**Milestone Goal:** Add a bug KPI dashboard that analyzes weekly JIRA exports to track DevOps duty team performance with actionable metrics and alerts.
+
+- [ ] **Phase 10: Backend Foundation** - Database schema, BugService, KPI calculations, REST API
+- [ ] **Phase 11: CSV Upload** - Upload UI with validation, parsing, progress feedback
+- [ ] **Phase 12: Dashboard UI** - KPI cards, filters, alerts, charts, aging bugs table
+
+### Phase 10: Backend Foundation
+**Goal**: Backend can store bug data, calculate KPIs, and serve analytics via REST API
+**Depends on**: Phase 9 (v1.1 complete)
+**Requirements**: DB-01, DB-02, DB-03, DB-04, DB-05, KPI-01 through KPI-09, API-02, API-03, API-04, API-05, UPLOAD-03
+**Success Criteria** (what must be TRUE):
+  1. Database tables (bug_uploads, bugs, weekly_kpis) exist with proper indexes
+  2. BugService can parse CSV and validate required columns
+  3. BugService calculates all 10 KPIs matching specification formulas
+  4. GET /api/bugs/kpis returns pre-calculated KPIs for week + component
+  5. GET /api/bugs/list returns bugs with filtering and pagination
+  6. DELETE /api/bugs/uploads/:id cascades to bugs and KPIs
+**Plans**: 2 plans
+
+Plans:
+- [ ] 10-01-PLAN.md — Database schema, migration, and BugService foundation
+- [ ] 10-02-PLAN.md — KPI calculations and REST API routes
+
+### Phase 11: CSV Upload
+**Goal**: User can upload JIRA CSV exports with validation and progress feedback
+**Depends on**: Phase 10 (backend must exist)
+**Requirements**: UPLOAD-01, UPLOAD-02, UPLOAD-04, UPLOAD-05, UPLOAD-06, API-01
+**Success Criteria** (what must be TRUE):
+  1. User can upload CSV via drag-and-drop or file picker
+  2. User must specify week-ending date (Saturday) for each upload
+  3. System shows clear error messages for invalid CSV format
+  4. Duplicate upload detection prompts for replace/cancel
+  5. Upload progress and summary displayed (total bugs, components)
+**Plans**: 1 plan
+
+Plans:
+- [ ] 11-01-PLAN.md — Upload page with validation, progress, and duplicate detection
+
+### Phase 12: Dashboard UI
+**Goal**: User can view KPIs with status indicators, filters, alerts, and charts
+**Depends on**: Phase 10 (API must exist), Phase 11 (data must be uploadable)
+**Requirements**: DASH-01 through DASH-08
+**Success Criteria** (what must be TRUE):
+  1. Dashboard shows all KPIs in card layout with green/yellow/red status
+  2. Filter by component dropdown updates all KPIs
+  3. Filter by week dropdown loads historical data
+  4. Critical alert banner appears when any KPI in red zone
+  5. Aging bugs table shows open VH/High bugs with clickable JIRA links
+  6. MTTR by priority bar chart renders correctly
+  7. Bug category pie/donut chart renders correctly
+**Plans**: 2 plans
+
+Plans:
+- [ ] 12-01-PLAN.md — Dashboard page with KPI cards, filters, and alert banner
+- [ ] 12-02-PLAN.md — Aging bugs table and charts (MTTR, category distribution)
+
 ## Progress
 
 **Execution Order:**
 v1.0: 1 -> 2 -> 3 -> 4/5 parallel
 v1.1: 6 -> 7 (depends on 6), 8 (depends on 6), 9 (depends on 6+7)
+v1.2: 10 -> 11 (depends on 10) -> 12 (depends on 10+11)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -183,8 +246,52 @@ v1.1: 6 -> 7 (depends on 6), 8 (depends on 6), 9 (depends on 6+7)
 | 7. Extension Core | v1.1 | 3/3 | Complete | 2026-01-22 |
 | 8. Inbox and Mapping UI | v1.1 | 2/2 | Complete | 2026-01-22 |
 | 9. Rule Builder UI | v1.1 | 2/2 | Complete | 2026-01-22 |
+| 10. Backend Foundation | v1.2 | 0/2 | Pending | — |
+| 11. CSV Upload | v1.2 | 0/1 | Pending | — |
+| 12. Dashboard UI | v1.2 | 0/2 | Pending | — |
 
-## v1.1 Requirement Coverage
+## v1.2 Requirement Coverage
+
+| REQ-ID | Phase | Description |
+|--------|-------|-------------|
+| DB-01 | 10 | bug_uploads table with metadata |
+| DB-02 | 10 | bugs table with parsed data |
+| DB-03 | 10 | weekly_kpis table for pre-calculated metrics |
+| DB-04 | 10 | Indexes on user_id, status, priority, component |
+| DB-05 | 10 | CASCADE DELETE from bug_uploads |
+| UPLOAD-03 | 10 | CSV column validation |
+| KPI-01 | 10 | Bug Inflow Rate calculation |
+| KPI-02 | 10 | Time to First Response calculation |
+| KPI-03 | 10 | MTTR by Priority calculation |
+| KPI-04 | 10 | SLA Compliance calculation |
+| KPI-05 | 10 | Open Bug Age Distribution calculation |
+| KPI-06 | 10 | Automated vs Actionable Ratio calculation |
+| KPI-07 | 10 | Bug Category Distribution calculation |
+| KPI-08 | 10 | Duty Rotation Workload calculation |
+| KPI-09 | 10 | Backlog Health Score calculation |
+| API-02 | 10 | GET /api/bugs/uploads endpoint |
+| API-03 | 10 | GET /api/bugs/kpis endpoint |
+| API-04 | 10 | GET /api/bugs/list endpoint |
+| API-05 | 10 | DELETE /api/bugs/uploads/:id endpoint |
+| UPLOAD-01 | 11 | Drag-and-drop or file picker upload |
+| UPLOAD-02 | 11 | Week-ending date picker (Saturday) |
+| UPLOAD-04 | 11 | Duplicate upload detection |
+| UPLOAD-05 | 11 | Upload progress and summary |
+| UPLOAD-06 | 11 | Clear error messages |
+| API-01 | 11 | POST /api/bugs/upload endpoint |
+| DASH-01 | 12 | KPI card layout |
+| DASH-02 | 12 | Green/yellow/red status indicators |
+| DASH-03 | 12 | Component filter dropdown |
+| DASH-04 | 12 | Week filter dropdown |
+| DASH-05 | 12 | Critical alert banner |
+| DASH-06 | 12 | Aging bugs table with JIRA links |
+| DASH-07 | 12 | MTTR by priority bar chart |
+| DASH-08 | 12 | Bug category pie/donut chart |
+
+**Coverage:** 33/33 v1.2 requirements mapped
+
+<details>
+<summary>v1.1 Requirement Coverage (Archived)</summary>
 
 | REQ-ID | Phase | Description |
 |--------|-------|-------------|
@@ -221,3 +328,5 @@ v1.1: 6 -> 7 (depends on 6), 8 (depends on 6), 9 (depends on 6+7)
 | RULE-06 | 9 | Preset templates for common sites |
 
 **Coverage:** 31/31 v1.1 requirements mapped
+
+</details>

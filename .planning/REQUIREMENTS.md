@@ -1,74 +1,85 @@
-# Requirements: P&E Manager v1.1 Web Capture Framework
+# Requirements: P&E Manager v1.2 DevOps Bug Dashboard
 
-**Generated:** 2026-01-22
+**Generated:** 2026-01-27
 **Status:** Active
-**Source:** User selections + research findings
+**Source:** User specification + KPI_SPECIFICATION.md + IMPLEMENTATION_GUIDE.md
 
 ---
 
-## v1.1 Requirements (This Milestone)
+## v1.2 Requirements (This Milestone)
 
-### Rule Configuration (RULE)
+### CSV Upload (UPLOAD)
 
-- [x] **RULE-01**: User can create capture rule with URL pattern (e.g., `*.grafana.sap/*`)
-- [x] **RULE-02**: User can define CSS selectors for data extraction in a rule
-- [x] **RULE-03**: User can name extracted fields (e.g., "build_status", "job_name")
-- [x] **RULE-04**: User can enable/disable rules without deleting them
-- [x] **RULE-05**: User can test selectors against a live page before saving rule
-- [x] **RULE-06**: User can create rules from preset templates (Jenkins, Grafana, Concourse, Dynatrace)
-
-### Data Staging (STAGE)
-
-- [x] **STAGE-01**: User can view captured items in an inbox before they enter main system
-- [x] **STAGE-02**: User can preview raw captured data for each item
-- [x] **STAGE-03**: User can accept or reject individual captured items
-- [x] **STAGE-04**: User can select target entity type when accepting (project, team member, service)
-- [x] **STAGE-05**: User can bulk accept/reject multiple captured items
-
-### Entity Mapping (MAP)
-
-- [x] **MAP-01**: User can map captured source identifier to a target entity
-- [x] **MAP-02**: User can select target entity type (project, team member, service)
-- [x] **MAP-03**: System auto-suggests mappings based on name similarity
-- [x] **MAP-04**: User can create reusable mapping rules that auto-apply to future captures
-
-### Extension Behavior (EXT)
-
-- [x] **EXT-01**: Extension fetches capture rules from backend on startup/refresh
-- [x] **EXT-02**: Extension activates on sites matching rule URL patterns (dynamic, not hardcoded)
-- [x] **EXT-03**: Extension sends captured data to staging table (not directly to main tables)
-- [x] **EXT-04**: Extension badge shows capture count on icon
-- [x] **EXT-05**: User can trigger manual capture from extension popup
+- [ ] **UPLOAD-01**: User can upload JIRA CSV export file via drag-and-drop or file picker
+- [ ] **UPLOAD-02**: User must specify week-ending date (Saturday) for each upload
+- [ ] **UPLOAD-03**: System validates CSV has required columns (Key, Summary, Priority, Status, Created, Resolved, Reporter, Assignee, Labels)
+- [ ] **UPLOAD-04**: System detects duplicate uploads for same week and prompts for replace/cancel
+- [ ] **UPLOAD-05**: System shows upload progress and summary (total bugs, components detected)
+- [ ] **UPLOAD-06**: System displays clear error messages for invalid CSV format
 
 ### Database Schema (DB)
 
-- [x] **DB-01**: capture_rules table stores rule definitions with URL patterns and selectors (JSONB)
-- [x] **DB-02**: capture_inbox table stores staged items awaiting review
-- [x] **DB-03**: entity_mappings table stores source-to-target mappings (generic, not Jira-specific)
-- [x] **DB-04**: Migration file following existing conventions
+- [ ] **DB-01**: bug_uploads table stores upload metadata (id, user_id, week_ending, filename, uploaded_at, bug_count)
+- [ ] **DB-02**: bugs table stores parsed bug data with calculated fields (resolution_time_hours, component)
+- [ ] **DB-03**: weekly_kpis table stores pre-calculated KPI values per (upload_id, component)
+- [ ] **DB-04**: Indexes on user_id, status, priority, component for query performance
+- [ ] **DB-05**: CASCADE DELETE from bug_uploads removes associated bugs and KPIs
+
+### KPI Calculations (KPI)
+
+- [ ] **KPI-01**: Bug Inflow Rate - Average bugs created per week over rolling 4-week period
+- [ ] **KPI-02**: Time to First Response (TTFR) - Median time to first status change, % under 24h
+- [ ] **KPI-03**: MTTR by Priority - Median resolution time for Very High, High, Medium, Low
+- [ ] **KPI-04**: SLA Compliance - % of VH bugs resolved <24h, % of High bugs resolved <48h
+- [ ] **KPI-05**: Open Bug Age Distribution - Count and avg age of open bugs by priority
+- [ ] **KPI-06**: Automated vs Actionable Ratio - % of bugs from automated reporters (T_*)
+- [ ] **KPI-07**: Bug Category Distribution - Count by category (deployment, foss, service-broker, other)
+- [ ] **KPI-08**: Duty Rotation Workload - Avg bugs/week and standard deviation
+- [ ] **KPI-09**: Backlog Health Score - 100 - (VH×10) - (High×5), clamped 0-100
+
+### Dashboard UI (DASH)
+
+- [ ] **DASH-01**: Dashboard page shows all KPIs in card layout with status indicators
+- [ ] **DASH-02**: KPI cards show green/yellow/red status based on thresholds
+- [ ] **DASH-03**: Filter by component (All, deploy-metering, service-broker, foss, etc.)
+- [ ] **DASH-04**: Filter by week (dropdown of uploaded weeks)
+- [ ] **DASH-05**: Critical alert banner when any KPI in red zone
+- [ ] **DASH-06**: Aging bugs table showing open VH/High bugs with JIRA links
+- [ ] **DASH-07**: MTTR by priority bar chart
+- [ ] **DASH-08**: Bug category pie/donut chart
 
 ### Backend API (API)
 
-- [x] **API-01**: GET /api/capture-rules - List rules for extension to fetch
-- [x] **API-02**: POST/PUT/DELETE /api/capture-rules - CRUD for rule management
-- [x] **API-03**: POST /api/capture-inbox - Receive captured items from extension
-- [x] **API-04**: GET /api/capture-inbox - List items for inbox UI
-- [x] **API-05**: POST /api/capture-inbox/:id/accept - Accept item with entity mapping
-- [x] **API-06**: POST /api/capture-inbox/:id/reject - Reject item
-- [x] **API-07**: GET/POST /api/entity-mappings - CRUD for mapping rules
+- [ ] **API-01**: POST /api/bugs/upload - Accept CSV file, validate, parse, store, calculate KPIs
+- [ ] **API-02**: GET /api/bugs/uploads - List uploaded weeks for dropdown
+- [ ] **API-03**: GET /api/bugs/kpis - Get KPI values for week + component
+- [ ] **API-04**: GET /api/bugs/list - Get bugs with filtering and pagination
+- [ ] **API-05**: DELETE /api/bugs/uploads/:id - Delete upload and cascade to bugs/KPIs
 
 ---
 
-## Future Requirements (v1.2+)
+## KPI Thresholds Reference
+
+| KPI | Green | Yellow | Red |
+|-----|-------|--------|-----|
+| Bug Inflow Rate | ≤6/week | 6.1-8/week | >8/week |
+| TTFR Median | <24h | 24-48h | >48h |
+| SLA VH (<24h) | ≥80% | 60-79% | <60% |
+| SLA High (<48h) | ≥70% | 50-69% | <50% |
+| Backlog Health | 70-100 | 50-69 | 0-49 |
+
+---
+
+## Future Requirements (v1.3+)
 
 ### Deferred Features
 
-- **v2-01**: Visual selector picker (point-and-click in browser) — High complexity
-- **v2-02**: Selector fallback chains (try A, then B, then C) — Nice-to-have
-- **v2-03**: Edit captured data before accepting — Low priority
-- **v2-04**: Auto-approve rules for trusted sources — After manual workflow proven
-- **v2-05**: Capture history in extension popup — Polish feature
-- **v2-06**: Field-level mapping (which captured field → which entity field) — After basic mapping works
+- **v3-01**: Trend charts showing KPI history over multiple weeks
+- **v3-02**: Email notifications when KPIs breach thresholds
+- **v3-03**: Export KPI report to PDF/Excel
+- **v3-04**: Compare KPIs between time periods
+- **v3-05**: Bug resolution predictions based on historical data
+- **v3-06**: Integration with duty rotation calendar
 
 ---
 
@@ -76,12 +87,12 @@
 
 | Feature | Reason |
 |---------|--------|
-| Visual rule builder (drag-drop) | 10x complexity, declarative rules sufficient |
-| JavaScript in rules | Security risk, CSS selectors enough |
-| Automatic entity creation | Map to existing only, prevents data sprawl |
-| Write-back to source systems | Read-only capture, same as v1.0 |
-| Real-time streaming | Extension captures while browsing |
-| Complex transformations | Capture raw data, simple field naming |
+| Direct JIRA API integration | No API access, CSV export is standard workflow |
+| Real-time bug updates | Weekly upload workflow is sufficient |
+| Bug modification/write-back | Read-only analytics dashboard |
+| Custom KPI definitions | 10 fixed KPIs cover duty monitoring needs |
+| Historical data import | Starts fresh, builds history over time |
+| Automated scheduled uploads | Manual upload ensures data review |
 
 ---
 
@@ -89,68 +100,73 @@
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| RULE-01 | Phase 9 | Complete |
-| RULE-02 | Phase 9 | Complete |
-| RULE-03 | Phase 9 | Complete |
-| RULE-04 | Phase 9 | Complete |
-| RULE-05 | Phase 9 | Complete |
-| RULE-06 | Phase 9 | Complete |
-| STAGE-01 | Phase 8 | Complete |
-| STAGE-02 | Phase 8 | Complete |
-| STAGE-03 | Phase 8 | Complete |
-| STAGE-04 | Phase 8 | Complete |
-| STAGE-05 | Phase 8 | Complete |
-| MAP-01 | Phase 8 | Complete |
-| MAP-02 | Phase 8 | Complete |
-| MAP-03 | Phase 8 | Complete |
-| MAP-04 | Phase 8 | Complete |
-| EXT-01 | Phase 7 | Complete |
-| EXT-02 | Phase 7 | Complete |
-| EXT-03 | Phase 7 | Complete |
-| EXT-04 | Phase 7 | Complete |
-| EXT-05 | Phase 7 | Complete |
-| DB-01 | Phase 6 | Complete |
-| DB-02 | Phase 6 | Complete |
-| DB-03 | Phase 6 | Complete |
-| DB-04 | Phase 6 | Complete |
-| API-01 | Phase 6 | Complete |
-| API-02 | Phase 6 | Complete |
-| API-03 | Phase 6 | Complete |
-| API-04 | Phase 6 | Complete |
-| API-05 | Phase 6 | Complete |
-| API-06 | Phase 6 | Complete |
-| API-07 | Phase 6 | Complete |
+| UPLOAD-01 | Phase 11 | Pending |
+| UPLOAD-02 | Phase 11 | Pending |
+| UPLOAD-03 | Phase 10 | Pending |
+| UPLOAD-04 | Phase 11 | Pending |
+| UPLOAD-05 | Phase 11 | Pending |
+| UPLOAD-06 | Phase 11 | Pending |
+| DB-01 | Phase 10 | Pending |
+| DB-02 | Phase 10 | Pending |
+| DB-03 | Phase 10 | Pending |
+| DB-04 | Phase 10 | Pending |
+| DB-05 | Phase 10 | Pending |
+| KPI-01 | Phase 10 | Pending |
+| KPI-02 | Phase 10 | Pending |
+| KPI-03 | Phase 10 | Pending |
+| KPI-04 | Phase 10 | Pending |
+| KPI-05 | Phase 10 | Pending |
+| KPI-06 | Phase 10 | Pending |
+| KPI-07 | Phase 10 | Pending |
+| KPI-08 | Phase 10 | Pending |
+| KPI-09 | Phase 10 | Pending |
+| API-01 | Phase 11 | Pending |
+| API-02 | Phase 10 | Pending |
+| API-03 | Phase 10 | Pending |
+| API-04 | Phase 10 | Pending |
+| API-05 | Phase 10 | Pending |
+| DASH-01 | Phase 12 | Pending |
+| DASH-02 | Phase 12 | Pending |
+| DASH-03 | Phase 12 | Pending |
+| DASH-04 | Phase 12 | Pending |
+| DASH-05 | Phase 12 | Pending |
+| DASH-06 | Phase 12 | Pending |
+| DASH-07 | Phase 12 | Pending |
+| DASH-08 | Phase 12 | Pending |
 
-*Traceability table updated by roadmap generator — 2026-01-22*
+*Traceability table updated by roadmap generator — 2026-01-27*
 
 ---
 
 ## Acceptance Criteria Summary
 
-**Rule Configuration works when:**
-1. User creates rule via UI with URL pattern and selectors
-2. Rule appears in list, can be enabled/disabled
-3. Test button shows what would be captured from current page
-4. Preset templates available for Jenkins, Grafana
+**CSV Upload works when:**
+1. User can drag-drop or select CSV file
+2. Week-ending date picker shows only Saturdays
+3. Invalid CSV shows clear error message with missing columns
+4. Duplicate week detection offers replace option
+5. Upload shows progress bar and completion summary
 
-**Data Staging works when:**
-1. Captured items appear in inbox (not main UI until approved)
-2. User can preview raw data, see source site/rule
-3. Accept sends to entity mapping, reject removes
-4. Bulk operations handle 10+ items at once
+**KPI Calculations work when:**
+1. All 10 KPIs calculated on upload completion
+2. Values match formulas in KPI_SPECIFICATION.md
+3. KPIs stored per component + "all" aggregate
+4. Recalculation not needed on page load
 
-**Entity Mapping works when:**
-1. Accepted item prompts for target entity type
-2. Auto-suggest shows likely matches
-3. Created mapping applies to future captures from same source
-4. Mapped data visible in main P&E Manager UI
+**Dashboard works when:**
+1. KPI cards show values with green/yellow/red status
+2. Component filter updates all KPIs
+3. Week filter loads historical data
+4. Alert banner appears when any KPI red
+5. Aging bugs table shows clickable JIRA links
+6. Charts render correctly with data
 
-**Extension works when:**
-1. Extension fetches rules on startup
-2. Activates on sites matching any enabled rule
-3. Captures based on rule selectors, sends to inbox
-4. Badge shows pending capture count
+**API works when:**
+1. Upload endpoint parses CSV and returns summary
+2. KPIs endpoint returns all calculated values
+3. Bugs list supports filtering and pagination
+4. Delete cascades to bugs and KPIs
 
 ---
 
-*Requirements generated from user selections and v1.1 research findings*
+*Requirements generated from user specification and KPI documentation*
