@@ -189,6 +189,354 @@ class BugService {
     const result = await query(sql, [uploadId, userId]);
     return result.rowCount > 0;
   }
+
+  // ============================================
+  // KPI Calculations (KPI-01 through KPI-09)
+  // ============================================
+
+  /**
+   * Calculate all 9 KPIs (KPI-01 through KPI-09) from bug array
+   * @param {Array} bugs - Array of bug objects
+   * @returns {Object} - KPI values object
+   */
+  calculateKPIs(bugs) {
+    const totalBugs = bugs.length;
+    const openStatuses = ['Open', 'Author Action', 'In Progress', 'Reopened'];
+    const openBugs = bugs.filter(b => openStatuses.includes(b.status));
+    const resolvedBugs = bugs.filter(b => b.resolution_time_hours !== null);
+
+    // KPI 1: Bug Inflow Rate (simplified - bugs per week, actual needs 4-week rolling)
+    const bugInflowRate = totalBugs / 4; // Assume 4-week dataset
+
+    // KPI 2: Time to First Response (using resolution time as proxy - TTFR not in CSV)
+    const sortedTimes = resolvedBugs
+      .map(b => b.resolution_time_hours)
+      .filter(t => t !== null)
+      .sort((a, b) => a - b);
+    const medianTTFR = this.calculateMedian(sortedTimes);
+    const ttfrUnder24h = sortedTimes.length > 0
+      ? (sortedTimes.filter(t => t < 24).length / sortedTimes.length) * 100
+      : 0;
+
+    // KPI 3: MTTR by Priority
+    const mttrByPriority = {};
+    for (const priority of ['Very High', 'High', 'Medium', 'Low']) {
+      const priorityBugs = resolvedBugs.filter(b => b.priority === priority);
+      const times = priorityBugs.map(b => b.resolution_time_hours).filter(t => t !== null).sort((a, b) => a - b);
+      mttrByPriority[priority] = {
+        median: this.calculateMedian(times),
+        count: priorityBugs.length
+      };
+    }
+
+    // KPI 4: SLA Compliance
+    const vhBugs = resolvedBugs.filter(b => b.priority === 'Very High');
+    const highBugs = resolvedBugs.filter(b => b.priority === 'High');
+    const slaVhPercent = vhBugs.length > 0
+      ? (vhBugs.filter(b => b.resolution_time_hours < 24).length / vhBugs.length) * 100
+      : 100; // No VH bugs = 100% compliance
+    const slaHighPercent = highBugs.length > 0
+      ? (highBugs.filter(b => b.resolution_time_hours < 48).length / highBugs.length) * 100
+      : 100;
+
+    // KPI 5: Open Bug Age Distribution
+    const now = new Date();
+    const openBugAge = {};
+    for (const priority of ['Very High', 'High', 'Medium', 'Low']) {
+      const priorityOpen = openBugs.filter(b => b.priority === priority);
+      const ages = priorityOpen.map(b => {
+        if (!b.created_date) return null;
+        const created = new Date(b.created_date);
+        return (now - created) / (1000 * 60 * 60 * 24); // Days
+      }).filter(a => a !== null);
+      openBugAge[priority] = {
+        count: priorityOpen.length,
+        avgAgeDays: ages.length > 0 ? ages.reduce((a, b) => a + b, 0) / ages.length : 0
+      };
+    }
+
+    // KPI 6: Automated vs Actionable Ratio
+    const automatedBugs = bugs.filter(b => b.reporter && b.reporter.startsWith('T_'));
+    const automatedPercent = totalBugs > 0
+      ? (automatedBugs.length / totalBugs) * 100
+      : 0;
+
+    // KPI 7: Bug Category Distribution (uses component field)
+    const categoryDistribution = {};
+    for (const bug of bugs) {
+      const cat = bug.component || 'other';
+      categoryDistribution[cat] = (categoryDistribution[cat] || 0) + 1;
+    }
+
+    // KPI 8: Duty Rotation Workload (avg bugs per week and std dev)
+    // Group by week, then calculate stats
+    const weeklyGroups = {};
+    for (const bug of bugs) {
+      if (!bug.created_date) continue;
+      const created = new Date(bug.created_date);
+      const weekKey = this.getWeekKey(created);
+      weeklyGroups[weekKey] = (weeklyGroups[weekKey] || 0) + 1;
+    }
+    const weeklyCounts = Object.values(weeklyGroups);
+    const avgBugsPerWeek = weeklyCounts.length > 0
+      ? weeklyCounts.reduce((a, b) => a + b, 0) / weeklyCounts.length
+      : 0;
+    const stdDev = this.calculateStdDev(weeklyCounts);
+
+    // KPI 9: Backlog Health Score
+    // 100 - (VH_open × 10) - (High_open × 5), clamped 0-100
+    const vhOpenCount = openBugs.filter(b => b.priority === 'Very High').length;
+    const highOpenCount = openBugs.filter(b => b.priority === 'High').length;
+    const backlogHealthScore = Math.max(0, Math.min(100,
+      100 - (vhOpenCount * 10) - (highOpenCount * 5)
+    ));
+
+    return {
+      bug_inflow_rate: bugInflowRate,
+      median_ttfr_hours: medianTTFR,
+      ttfr_under_24h_percent: ttfrUnder24h,
+      mttr_by_priority: mttrByPriority,
+      sla_vh_percent: slaVhPercent,
+      sla_high_percent: slaHighPercent,
+      open_bug_age: openBugAge,
+      automated_percent: automatedPercent,
+      category_distribution: categoryDistribution,
+      avg_bugs_per_week: avgBugsPerWeek,
+      workload_std_dev: stdDev,
+      backlog_health_score: backlogHealthScore,
+      total_bugs: totalBugs,
+      open_bugs_count: openBugs.length,
+      resolved_bugs_count: resolvedBugs.length
+    };
+  }
+
+  /**
+   * Calculate median from sorted array
+   */
+  calculateMedian(sortedArr) {
+    if (sortedArr.length === 0) return null;
+    const mid = Math.floor(sortedArr.length / 2);
+    return sortedArr.length % 2 === 0
+      ? (sortedArr[mid - 1] + sortedArr[mid]) / 2
+      : sortedArr[mid];
+  }
+
+  /**
+   * Calculate standard deviation
+   */
+  calculateStdDev(arr) {
+    if (arr.length < 2) return 0;
+    const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+    const squaredDiffs = arr.map(x => Math.pow(x - mean, 2));
+    const variance = squaredDiffs.reduce((a, b) => a + b, 0) / arr.length;
+    return Math.sqrt(variance);
+  }
+
+  /**
+   * Get ISO week key for grouping
+   */
+  getWeekKey(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+    const yearStart = new Date(d.getFullYear(), 0, 1);
+    const weekNum = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+    return `${d.getFullYear()}-W${weekNum.toString().padStart(2, '0')}`;
+  }
+
+  // ============================================
+  // Upload Workflow with Transaction
+  // ============================================
+
+  /**
+   * Process CSV upload: parse, validate, store bugs, calculate KPIs
+   * @param {string} userId - User ID for multi-tenancy
+   * @param {Buffer} fileBuffer - CSV file content
+   * @param {string} filename - Original filename
+   * @param {string} weekEnding - Week-ending date (Saturday)
+   * @returns {Object} - { uploadId, bugCount, components, kpis }
+   */
+  async uploadCSV(userId, fileBuffer, filename, weekEnding) {
+    // 1. Parse CSV
+    const bugs = await this.parseCSV(fileBuffer);
+
+    // 2. Enrich with calculated fields
+    const enrichedBugs = this.enrichBugs(bugs);
+
+    // 3. Begin transaction
+    const client = await getClient();
+    try {
+      await client.query('BEGIN');
+
+      // 4. Upsert upload metadata (handles duplicate weeks)
+      const uploadResult = await client.query(`
+        INSERT INTO bug_uploads (user_id, week_ending, filename, bug_count)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (user_id, week_ending) DO UPDATE SET
+          filename = EXCLUDED.filename,
+          bug_count = EXCLUDED.bug_count,
+          uploaded_at = CURRENT_TIMESTAMP
+        RETURNING id
+      `, [userId, weekEnding, filename, enrichedBugs.length]);
+
+      const uploadId = uploadResult.rows[0].id;
+
+      // 5. Delete old bugs for this upload (allows re-upload)
+      await client.query('DELETE FROM bugs WHERE upload_id = $1', [uploadId]);
+
+      // 6. Batch insert bugs
+      for (const bug of enrichedBugs) {
+        await client.query(`
+          INSERT INTO bugs (
+            upload_id, bug_key, summary, priority, status,
+            created_date, resolved_date, resolution_time_hours,
+            reporter, assignee, labels, component, raw_data
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        `, [
+          uploadId,
+          bug.bug_key,
+          bug.summary,
+          bug.priority,
+          bug.status,
+          bug.created_date,
+          bug.resolved_date,
+          bug.resolution_time_hours,
+          bug.reporter,
+          bug.assignee,
+          bug.labels,
+          bug.component,
+          JSON.stringify(bug.raw_data)
+        ]);
+      }
+
+      // 7. Delete old KPIs
+      await client.query('DELETE FROM weekly_kpis WHERE upload_id = $1', [uploadId]);
+
+      // 8. Calculate and store KPIs for "all" components
+      const allKPIs = this.calculateKPIs(enrichedBugs);
+      await client.query(`
+        INSERT INTO weekly_kpis (upload_id, component, kpi_data)
+        VALUES ($1, NULL, $2)
+      `, [uploadId, JSON.stringify(allKPIs)]);
+
+      // 9. Calculate and store KPIs per component
+      const components = [...new Set(enrichedBugs.map(b => b.component).filter(Boolean))];
+      for (const component of components) {
+        const componentBugs = enrichedBugs.filter(b => b.component === component);
+        const componentKPIs = this.calculateKPIs(componentBugs);
+        await client.query(`
+          INSERT INTO weekly_kpis (upload_id, component, kpi_data)
+          VALUES ($1, $2, $3)
+        `, [uploadId, component, JSON.stringify(componentKPIs)]);
+      }
+
+      await client.query('COMMIT');
+
+      return {
+        uploadId,
+        bugCount: enrichedBugs.length,
+        components,
+        kpis: allKPIs
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // ============================================
+  // Query Methods for API Routes
+  // ============================================
+
+  /**
+   * List bugs for an upload with filtering and pagination
+   */
+  async listBugs(userId, uploadId, filters = {}) {
+    // First verify user owns the upload
+    const upload = await this.getUpload(userId, uploadId);
+    if (!upload) {
+      throw new Error('Upload not found');
+    }
+
+    let sql = `
+      SELECT id, bug_key, summary, priority, status, created_date,
+             resolved_date, resolution_time_hours, reporter, assignee,
+             labels, component
+      FROM bugs
+      WHERE upload_id = $1
+    `;
+    const params = [uploadId];
+    let paramIndex = 2;
+
+    if (filters.priority) {
+      sql += ` AND priority = $${paramIndex}`;
+      params.push(filters.priority);
+      paramIndex++;
+    }
+
+    if (filters.status) {
+      sql += ` AND status = $${paramIndex}`;
+      params.push(filters.status);
+      paramIndex++;
+    }
+
+    if (filters.component) {
+      sql += ` AND component = $${paramIndex}`;
+      params.push(filters.component);
+      paramIndex++;
+    }
+
+    // Order by priority (VH first), then by age
+    sql += ` ORDER BY
+      CASE priority
+        WHEN 'Very High' THEN 1
+        WHEN 'High' THEN 2
+        WHEN 'Medium' THEN 3
+        WHEN 'Low' THEN 4
+        ELSE 5
+      END,
+      created_date ASC
+    `;
+
+    // Pagination
+    const limit = filters.limit || 100;
+    const offset = filters.offset || 0;
+    sql += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(limit, offset);
+
+    const result = await query(sql, params);
+    return result.rows;
+  }
+
+  /**
+   * Get KPIs for an upload and optional component
+   */
+  async getKPIs(userId, uploadId, component = null) {
+    // Verify user owns the upload
+    const upload = await this.getUpload(userId, uploadId);
+    if (!upload) {
+      throw new Error('Upload not found');
+    }
+
+    const sql = `
+      SELECT kpi_data, calculated_at
+      FROM weekly_kpis
+      WHERE upload_id = $1 AND component IS NOT DISTINCT FROM $2
+    `;
+    const result = await query(sql, [uploadId, component]);
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    return {
+      ...result.rows[0].kpi_data,
+      calculated_at: result.rows[0].calculated_at,
+      component: component
+    };
+  }
 }
 
 export default new BugService();
