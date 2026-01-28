@@ -148,6 +148,40 @@ router.get('/kpis', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/bugs/kpis/history
+ * Get historical KPI data for trend charts
+ * Query params: weeks (4|8|12, default 12), component (optional)
+ *
+ * Returns array of KPI objects with week_ending dates for chart X-axis:
+ * [
+ *   {
+ *     week_ending: "2026-01-25",
+ *     component: null,
+ *     kpi_data: { ... },
+ *     calculated_at: "..."
+ *   },
+ *   ...
+ * ]
+ */
+router.get('/kpis/history', async (req, res) => {
+  try {
+    const { weeks, component } = req.query;
+    const weekCount = parseInt(weeks, 10) || 12;
+
+    const history = await BugService.getKPIHistory(
+      req.user.id,
+      weekCount,
+      component || null
+    );
+
+    res.json(history);
+  } catch (error) {
+    console.error('GET /api/bugs/kpis/history error:', error);
+    res.status(500).json({ error: 'Internal Server Error', message: error.message });
+  }
+});
+
 // ============================================
 // Bug List (API-04)
 // ============================================
@@ -243,6 +277,75 @@ router.get('/uploads/check', async (req, res) => {
     res.json({ exists: !!existing, upload: existing });
   } catch (error) {
     console.error('GET /api/bugs/uploads/check error:', error);
+    res.status(500).json({ error: 'Internal Server Error', message: error.message });
+  }
+});
+
+// ============================================
+// Date Range Queries (Sprint/Takt Filter)
+// ============================================
+
+/**
+ * GET /api/bugs/by-date-range
+ * Get bugs across all uploads within a date range (by created_date)
+ * Query params: startDate (required), endDate (required), component, priority, status, limit, offset
+ */
+router.get('/by-date-range', async (req, res) => {
+  try {
+    const { startDate, endDate, component, priority, status, limit, offset } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'startDate and endDate are required'
+      });
+    }
+
+    const filters = {};
+    if (component) filters.component = component;
+    if (priority) filters.priority = priority;
+    if (status) filters.status = status;
+    if (limit) filters.limit = parseInt(limit, 10);
+    if (offset) filters.offset = parseInt(offset, 10);
+
+    const bugs = await BugService.listBugsByDateRange(
+      req.user.id,
+      startDate,
+      endDate,
+      filters
+    );
+    res.json(bugs);
+  } catch (error) {
+    console.error('GET /api/bugs/by-date-range error:', error);
+    res.status(500).json({ error: 'Internal Server Error', message: error.message });
+  }
+});
+
+/**
+ * GET /api/bugs/kpis-by-date-range
+ * Get KPIs for bugs within a date range (calculated on the fly)
+ * Query params: startDate (required), endDate (required), component (optional)
+ */
+router.get('/kpis-by-date-range', async (req, res) => {
+  try {
+    const { startDate, endDate, component } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'startDate and endDate are required'
+      });
+    }
+
+    const kpis = await BugService.getKPIsByDateRange(
+      req.user.id,
+      startDate,
+      endDate,
+      component || null
+    );
+    res.json(kpis);
+  } catch (error) {
+    console.error('GET /api/bugs/kpis-by-date-range error:', error);
     res.status(500).json({ error: 'Internal Server Error', message: error.message });
   }
 });
