@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-28)
 
 **Core value:** Single dashboard showing health and status across all team tools without switching contexts
-**Current focus:** Planning next milestone
+**Current focus:** v1.3 KPI Insights & Alerts
 
 ## Current Position
 
-Phase: 12 of 12 (v1.2 complete)
-Plan: N/A
-Status: Ready to plan next milestone
-Last activity: 2026-01-28 — v1.2 milestone complete
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-01-28 — Milestone v1.3 started
 
-Progress: [██████████] 100% (3 milestones shipped)
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -54,23 +54,20 @@ Decisions are logged in PROJECT.md Key Decisions table.
 
 ### Pending Todos
 
-None — milestone complete.
+None — starting new milestone.
 
 ### Blockers/Concerns
 
-None — ready for next milestone planning.
+None — ready for planning.
 
 ## Session Continuity
 
-Last session: 2026-01-28 10:30 UTC
-Stopped at: v1.2 milestone complete
+Last session: 2026-01-28
+Stopped at: Starting v1.3 milestone
 Resume file: None
 
 ## Next Steps
 
-1. Run `/gsd:new-milestone` to plan next version
-2. Possible v1.3 features (from deferred requirements):
-   - Trend charts showing KPI history over multiple weeks
-   - Email notifications when KPIs breach thresholds
-   - Export KPI report to PDF/Excel
-   - Compare KPIs between time periods
+1. Complete research (if selected)
+2. Define REQUIREMENTS.md
+3. Create ROADMAP.md with phase 13+

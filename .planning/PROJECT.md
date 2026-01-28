@@ -8,6 +8,15 @@ A unified people and engineering management system combining team management, we
 
 Single dashboard showing health and status across all team tools without switching contexts, with full control over what gets captured and how it connects to your data.
 
+## Current Milestone: v1.3 KPI Insights & Alerts
+
+**Goal:** Add historical KPI trend visualization and proactive notifications when performance degrades.
+
+**Target features:**
+- KPI trend charts showing week-over-week performance
+- Email notifications when KPIs breach red zone thresholds
+- In-app notification center for threshold alerts
+
 ## Current State (v1.2 Shipped)
 
 **Shipped:** 2026-01-28
@@ -50,7 +59,10 @@ Single dashboard showing health and status across all team tools without switchi
 
 ### Active
 
-(No active requirements — ready for next milestone planning)
+- [ ] KPI trend line charts showing historical values week-over-week
+- [ ] Email notifications when any KPI hits red zone
+- [ ] In-app notification center with alert history
+- [ ] Notification preferences configuration
 
 ### Out of Scope
 
@@ -100,4 +112,4 @@ Bugs categorized by labels/summary into: deploy-metering, service-broker, foss-v
 | XMLHttpRequest for uploads | fetch lacks progress events needed for upload UI | ✓ Good (v1.2) |
 
 ---
-*Last updated: 2026-01-28 after v1.2 milestone shipped*
+*Last updated: 2026-01-28 after v1.3 milestone started*
