@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-28)
 
 ## Current Position
 
-Phase: 18 of 18 (Table Enhancements & UI Polish)
-Plan: 1/2 complete
-Status: In progress
-Last activity: 2026-01-28 — Completed 18-02-PLAN.md (Weekly Inflow Chart & Filter Polish)
+Phase: 18 of 18 (Table Enhancements & UI Polish) - COMPLETE
+Plan: 2/2 complete
+Status: Phase complete, v1.4 ready to ship
+Last activity: 2026-01-28 — Completed 18-01-PLAN.md (Table Sorting Enhancement)
 
-Progress: [############################..] 97% (34/35 plans complete)
+Progress: [##############################] 100% (35/35 plans complete)
 
 ## Performance Metrics
 
@@ -39,14 +39,14 @@ Progress: [############################..] 97% (34/35 plans complete)
 - Shipped: 2026-01-28
 
 **v1.4 Bug Dashboard Fixes & Enhancements:**
-- Total plans: 4 (Phase 17: 2 complete, Phase 18: 1 complete)
+- Total plans: 4 (Phase 17: 2 complete, Phase 18: 2 complete)
 - Phases: 17-18 (2 phases)
-- Status: In progress
+- Status: Complete
 
 **Cumulative:**
-- Total milestones: 4 shipped, 1 in progress
+- Total milestones: 5 shipped
 - Total phases: 18
-- Total plans: 35 (34 complete, 1 pending)
+- Total plans: 35 (35 complete)
 
 ## Accumulated Context
 
@@ -66,10 +66,12 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - Dynamic UI filter population from backend aggregations (proven v1.4)
 - Rolling window calculations for time-series KPIs (proven v1.4)
 - Inline filter labels with conditional badge indicators (proven v1.4)
+- SortableHeader component for table sorting with direction indicators (proven v1.4)
+- AgeIndicator with color-coded thresholds (coral >14d, amber 7-14d, sage <7d) (proven v1.4)
 
 ### Pending Todos
 
-None - one plan remaining in phase 18.
+None - all plans complete.
 
 ### Blockers/Concerns
 
@@ -78,11 +80,11 @@ None - one plan remaining in phase 18.
 
 ## Session Continuity
 
-Last session: 2026-01-28T21:10:00Z
-Stopped at: Completed 18-02-PLAN.md (Weekly Inflow Chart & Filter Polish)
+Last session: 2026-01-28T21:23:00Z
+Stopped at: Completed 18-01-PLAN.md (Table Sorting Enhancement)
 Resume file: None
 
 ## Next Steps
 
-1. Execute 18-01-PLAN.md (Table Sorting Enhancement)
-2. Ship v1.4 milestone
+1. Ship v1.4 milestone (all plans complete)
+2. Plan next milestone if needed
