@@ -17,18 +17,18 @@ Requirements for Bug Dashboard Fixes & Enhancements milestone. Each maps to road
 
 ### Table Enhancements
 
-- [ ] **TABLE-01**: Aging bugs table shows visual age indicators (🔴🟡🟢)
-- [ ] **TABLE-02**: Aging bugs table includes component column with badge display
-- [ ] **TABLE-03**: All table columns are sortable with sort indicators
+- [x] **TABLE-01**: Aging bugs table shows visual age indicators (🔴🟡🟢)
+- [x] **TABLE-02**: Aging bugs table includes component column with badge display
+- [x] **TABLE-03**: All table columns are sortable with sort indicators
 
 ### Visualization
 
-- [ ] **VIS-01**: Weekly inflow trend chart displays when multiple weeks uploaded
+- [x] **VIS-01**: Weekly inflow trend chart displays when multiple weeks uploaded
 
 ### UI Polish
 
-- [ ] **UI-01**: Filter dropdowns have clear, descriptive labels
-- [ ] **UI-02**: Component filter badge shows when filtered (not "All")
+- [x] **UI-01**: Filter dropdowns have clear, descriptive labels
+- [x] **UI-02**: Component filter badge shows when filtered (not "All")
 
 ## Future Requirements
 
@@ -72,12 +72,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FIX-03 | Phase 17 | Complete |
 | FIX-04 | Phase 17 | Complete |
 | FIX-05 | Phase 17 | Complete |
-| TABLE-01 | Phase 18 | Pending |
-| TABLE-02 | Phase 18 | Pending |
-| TABLE-03 | Phase 18 | Pending |
-| VIS-01 | Phase 18 | Pending |
-| UI-01 | Phase 18 | Pending |
-| UI-02 | Phase 18 | Pending |
+| TABLE-01 | Phase 18 | Complete |
+| TABLE-02 | Phase 18 | Complete |
+| TABLE-03 | Phase 18 | Complete |
+| VIS-01 | Phase 18 | Complete |
+| UI-01 | Phase 18 | Complete |
+| UI-02 | Phase 18 | Complete |
 
 **Coverage:**
 - v1.4 requirements: 11 total
@@ -90,4 +90,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-28*
-*Last updated: 2026-01-28 after initial definition*
+*Last updated: 2026-01-28 after Phase 18 completion*

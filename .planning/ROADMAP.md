@@ -6,7 +6,7 @@
 - **v1.1 Web Capture Framework** - Phases 6-9 (shipped 2026-01-22) — [Archive](milestones/v1.1-ROADMAP.md)
 - **v1.2 DevOps Bug Dashboard** - Phases 10-12 (shipped 2026-01-28) — [Archive](milestones/v1.2-ROADMAP.md)
 - **v1.3 KPI Insights & Alerts** - Phases 13-16 (shipped 2026-01-28) — [Archive](milestones/v1.3-ROADMAP.md)
-- **v1.4 Bug Dashboard Fixes & Enhancements** - Phases 17-18 (in progress)
+- **v1.4 Bug Dashboard Fixes & Enhancements** - Phases 17-18 (shipped 2026-01-28) — [Archive](milestones/v1.4-ROADMAP.md)
 
 ## Phases
 
@@ -311,7 +311,7 @@ Plans:
 **Milestone Goal:** Fix component extraction and filtering bugs, add table enhancements and UI polish to complete the bug dashboard vision.
 
 - [x] **Phase 17: Core Bug Fixes** - Fix component extraction, filtering, category chart, and inflow calculation
-- [ ] **Phase 18: Table Enhancements & UI Polish** - Age indicators, component column, sorting, trend chart, UI improvements
+- [x] **Phase 18: Table Enhancements & UI Polish** - Age indicators, component column, sorting, trend chart, UI improvements
 
 ### Phase 17: Core Bug Fixes
 **Goal**: Component extraction, filtering, and KPI calculations work correctly
@@ -343,8 +343,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 18-01-PLAN.md — Table enhancements (age indicators, component column, sorting)
-- [ ] 18-02-PLAN.md — Weekly inflow chart and UI polish
+- [x] 18-01-PLAN.md — Table enhancements (age indicators, component column, sorting)
+- [x] 18-02-PLAN.md — Weekly inflow chart and UI polish
 
 ## Progress
 
@@ -374,4 +374,4 @@ v1.4: 17 -> 18 (depends on 17)
 | 15. Threshold Detection & In-App Notifications | v1.3 | 2/2 | Complete | 2026-01-28 |
 | 16. Email Notifications & Preferences | v1.3 | 2/2 | Complete | 2026-01-28 |
 | 17. Core Bug Fixes | v1.4 | 2/2 | Complete | 2026-01-28 |
-| 18. Table Enhancements & UI Polish | v1.4 | 0/2 | Not started | - |
+| 18. Table Enhancements & UI Polish | v1.4 | 2/2 | Complete | 2026-01-28 |
