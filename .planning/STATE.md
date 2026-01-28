@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Single dashboard showing health and status across all team tools without switching contexts
-**Current focus:** v1.2 DevOps Bug Dashboard — Starting
+**Current focus:** v1.2 DevOps Bug Dashboard — Phase 11 complete
 
 ## Current Position
 
-Phase: 10 of 12 (Backend Foundation) — COMPLETE
-Plan: 2 of 2 in current phase
-Status: Phase verified ✓
-Last activity: 2026-01-27 — Phase 10 execution complete, verified 6/6 must-haves
+Phase: 11 of 12 (CSV Upload) — COMPLETE
+Plan: 1 of 1 in current phase
+Status: Phase complete
+Last activity: 2026-01-28 — Completed 11-01-PLAN.md (CSV Upload UI)
 
-Progress: [██........] 40% (2/5 plans, 1/3 phases)
+Progress: [███.......] 60% (3/5 plans, 2/3 phases)
 
 ## Performance Metrics
 
@@ -30,9 +30,9 @@ Progress: [██........] 40% (2/5 plans, 1/3 phases)
 
 **v1.2 DevOps Bug Dashboard:**
 - Estimated plans: 5 (Phase 10: 2, Phase 11: 1, Phase 12: 2)
-- Completed: 2
-- Average duration: 4.5 min
-- Total execution time: 9 min
+- Completed: 3
+- Average duration: 4.6 min
+- Total execution time: 14 min
 
 ## Accumulated Context
 
@@ -66,7 +66,12 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - Store KPIs per component plus 'all' aggregate for flexible filtering
 - Use multer memory storage to avoid disk I/O for CSV processing
 - Calculate median MTTR and stddev for workload distribution
-- Transaction wraps entire upload workflow (metadata → bugs → KPIs)
+- Transaction wraps entire upload workflow (metadata -> bugs -> KPIs)
+
+**Phase 11-01 decisions:**
+- XMLHttpRequest for uploads (fetch lacks progress events)
+- Saturday date snapping (better UX than error messages)
+- AlertDialog for duplicate confirmation (consistent UI pattern)
 
 ### Pending Todos
 
@@ -90,22 +95,23 @@ None.
 - Charts: MTTR by priority, category distribution
 
 **Target Thresholds:**
-- Bug Inflow: ≤6/week (green), 6.1-8 (yellow), >8 (red)
+- Bug Inflow: <=6/week (green), 6.1-8 (yellow), >8 (red)
 - TTFR: <24h (green), 24-48h (yellow), >48h (red)
-- SLA VH: ≥80% (green), 60-79% (yellow), <60% (red)
+- SLA VH: >=80% (green), 60-79% (yellow), <60% (red)
 - Backlog Health: 70-100 (green), 50-69 (yellow), 0-49 (red)
 
 ## Session Continuity
 
-Last session: 2026-01-27 21:17
-Stopped at: Completed 10-02-PLAN.md (Upload API and KPI Calculations)
+Last session: 2026-01-28 06:35 UTC
+Stopped at: Completed 11-01-PLAN.md (CSV Upload UI)
 Resume file: None
 
 ## Next Steps
 
-1. ~~Define REQUIREMENTS.md for v1.2~~ ✓
-2. ~~Create ROADMAP.md with phases (starting from Phase 10)~~ ✓
-3. ~~Execute 10-01: Backend Foundation~~ ✓
-4. ~~Execute 10-02: Upload API and KPI Calculations~~ ✓
-5. ~~Phase 10 verified~~ ✓
-6. Plan Phase 11: CSV Upload
+1. ~~Define REQUIREMENTS.md for v1.2~~ Done
+2. ~~Create ROADMAP.md with phases (starting from Phase 10)~~ Done
+3. ~~Execute 10-01: Backend Foundation~~ Done
+4. ~~Execute 10-02: Upload API and KPI Calculations~~ Done
+5. ~~Phase 10 verified~~ Done
+6. ~~Execute 11-01: CSV Upload UI~~ Done
+7. Plan Phase 12: KPI Dashboard UI
