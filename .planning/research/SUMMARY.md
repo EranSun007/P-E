@@ -1,173 +1,200 @@
 # Project Research Summary
 
-**Project:** P&E Manager v1.1 - Web Capture Framework
-**Domain:** Browser Extension + Configurable Web Scraping + Data Staging
-**Researched:** 2026-01-22
+**Project:** P&E Manager v1.3 - KPI Insights & Alerts
+**Domain:** Bug Dashboard KPI Trend Visualization & Threshold Notification System
+**Researched:** 2026-01-28
 **Confidence:** HIGH
 
 ## Executive Summary
 
-The v1.1 Web Capture Framework evolves the existing hardcoded Jira extension into a configurable, multi-site data capture system. The critical insight from research: **this is primarily a schema design problem, not a library problem**. The existing stack (Express/PostgreSQL/React/Zod) provides everything needed. No new runtime dependencies are required. The architecture should preserve the working v1.0 Jira flow while adding configurability layers on top through new database tables, service classes, and a generic extraction engine.
+P&E Manager v1.3 adds KPI trend charts and threshold notifications to the existing bug dashboard. This is a well-trodden domain with established patterns: time-series queries for historical data, Recharts for trend visualization, threshold evaluation on data upload, and notification delivery via existing in-app system with optional email. The foundational infrastructure is already in place: Recharts (v2.15.4), PostgreSQL with weekly_kpis table, and NotificationService - requiring only minimal additions (nodemailer for email, node-cron for scheduling).
 
-The recommended approach is a layered architecture with three new core components: **Capture Rules** (JSONB-stored extraction configurations), **Data Staging/Inbox** (review workflow before entity mapping), and **Entity Mappings** (user-defined rules linking captured data to P&E entities). The extension evolves from static content scripts to dynamic registration via Chrome's `scripting` API, with a generic extractor replacing site-specific hardcoded code. Backwards compatibility with the existing Jira flow is preserved throughout.
+The recommended approach is incremental: start with historical KPI queries and trend charts (zero new dependencies), then add threshold evaluation (reuse existing notifications), and optionally layer in email alerts (nodemailer) and scheduled monitoring (node-cron). This milestone extends existing patterns rather than introducing new paradigms. The weekly_kpis table's JSONB structure works for current-week display but needs JOIN-based queries for efficient multi-week trend retrieval. Default thresholds hardcoded in code provide immediate value without configuration UI complexity.
 
-The most significant risks are **configuration complexity explosion** (users struggling to configure CSS selectors), **selector brittleness multiplied across sites** (maintenance nightmare), and **data staging becoming a graveyard** (items piling up unreviewed). Mitigation strategies include: preset-based configuration with tiered complexity, multi-selector fallback chains with health monitoring, and trust-based auto-approval rules that limit human review to genuinely uncertain captures.
+Key risks are time-series query performance (mitigated by indexes on user_id/week_ending), chart re-render thrashing (mitigated by React.memo and useMemo), notification spam (mitigated by 24-hour deduplication), and email delivery failures (mitigated by queue with retry logic). All risks have established mitigation patterns and should be addressed from day one rather than retrofitted later.
 
 ## Key Findings
 
 ### Recommended Stack
 
-No new npm packages required. All additions are schema and code changes to the existing stack.
+Research confirms the existing stack is sufficient with only two targeted additions. Recharts already supports LineChart for time-series trends, Radix Toast handles in-app notifications, and PostgreSQL's JSONB storage works for aggregated KPIs. The only gaps are email delivery (nodemailer) and task scheduling (node-cron), both lightweight and battle-tested.
 
-**Core technologies (already in place):**
-- **PostgreSQL JSONB**: Store extraction rules as structured JSON — native feature, indexed, queryable
-- **Zod 3.25.76**: Schema validation for rules on both frontend and backend — already integrated
-- **react-hook-form 7.60.0**: Dynamic rule builder forms via `useFieldArray` — already installed
-- **Chrome Extension MV3**: Extend with `scripting` permission for dynamic content script registration
+**Core technologies:**
+- **Recharts (existing v2.15.4)**: Time-series line charts — already used for MTTRBarChart, supports multi-week trends out-of-box
+- **PostgreSQL (existing pg 8.11.3)**: Historical KPI storage — weekly_kpis table JOIN with bug_uploads provides week_ending for X-axis
+- **NotificationService (existing)**: In-app alerts — reuse for threshold breach notifications, no new tables needed
+- **nodemailer (NEW v7.0.13)**: Email delivery — SMTP-agnostic, 1.4M+ dependents, zero frontend impact
+- **node-cron (NEW v4.2.1)**: Scheduled monitoring — lightweight, in-process, 5M+ weekly downloads
 
-**Explicitly NOT adding:**
-- Puppeteer/Playwright (extension already has DOM access)
-- Cheerio (live DOM exists, no need to parse HTML strings)
-- Dedicated rule engines (simple selector-to-field mapping suffices)
-- Redis/Message queues (volume doesn't justify complexity)
+**Explicitly rejected:**
+- Chart.js, Victory, Nivo — duplicates Recharts capability (200-500KB bundle increase for zero benefit)
+- SendGrid, Mailgun clients — vendor lock-in, nodemailer works with any SMTP including SAP BTP Mail service
+- Bull/BullMQ job queues — overkill for hourly checks, requires Redis infrastructure
 
 ### Expected Features
 
-**Must have (v1.1 MVP):**
-- Site URL Pattern — foundation for multi-site
-- CSS Selector Rules — core extraction logic
-- Field Name Mapping — structure captured data
-- Test Rule UI — users cannot debug without preview
-- Capture Inbox — central review workflow
-- Accept/Reject Actions — core review workflow
-- Target Entity Selection — connect to existing data
-- Multi-Site Support — dynamic host permissions
+Research identified clear table stakes and differentiators. Users expect historical trend visualization and threshold alerts; configuration UI and visual polish are nice-to-have.
+
+**Must have (table stakes):**
+- **Historical KPI queries** — 8-12 weeks of trend data, users expect "how's this trending?" context
+- **Line charts per KPI** — visual representation of weekly progression, standard pattern for time-series
+- **Threshold evaluation on upload** — immediate feedback when KPIs breach red/yellow zones
+- **In-app notification center** — persistent alerts for threshold breaches, existing notifications table ready
+- **Default thresholds** — sensible values (e.g., MTTR VH > 48hrs = yellow, > 72hrs = red) without requiring configuration
 
 **Should have (competitive):**
-- Rule Templates — pre-built rules for Grafana/Jenkins
-- Bulk Accept — efficiency for high volume
-- Duplicate Detection — prevent duplicates
-- Conditional Rules — filter unwanted captures
+- **Email alerts** — notify users outside the app when critical thresholds breached
+- **Trend indicators** — arrows/percentages on KPI cards showing week-over-week change
+- **Notification deduplication** — don't spam users with identical alerts within 24 hours
+- **Source link in notifications** — click alert → scroll to relevant KPI chart
 
 **Defer (v2+):**
-- Visual Selector Helper — 10x complexity for point-and-click builder
-- Data Transformation plugins — add when patterns emerge
-- Auto-Accept Rules — trust must be earned first
-- AI Selector Generation — unreliable approach
+- **Custom threshold configuration UI** — start with hardcoded defaults, add customization if requested
+- **Weekly digest emails** — batch multiple breaches into single email, wait for user feedback
+- **Notification preferences** — per-KPI alert enable/disable, build after MVP usage patterns emerge
+- **Visual threshold lines on charts** — overlay red/yellow zones on trend charts, polish feature
 
 ### Architecture Approach
 
-The architecture preserves v1.0 patterns while adding configurability layers. Three new database tables (`capture_rules`, `capture_inbox`, `entity_mappings`) store user-defined extraction configurations. The extension gains dynamic content script registration via `chrome.scripting.registerContentScripts()` based on rules fetched from backend. A new generic extractor (`generic-extractor.js`) replaces site-specific hardcoded extractors, using rule-defined selectors. The existing Jira flow remains untouched for backwards compatibility.
+The milestone integrates seamlessly with existing patterns. BugService gains `getKPIHistory()` for multi-week queries (JOIN weekly_kpis + bug_uploads), new ThresholdService evaluates KPIs on upload and creates notifications, and frontend adds KPITrendChart component using Recharts. No schema changes required for MVP; existing weekly_kpis JSONB + notifications table handle everything.
 
 **Major components:**
-1. **CaptureRuleService** — CRUD for extraction rules, validation, extension sync
-2. **CaptureInboxService** — data staging, approve/reject workflow, entity creation
-3. **EntityMappingService** — field mapping definitions, transform application
-4. **generic-extractor.js** — rule-driven DOM extraction, runs in content script context
-5. **Dynamic registration** — service worker manages content script registration per rule
+1. **BugService extension** — Add `getKPIHistory(userId, weeks, component)` method for time-series queries, modify `uploadCSV()` to trigger threshold checks post-commit (fire-and-forget)
+2. **ThresholdService (NEW)** — Evaluate KPIs against default thresholds (warning/critical), call NotificationService.create() on breach, future: read per-user overrides from kpi_thresholds table
+3. **KPITrendChart (NEW)** — Recharts LineChart component, receives historical data array, transforms to chart format with date-fns, memoized to prevent re-render thrashing
+4. **NotificationBell (NEW)** — Display unread count badge, dropdown of recent alerts, uses existing NotificationService (no new backend code)
+5. **EmailService (OPTIONAL)** — Nodemailer wrapper for SMTP delivery, email_queue table with retry logic, SAP BTP Mail service integration
+
+**Data flow:**
+Upload CSV → BugService.uploadCSV() → calculate KPIs → store in weekly_kpis → ThresholdService.evaluateKPIs() (async) → NotificationService.create() if breached → Frontend polls notifications → displays badge/toast.
+
+**Build order:** Historical queries (Phase 1) → Trend charts (Phase 2) → Threshold evaluation (Phase 3) → In-app notifications (Phase 4) → Email delivery (Phase 5 - optional).
 
 ### Critical Pitfalls
 
-1. **Configuration Complexity Explosion** — Build presets with tiered configuration (Level 0: works out of box, Level 1: change URL, Level 2: override selectors, Level 3: expert custom mappings). Never require CSS selector knowledge for basic usage.
+Research identified five critical mistakes that would cause rewrites or major technical debt.
 
-2. **Selector Brittleness Multiplied Across Sites** — Implement multi-selector fallback chains (3+ strategies per critical field), selector health monitoring with alerts, and version-specific selector sets. Graceful degradation: Site A broken should not affect Sites B, C, D.
+1. **Time-series data model mismatch** — Querying JSONB for multi-week trends becomes O(n) scan. Prevention: Add indexes on (user_id, week_ending), ensure JOINs use indexed columns, consider normalizing KPI values if JSONB queries exceed 500ms.
 
-3. **Data Staging Becomes Graveyard** — Implement trust tiers (HIGH_TRUST auto-approves, LOW_TRUST requires individual review). Items pending >30 days get auto-action. Inline review in main UI, not separate staging screen.
+2. **Chart re-render thrashing** — Recharts re-renders on every parent state change (200-500ms jank). Prevention: Wrap charts in React.memo with data comparison, memoize data transformations with useMemo, limit to 12 weeks max per chart.
 
-4. **Entity Mapping N x M Explosion** — Use canonical intermediate format. All sources normalize TO common schema, system maps FROM common schema. State mapping tables instead of if/else code.
+3. **Email notifications without delivery infrastructure** — Emails silently fail without SAP BTP Mail service binding or retry logic. Prevention: Configure mail service first, add email_queue table with attempts counter, health check endpoint for SMTP connection.
 
-5. **Multi-Site Extension Architecture** — Single extension with lazy-loaded site-specific extractors, not N separate extensions or one monolith loading all code everywhere.
+4. **Notification spam and fatigue** — Sending alerts on every upload without deduplication (3 uploads in 5 min = 3 identical emails). Prevention: notification_log table tracking last sent timestamp, 24-hour cooldown per KPI, batch multiple breaches into digest.
+
+5. **Performance degradation on upload** — Adding threshold checks + email sending to upload flow increases latency from 2s to 30s. Prevention: Fire-and-forget pattern for threshold evaluation, return upload response immediately, background job for notifications.
 
 ## Implications for Roadmap
 
-Based on research, suggested phase structure:
+Based on research, suggested phase structure follows dependency chain: historical data queries → visualization → threshold logic → notification delivery. Each phase delivers standalone value and builds on previous infrastructure.
 
-### Phase 1: Backend Foundation
-**Rationale:** Services and database must exist before extension or frontend can interact with them.
-**Delivers:** Database schema (capture_rules, capture_inbox, entity_mappings tables), CaptureRuleService, CaptureInboxService, EntityMappingService, REST routes
-**Addresses:** Core infrastructure enabling all features
-**Avoids:** Building frontend/extension without working backend (integration chaos)
+### Phase 1: Historical KPI Queries
+**Rationale:** Foundation for all trend features. No new dependencies, pure backend extension. Must precede chart work since charts need time-series data.
+**Delivers:** `GET /api/bugs/kpis/history?weeks=8&component=X` endpoint returning array of {week_ending, kpi_data}
+**Addresses:** Historical KPI queries (table stakes), enables all downstream trend features
+**Avoids:** Time-series data model mismatch (Pitfall 1) by designing efficient JOIN pattern from start
+**Complexity:** Low - extends existing BugService pattern
+**Research needed:** No - standard PostgreSQL JOIN, existing weekly_kpis schema sufficient
 
-### Phase 2: Extension Core
-**Rationale:** Dynamic registration depends on backend API; must complete before generic extractor can function.
-**Delivers:** manifest.json updates (scripting permission), service worker rule sync, STAGE_CAPTURE message handler, Api.js additions
-**Addresses:** Multi-site support, dynamic content script registration
-**Avoids:** Monolithic extension (Pitfall 5)
+### Phase 2: Trend Chart Components
+**Rationale:** Visual representation of historical data. Recharts already installed, follows MTTRBarChart patterns. Can develop in parallel with backend queries.
+**Delivers:** KPITrendChart.jsx component, integrated into BugDashboard, memoized data transformations
+**Addresses:** Line charts per KPI (table stakes), trend visualization
+**Avoids:** Chart re-render thrashing (Pitfall 2) by implementing React.memo + useMemo from start
+**Complexity:** Medium - Recharts integration, performance optimization required
+**Research needed:** No - established patterns in existing codebase (Metrics.jsx, BugDashboard.jsx)
 
-### Phase 3: Generic Extractor
-**Rationale:** Depends on extension core for message handling; core extraction capability needed before UI.
-**Delivers:** generic-extractor.js, selector execution engine, transform functions
-**Addresses:** CSS Selector Rules, Field Name Mapping
-**Avoids:** Selector brittleness (with fallback chains built in from start)
+### Phase 3: Threshold Evaluation Logic
+**Rationale:** Core notification trigger. Default thresholds in code avoid UI complexity. Evaluates after upload completes (fire-and-forget).
+**Delivers:** ThresholdService with default thresholds, BugService.uploadCSV() integration, evaluation on CSV upload
+**Addresses:** Threshold evaluation on upload (table stakes), default thresholds
+**Avoids:** Performance degradation on upload (Pitfall 5) via async threshold checks
+**Complexity:** Medium - new service pattern, requires careful error handling
+**Research needed:** Yes (minor) - validate threshold values with actual bug data, may need calibration
 
-### Phase 4: Inbox UI
-**Rationale:** Depends on backend services; essential review workflow needed before rule builder.
-**Delivers:** CaptureInbox page, pending items list, approve/reject workflow, entity type selection
-**Addresses:** Capture Inbox, Accept/Reject Actions, Target Entity Selection
-**Avoids:** Staging graveyard (with trust tiers and aging policies)
+### Phase 4: In-App Notification Integration
+**Rationale:** Reuse existing NotificationService infrastructure. Notification center UI completes alert delivery loop without external dependencies.
+**Delivers:** NotificationBell component with badge count, notification list UI, mark-as-read functionality
+**Addresses:** In-app notification center (table stakes), notification deduplication (competitive)
+**Avoids:** Notification spam (Pitfall 4) via 24-hour deduplication in notification_log table
+**Complexity:** Low-Medium - UI work, notification_log table for deduplication
+**Research needed:** No - existing notifications table and patterns proven
 
-### Phase 5: Rule Builder UI
-**Rationale:** Users need to see captured data working before investing in rule configuration.
-**Delivers:** CaptureRules page, rule creation form, URL pattern builder, selector tester
-**Addresses:** Site URL Pattern, Test Rule UI, Rule Enable/Disable
-**Avoids:** Configuration complexity (with presets and tiered UI)
+### Phase 5 (Optional): Email Notifications
+**Rationale:** Extends alerts outside app. Optional because in-app notifications may suffice. Requires SAP BTP Mail service binding and careful delivery monitoring.
+**Delivers:** EmailService with nodemailer, email_queue with retry logic, SMTP configuration, unsubscribe links
+**Addresses:** Email alerts (competitive feature), notification preferences (deferred)
+**Avoids:** Email delivery failures (Pitfall 3) via queue + retries + health checks
+**Complexity:** High - external SMTP dependency, deliverability concerns, user preferences
+**Research needed:** Yes - SAP BTP Mail service configuration, SMTP credentials setup, test deliverability
 
-### Phase 6: Advanced Features
-**Rationale:** Polish after core loop is complete.
-**Delivers:** Entity mapping configuration UI, auto-apply rules, bulk approval, polling configuration
-**Addresses:** Field-to-Property Mapping, Bulk Accept, Rule Templates
+### Phase 6 (Optional): Scheduled Monitoring
+**Rationale:** Periodic threshold checks even without new uploads. Low priority since most value is immediate feedback on upload.
+**Delivers:** node-cron scheduled job, runs Monday 8am, checks last upload for each user
+**Addresses:** Proactive monitoring (nice-to-have)
+**Avoids:** No critical pitfalls, but needs monitoring to prevent crash loops
+**Complexity:** Medium - cron job management, error handling for background process
+**Research needed:** No - node-cron well-documented, simple cron syntax
 
 ### Phase Ordering Rationale
 
-- **Backend-first:** Extension and frontend both depend on API endpoints existing
-- **Extension before UI:** Users need data flowing before configuration UI matters
-- **Inbox before Rules:** "See it working" validates approach before "configure it yourself"
-- **Jira preserved throughout:** No breaking changes, v1.0 flow continues working
+- **Phases 1-2 can overlap** (backend queries + frontend charts developed concurrently) once API contract defined
+- **Phase 3 depends on Phase 1** (needs historical queries to calculate thresholds based on trends, though MVP uses static defaults)
+- **Phase 4 depends on Phase 3** (notification UI needs threshold breaches to display)
+- **Phases 5-6 are independent enhancements** (email and scheduling can be added in any order or skipped entirely)
+
+This order avoids pitfalls by addressing data model first (prevents rewrites), then visualization (delivers user value), then notification logic (completes feature), with optional enhancements last. Research confirms this is the standard build sequence for KPI dashboards with alerting.
 
 ### Research Flags
 
-**Phases likely needing deeper research during planning:**
-- **Phase 3 (Generic Extractor):** DOM structure varies by target site — recommend live inspection of SAP Grafana/Jenkins instances
-- **Phase 4 (Inbox UI):** User workflow preferences unclear — recommend user interviews on review workflow
+Phases likely needing deeper research during planning:
+- **Phase 3 (Threshold Logic):** Validate default threshold values against actual bug data - may need calibration based on historical KPI distributions
+- **Phase 5 (Email Delivery):** SAP BTP Mail service setup requires environment-specific configuration, SMTP credentials rotation policy unknown
 
-**Phases with standard patterns (skip research-phase):**
-- **Phase 1 (Backend Foundation):** Well-established service pattern from existing codebase
-- **Phase 2 (Extension Core):** Chrome scripting API is documented, pattern is clear
+Phases with standard patterns (skip research-phase):
+- **Phase 1 (Historical Queries):** PostgreSQL JOIN patterns well-documented, existing weekly_kpis schema sufficient
+- **Phase 2 (Trend Charts):** Recharts LineChart proven in codebase (MTTRBarChart), performance patterns established
+- **Phase 4 (In-App Notifications):** NotificationService exists, standard React Context + polling pattern
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Verified all needed features exist in current stack — no new dependencies |
-| Features | MEDIUM | Based on domain knowledge; no user research conducted |
-| Architecture | HIGH | Based on working v1.0 implementation and Chrome extension documentation |
-| Pitfalls | MEDIUM-HIGH | Drawn from v1.0 experience and domain expertise; per-site DOM stability needs live verification |
+| Stack | HIGH | Recharts/PostgreSQL proven in existing codebase, nodemailer industry standard with 1.4M+ dependents, node-cron widely adopted (5M+ weekly) |
+| Features | HIGH | KPI trend charts and threshold alerts are well-established patterns, table stakes vs nice-to-have clear from domain knowledge |
+| Architecture | HIGH | All patterns exist in codebase (BugService extension, Recharts integration, NotificationService), new components follow established structure |
+| Pitfalls | HIGH | Time-series performance, chart re-renders, email delivery, notification spam - all common mistakes with known mitigations |
 
 **Overall confidence:** HIGH
 
-The recommendation to add no new dependencies is strongly supported by codebase analysis. Architecture patterns extend existing working code. Main uncertainty is per-site selector stability which can only be validated during implementation.
+Research based on existing P&E Manager codebase analysis (BugService.js, BugDashboard.jsx, NotificationService.js, database schema 019_bug_dashboard.sql), package.json dependencies, and established patterns for time-series visualization and notification systems. All recommended technologies verified as current versions with active maintenance.
 
 ### Gaps to Address
 
-- **DOM structure of target sites:** Need live inspection of SAP internal Grafana, Jenkins, Concourse, Dynatrace to validate selector approaches
-- **User configuration experience:** No user feedback on v1.0 Jira configuration — should survey during Phase 5
-- **Shadow DOM limitations:** Some target sites may use Shadow DOM; document as limitation or research piercing strategies
-- **Multi-site performance:** Extension loading extractors for multiple sites — needs performance testing
+Minor areas requiring validation during implementation:
+
+- **Threshold calibration:** Default values (e.g., MTTR VH > 48hrs = yellow) are educated guesses. Validate against actual bug data distribution in Phase 3. May need per-component thresholds if variance is high.
+- **SAP BTP Mail service availability:** Assumed SAP BTP includes mail service in catalog. Verify service exists and binding process before Phase 5. Fallback: external SMTP provider (Gmail, SendGrid) if BTP mail unavailable.
+- **Query performance at scale:** Tested patterns with <10 uploads. Monitor query times in Phase 1 if users have >50 uploads. Add composite index (user_id, component, week_ending) if slow.
+- **Email deliverability:** SMTP success doesn't guarantee inbox delivery. Monitor spam folder rates in Phase 5, may need SPF/DKIM configuration.
+
+All gaps have clear validation points during implementation and fallback options. None block MVP delivery.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- **Existing v1.0 codebase** — `/Users/i306072/Documents/GitHub/P-E/extension/` for extension patterns, `/server/` for service patterns
-- **package.json analysis** — Verified versions: react-hook-form 7.60.0, zod 3.25.76, pg 8.11.3
-- **Chrome Extension Documentation** — scripting API, content script registration, Manifest V3 patterns
+- **Existing codebase:** `/server/services/BugService.js` (KPI calculation patterns, uploadCSV flow), `/server/services/NotificationService.js` (notification CRUD), `/server/db/019_bug_dashboard.sql` (weekly_kpis schema), `/src/pages/BugDashboard.jsx` (Recharts integration), `package.json` (dependency versions verified)
+- **STACK.md research:** Nodemailer v7.0.13 (released 2026-01-27, GitHub verification), node-cron v4.2.1, Recharts v2.15.4 already installed
+- **ARCHITECTURE.md research:** Component boundaries analysis, data flow patterns, integration points with existing services
 
 ### Secondary (MEDIUM confidence)
-- **Domain expertise** — Web scraping patterns, ETL staging workflows, data mapping patterns
-- **CLAUDE.md project context** — Service layer patterns, multi-tenancy enforcement
+- **FEATURES.md research:** Table stakes vs differentiators based on domain knowledge of KPI dashboards, no external validation
+- **PITFALLS.md research:** Common mistakes from domain experience (time-series queries, React performance, email delivery), validated against codebase patterns
+- **PostgreSQL documentation:** Time-series query optimization, JSONB indexing strategies (general knowledge, not P&E-specific)
 
 ### Tertiary (LOW confidence)
-- **Per-site DOM stability** — Inferred from framework knowledge; needs live verification for SAP instances
+- None - all findings grounded in existing codebase or verified package documentation
 
 ---
-*Research completed: 2026-01-22*
+*Research completed: 2026-01-28*
 *Ready for roadmap: yes*

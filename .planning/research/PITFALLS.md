@@ -1,810 +1,764 @@
-# Domain Pitfalls: Configurable Web Capture Framework
+# Domain Pitfalls: Adding KPI Trends and Notifications
 
-**Domain:** Multi-site configurable capture extension with data staging
-**Researched:** 2026-01-22
-**Confidence:** MEDIUM-HIGH (based on v1.0 Jira extension experience + domain expertise)
-
----
+**Domain:** Bug Dashboard with KPI Trend Visualization and Notification System
+**Researched:** 2026-01-28
+**Context:** Adding trend charts and notifications to existing React dashboard with weekly CSV uploads
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, major production issues, or block multi-site scaling.
+Mistakes that cause rewrites, data loss, or major architectural issues.
 
----
+### Pitfall 1: Time Series Data Model Mismatch
 
-### Pitfall 1: Configuration Complexity Explosion
-
-**Severity:** CRITICAL
-**Phase to address:** Phase 1 (Configuration Architecture)
-
-**What goes wrong:** Teams build "infinitely configurable" extraction systems where users can define any selector, any field mapping, any transformation. The configuration UI becomes unusable, the extraction logic becomes unmaintainable, and users can't actually configure anything without developer assistance.
+**What goes wrong:** Adding trend charts without restructuring the data model for time-series queries. Current schema stores KPIs in JSONB blobs (`weekly_kpis.kpi_data`), which prevents efficient historical queries and chart rendering.
 
 **Why it happens:**
-- Overestimating user sophistication ("they'll write CSS selectors")
-- Fear of hardcoding anything ("what if they need different fields?")
-- Treating configuration as a substitute for architecture decisions
-- Confusing "flexible" with "good"
+- Existing system designed for single-point-in-time analysis (per upload)
+- JSONB storage optimized for current week, not historical trends
+- No time-series indexes (GIN/GiST on JSONB doesn't help with temporal queries)
+- Query pattern becomes "scan all uploads, parse all JSONB" (O(n) with uploads)
 
 **Consequences:**
-- Users struggle to create working configurations
-- Invalid configurations crash extraction silently
-- Debugging becomes nearly impossible (which config caused this?)
-- Configuration schema changes break existing configs
-- Developer time shifts from features to config support
-
-**Warning signs:**
-- Configuration schema exceeds 50 fields
-- Users ask "how do I configure X?" more than "does it work?"
-- Need a tutorial video to explain configuration
-- Finding bugs requires reproducing user's exact config
-- Config validation logic exceeds extraction logic
+- Chart rendering times explode as historical data grows (500ms → 5s+)
+- PostgreSQL can't optimize JSONB time-series queries effectively
+- Forced to fetch all data to frontend and calculate there (defeats backend purpose)
+- Impossible to add "show last 12 weeks" without full table scan
 
 **Prevention:**
+1. **Normalize KPI data into columns or time-series table**
+   ```sql
+   CREATE TABLE kpi_history (
+     id UUID PRIMARY KEY,
+     user_id VARCHAR(255),
+     upload_id UUID REFERENCES bug_uploads(id),
+     week_ending DATE,
+     kpi_name VARCHAR(50),  -- 'bug_inflow_rate', 'mttr_vh', etc.
+     kpi_value NUMERIC,
+     component VARCHAR(100),
+     metadata JSONB,
+     created_at TIMESTAMP DEFAULT NOW()
+   );
+   CREATE INDEX idx_kpi_history_time_series
+     ON kpi_history (user_id, kpi_name, component, week_ending);
+   ```
 
-1. **Start with presets, not blank forms:**
-```javascript
-// BAD: User must configure everything
-{
-  siteName: "",
-  selectors: {
-    container: "",
-    items: "",
-    title: "",
-    status: "",
-    // ... 20 more fields
-  }
-}
+2. **Add migration to backfill from existing JSONB**
+   - Extract all KPIs from `weekly_kpis.kpi_data` JSONB
+   - Insert into normalized structure
+   - Keep JSONB for dashboard UI (current week), use normalized for trends
 
-// GOOD: Site-specific presets with optional overrides
-{
-  preset: "grafana-dashboard",  // Loads tested defaults
-  overrides: {
-    // Only fields that differ from preset
-    titleSelector: ".custom-title"  // Override specific field
-  }
-}
-```
+3. **Design API for time-series from day one**
+   ```javascript
+   GET /api/bugs/kpis/trends?kpi=bug_inflow_rate&weeks=12&component=all
+   // Returns array of {week_ending, value}
+   ```
 
-2. **Tiered configuration model:**
-   - **Level 0 (default):** Works with preset, zero config
-   - **Level 1 (basic):** Change instance URL, enable/disable
-   - **Level 2 (advanced):** Override specific selectors
-   - **Level 3 (expert):** Custom field mappings (hidden by default)
+**Detection:** Query slow (>500ms) once you have >10 uploads, or you're fetching all KPIs to frontend for charting.
 
-3. **Visual selector builder:**
-   - User clicks element on page, system generates selector
-   - Show extracted data preview immediately
-   - Validate selectors before saving
-
-4. **Configuration versioning:**
-   - Each config has version number
-   - Breaking changes require migration path
-   - Old configs continue working (deprecated, not broken)
-
-**Detection:**
-- Survey users: "Did you need help configuring?"
-- Track: Configuration save attempts vs successful extractions
-- Monitor: Support tickets about configuration
+**Phase to address:** Phase 1 (Data Model) - must precede chart implementation.
 
 ---
 
-### Pitfall 2: Selector Brittleness Multiplied Across Sites
+### Pitfall 2: Chart Re-render Thrashing
 
-**Severity:** CRITICAL
-**Phase to address:** Phase 2 (Site-Specific Extractors)
-
-**What goes wrong:** The v1.0 Jira extension has selector stability issues with ONE site. Multi-site capture multiplies this problem - each site has different DOM patterns, different update cycles, different stability levels. When Grafana updates their UI, selectors break. When Jenkins updates, different selectors break. Maintenance becomes impossible.
+**What goes wrong:** React charts (Recharts) re-render on every parent state change, causing UI freezes and dropped frames. With multiple trend charts on the same page, the compound effect causes 200-500ms jank on filter changes.
 
 **Why it happens:**
-- Each internal tool (Grafana, Jenkins, Concourse, Dynatrace) uses different frontend frameworks
-- Internal tools may be customized versions (SAP-specific builds)
-- Update cycles are unpredictable and uncoordinated
-- No data-testid attributes on internal tools
-- React/Angular/Vue each produce different DOM structures
-
-**Consequences from v1.0 Jira extension:**
-```javascript
-// Current hardcoded selectors that break:
-const BOARD_SELECTORS = {
-  boardContainer: '[data-test-id="software-board.board"]',  // Breaks on updates
-  issueCard: '[data-test-id*="card-container"]',           // Inconsistent
-  // Fallback chain helps but doesn't solve root cause
-};
-```
-
-**Warning signs:**
-- "Extraction stopped working" reports spike after tool updates
-- Different sites break at different times (whack-a-mole)
-- Need dedicated developer time for "selector maintenance"
-- Users don't know extraction broke until they check staging
-
-**Prevention:**
-
-1. **Selector stability tier system:**
-```javascript
-const SELECTOR_TIERS = {
-  // Tier 1: Most stable - use first
-  stable: [
-    'data-testid',
-    'data-cy',
-    'aria-label',
-    'id with semantic name'
-  ],
-
-  // Tier 2: Moderately stable
-  moderate: [
-    'href patterns',
-    'semantic HTML tags',
-    'ARIA roles'
-  ],
-
-  // Tier 3: Fragile - last resort with fallback
-  fragile: [
-    'CSS classes',
-    'DOM structure',
-    'nth-child'
-  ]
-};
-```
-
-2. **Multi-selector fallback chains (already in v1.0, expand):**
-```javascript
-// Require 3+ fallback strategies per critical field
-const extractTitle = (element) => {
-  return element.querySelector('[data-testid*="title"]')?.textContent ||
-         element.querySelector('[aria-label*="title"]')?.textContent ||
-         element.querySelector('h1, h2, .title')?.textContent ||
-         element.getAttribute('title') ||
-         null;  // Explicit null for missing data
-};
-```
-
-3. **Selector health monitoring:**
-   - Track selector success rate per site per selector
-   - Alert when success rate drops below 95%
-   - Dashboard showing selector health across all sites
-   - Automatic fallback to secondary selectors when primary fails
-
-4. **Version/DOM fingerprinting:**
-```javascript
-// Detect tool version to use appropriate selector set
-const detectGrafanaVersion = () => {
-  const versionMeta = document.querySelector('meta[name="grafana-version"]');
-  const bodyClass = document.body.className;
-
-  if (versionMeta) return versionMeta.content;
-  if (bodyClass.includes('grafana-10')) return '10.x';
-  if (bodyClass.includes('grafana-9')) return '9.x';
-  return 'unknown';
-};
-
-// Load version-specific selectors
-const selectors = GRAFANA_SELECTORS[version] || GRAFANA_SELECTORS.fallback;
-```
-
-5. **Graceful degradation per site:**
-   - Site A broken? Still capture from sites B, C, D
-   - Partial extraction is better than no extraction
-   - Clear indication which sites have issues
-
-**Detection:**
-- Per-site extraction success rate dashboard
-- Automated alerts on selector failure
-- Weekly selector health reports
-
----
-
-### Pitfall 3: Data Staging Becomes Data Graveyard
-
-**Severity:** CRITICAL
-**Phase to address:** Phase 3 (Data Staging/Inbox)
-
-**What goes wrong:** Team builds "staging area" for captured data before it enters the main system. Users are supposed to review and approve items. In practice: items pile up, nobody reviews them, staging becomes a dumping ground. Users either ignore staging entirely (defeating the purpose) or rubber-stamp approve everything (also defeating the purpose).
-
-**Why it happens:**
-- Review workflow is friction, not value
-- No clear criteria for what needs review vs auto-approve
-- Staging UI is separate from main workflow
-- Volume exceeds human review capacity
-- "Review later" becomes "never review"
+- Recharts components are expensive to render (SVG path calculations)
+- Parent dashboard updates filters → all charts re-render even if data unchanged
+- No memoization of chart data transformations
+- Loading multiple charts simultaneously blocks the main thread
 
 **Consequences:**
-- 1000+ items in staging, 0 reviewed
-- Users bypass staging (direct import) losing data quality
-- Duplicates and errors enter main system via bulk approve
-- Staging becomes technical debt itself
-- Team debates: "remove staging? it's not working"
-
-**Warning signs:**
-- Staging item count grows unbounded
-- Average time-in-staging exceeds 7 days
-- Most items approved in bulk, not individually
-- Users ask to "skip staging"
-- Staging UI rarely opened
+- Selecting a filter dropdown feels sluggish (visible delay)
+- Scrolling dashboard with visible charts causes dropped frames
+- Mobile devices become nearly unusable
+- User perception: "The new features made the app slower"
 
 **Prevention:**
+1. **Memoize chart data transformations**
+   ```javascript
+   const chartData = useMemo(() => {
+     return kpiTrends.map(week => ({
+       date: format(new Date(week.week_ending), 'MMM d'),
+       value: week.value,
+       status: getThresholdStatus(week.value)
+     }));
+   }, [kpiTrends]); // Only recompute if actual data changes
+   ```
 
-1. **Trust tiers, not blanket staging:**
-```javascript
-const CAPTURE_TRUST_LEVELS = {
-  HIGH_TRUST: {
-    // Auto-approved, no staging
-    conditions: ['selector_confidence > 95%', 'matches_known_entity'],
-    action: 'direct_import'
-  },
-  MEDIUM_TRUST: {
-    // Brief review, grouped
-    conditions: ['selector_confidence > 80%', 'partial_entity_match'],
-    action: 'batch_review'  // Review 10 at a time
-  },
-  LOW_TRUST: {
-    // Individual review required
-    conditions: ['selector_confidence < 80%', 'new_entity_type'],
-    action: 'individual_review'
-  },
-  NO_TRUST: {
-    // Discard or manual correction
-    conditions: ['selector_failed', 'data_validation_failed'],
-    action: 'quarantine'
-  }
-};
-```
+2. **Wrap charts in React.memo with custom comparison**
+   ```javascript
+   const TrendChart = React.memo(({ data, title }) => {
+     return <ResponsiveContainer>...</ResponsiveContainer>;
+   }, (prevProps, nextProps) => {
+     // Only re-render if data actually changed
+     return prevProps.data === nextProps.data;
+   });
+   ```
 
-2. **Inline review, not separate staging:**
-   - Show pending items in main UI with "pending" badge
-   - One-click approve from anywhere
-   - Review happens where data is used, not separate screen
+3. **Lazy load off-screen charts**
+   ```javascript
+   import { lazy, Suspense } from 'react';
+   const TrendChart = lazy(() => import('./TrendChart'));
 
-3. **Auto-approve rules:**
-```javascript
-// If captured data matches existing entity by key, auto-merge
-const autoApproveRules = [
-  {
-    name: 'exact_match',
-    condition: (captured, existing) =>
-      captured.issueKey === existing.issueKey,
-    action: 'merge_update'
-  },
-  {
-    name: 'trusted_source',
-    condition: (captured) =>
-      captured.source === 'jenkins' &&
-      captured.confidence > 90,
-    action: 'auto_import'
-  }
-];
-```
+   // In component
+   <Suspense fallback={<ChartSkeleton />}>
+     <TrendChart data={data} />
+   </Suspense>
+   ```
 
-4. **Aging + auto-actions:**
-   - Items pending > 7 days: prompt for action
-   - Items pending > 30 days: auto-archive or auto-approve based on trust
-   - Never let staging grow unbounded
-
-5. **Review metrics visibility:**
-   - Show: "23 items awaiting review (5 high-priority)"
-   - Gamification: "You reviewed 10 items today"
-   - SLA: "Items should be reviewed within 48 hours"
+4. **Limit chart complexity**
+   - Max 52 data points (1 year weekly data) per chart
+   - Aggregate older data into monthly buckets
+   - Use `<Line>` not `<Area>` for simpler SVG paths
+   - Disable animations on trend charts (only needed for dashboard KPI cards)
 
 **Detection:**
-- Track average time-in-staging
-- Track review rate (items reviewed / items captured)
-- Track bulk-approve vs individual-approve ratio
-- Survey: "Do you review staged items?"
+- React DevTools Profiler shows chart components taking >50ms to render
+- Filters/dropdowns have visible delay between click and update
+- Browser performance timeline shows long tasks (>50ms) during state updates
+
+**Phase to address:** Phase 2 (Chart Implementation) - add memoization from start.
 
 ---
 
-### Pitfall 4: Entity Mapping Becomes N x M Problem
+### Pitfall 3: Email Notifications Without Delivery Infrastructure
 
-**Severity:** HIGH
-**Phase to address:** Phase 4 (Entity Mapping)
-
-**What goes wrong:** Each site (N) produces different data shapes. The main system has different entity types (M). Team attempts to build generic mappers for all combinations. N x M mapping combinations explode. Jenkins build status doesn't map to Jira status which doesn't map to Grafana alert state.
+**What goes wrong:** Adding email notifications without properly configuring SAP BTP email service, SMTP credentials, or error handling. Emails silently fail in production, users never receive alerts, and you only discover it weeks later.
 
 **Why it happens:**
-- Semantic mismatch: "status" means different things per tool
-- Field cardinality differs: Grafana has tags[], Jira has single assignee
-- Temporal differences: Jenkins has build timestamps, Jira has update timestamps
-- Identifiers are incompatible: UUIDs vs issue keys vs build numbers
+- SAP BTP doesn't include SMTP service by default (must bind separately)
+- Development uses nodemailer with fake SMTP that "succeeds" without sending
+- No monitoring/logging of email delivery failures
+- Missing retry logic for transient failures (SMTP timeouts, rate limits)
+- Email service credentials expire or get rotated without warning
 
 **Consequences:**
-- Mapping code is larger than extraction code
-- Edge cases in mapping cause data corruption
-- Users manually fix mappings constantly
-- Different sites have different data quality
-- "Why is this Grafana alert showing as a Jira task?"
-
-**Warning signs:**
-- Mapping functions exceed 100 lines
-- Many if/else branches for source type
-- Users report "wrong data in wrong place"
-- Entity types proliferate to handle sources
-- Need lookup tables for status mappings
+- Users configure thresholds but never receive alerts (trust broken)
+- P0 bug threshold breaches go unnoticed (defeats purpose)
+- Email queue grows unbounded on persistent failures (memory leak)
+- Manual support tickets: "I never got the alert email"
 
 **Prevention:**
+1. **Use SAP BTP Mail Service or external provider from day one**
+   ```javascript
+   // manifest.yml
+   services:
+     - pe-manager-postgres
+     - pe-manager-mail  // SAP Mail service instance
 
-1. **Canonical intermediate format:**
-```typescript
-// All sources map TO this, system maps FROM this
-interface CapturedItem {
-  // Universal fields
-  id: string;              // Generated or extracted
-  source: 'grafana' | 'jenkins' | 'concourse' | 'dynatrace';
-  sourceUrl: string;       // Link back to source
-  capturedAt: Date;
+   // server/services/EmailService.js
+   import { getServices } from '@sap/xsenv';
+   const mailService = getServices({ mail: { tag: 'mail' } });
+   ```
 
-  // Normalized fields (source-agnostic semantics)
-  title: string;
-  description?: string;
-  state: 'active' | 'resolved' | 'pending' | 'unknown';
-  severity?: 'critical' | 'high' | 'medium' | 'low';
-  assignees?: string[];    // Array to handle both single and multiple
-  timestamp: Date;         // Most relevant timestamp (created, updated, triggered)
+2. **Implement email queue with retry logic**
+   ```javascript
+   // Don't send email synchronously in request handler
+   // Queue for async processing with retries
 
-  // Source-specific data (preserved as-is)
-  sourceData: Record<string, unknown>;
-}
-```
+   class EmailQueue {
+     async enqueue(email) {
+       await query(`
+         INSERT INTO email_queue (user_id, to_email, subject, body, attempts)
+         VALUES ($1, $2, $3, $4, 0)
+       `, [userId, email, subject, body]);
+     }
 
-2. **Source-specific normalizers:**
-```javascript
-// Each source has ONE normalizer to canonical format
-const normalizers = {
-  grafana: (raw) => ({
-    title: raw.alertName,
-    state: mapGrafanaState(raw.state),  // 'alerting' -> 'active'
-    severity: mapGrafanaSeverity(raw.labels?.severity),
-    timestamp: new Date(raw.activeAt),
-    sourceData: raw  // Preserve original
-  }),
+     async processQueue() {
+       // Background job: every 1 minute
+       const pending = await query(`
+         SELECT * FROM email_queue
+         WHERE sent_at IS NULL AND attempts < 3
+         ORDER BY created_at ASC
+         LIMIT 10
+       `);
 
-  jenkins: (raw) => ({
-    title: `Build #${raw.number}: ${raw.displayName}`,
-    state: mapJenkinsResult(raw.result),  // 'SUCCESS' -> 'resolved'
-    timestamp: new Date(raw.timestamp),
-    sourceData: raw
-  })
-};
-```
+       for (const email of pending.rows) {
+         try {
+           await this.sendEmail(email);
+           await query(`UPDATE email_queue SET sent_at = NOW() WHERE id = $1`, [email.id]);
+         } catch (err) {
+           await query(`
+             UPDATE email_queue
+             SET attempts = attempts + 1, last_error = $2
+             WHERE id = $1
+           `, [email.id, err.message]);
+         }
+       }
+     }
+   }
+   ```
 
-3. **Explicit state mapping tables (not code):**
-```javascript
-const STATE_MAPPINGS = {
-  grafana: {
-    'alerting': 'active',
-    'pending': 'pending',
-    'ok': 'resolved',
-    'nodata': 'unknown',
-    'paused': 'resolved'
-  },
-  jenkins: {
-    'SUCCESS': 'resolved',
-    'FAILURE': 'active',
-    'UNSTABLE': 'active',
-    'ABORTED': 'unknown',
-    'NOT_BUILT': 'pending'
-  }
-  // Easy to add new sources or adjust mappings
-};
-```
+3. **Add email_queue table to schema**
+   ```sql
+   CREATE TABLE email_queue (
+     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+     user_id VARCHAR(255) NOT NULL,
+     to_email VARCHAR(255) NOT NULL,
+     subject VARCHAR(255) NOT NULL,
+     body TEXT NOT NULL,
+     attempts INTEGER DEFAULT 0,
+     sent_at TIMESTAMP,
+     last_error TEXT,
+     created_at TIMESTAMP DEFAULT NOW()
+   );
+   CREATE INDEX idx_email_queue_pending ON email_queue(sent_at) WHERE sent_at IS NULL;
+   ```
 
-4. **Validation at mapping boundaries:**
-```javascript
-const validateCapturedItem = (item) => {
-  const errors = [];
+4. **Comprehensive error handling and logging**
+   ```javascript
+   try {
+     await emailService.send(email);
+     logger.info('Email sent', { to: email.to, subject: email.subject });
+   } catch (err) {
+     logger.error('Email failed', {
+       error: err.message,
+       code: err.code,  // SMTP error codes
+       to: email.to
+     });
+     // Don't throw - queue for retry
+   }
+   ```
 
-  if (!item.title) errors.push('Missing title');
-  if (!['active', 'resolved', 'pending', 'unknown'].includes(item.state)) {
-    errors.push(`Invalid state: ${item.state}`);
-  }
-  if (!item.timestamp || isNaN(item.timestamp.getTime())) {
-    errors.push('Invalid timestamp');
-  }
-
-  return { valid: errors.length === 0, errors };
-};
-```
-
-5. **Unmappable data handling:**
-   - Preserve in sourceData, don't force into wrong field
-   - UI can display sourceData for advanced users
-   - Log unmapped fields for future mapping improvements
+5. **Health check endpoint for email service**
+   ```javascript
+   // GET /api/health/email
+   async healthCheckEmail() {
+     try {
+       await emailService.verify(); // SMTP connection test
+       return { status: 'healthy', service: 'email' };
+     } catch (err) {
+       return { status: 'unhealthy', error: err.message };
+     }
+   }
+   ```
 
 **Detection:**
-- Track mapping errors per source
-- Track unmapped field frequency
-- Compare data quality scores per source
+- Emails don't arrive in inbox/spam during testing
+- SAP BTP logs show "Connection refused" or "Authentication failed"
+- No email-related logs in application logs (means not even attempting)
+
+**Phase to address:** Phase 3 (Email Setup) - infrastructure before notification logic.
 
 ---
 
-### Pitfall 5: Multi-Site Extension Becomes Multi-Extension Chaos
+### Pitfall 4: Notification Spam and Fatigue
 
-**Severity:** HIGH
-**Phase to address:** Phase 1 (Extension Architecture)
-
-**What goes wrong:** Team builds separate extensions for each site (Grafana extension, Jenkins extension, Concourse extension) OR builds one monolithic extension that loads all code for all sites regardless of which site user visits. Both approaches fail at scale.
+**What goes wrong:** Sending notifications on every CSV upload without debouncing or smart batching. User uploads 3 CSVs (fixing errors), gets 3 identical "MTTR threshold exceeded" emails in 5 minutes. Users disable all notifications.
 
 **Why it happens:**
-- Separate extensions: Easier initially, diverge over time
-- Monolithic extension: Simpler architecture, bloated performance
-- Chrome extension architecture makes code-splitting non-obvious
-- Content scripts are per-match pattern, not per-feature
+- Threshold checks run on every upload (makes sense for data consistency)
+- No deduplication logic ("already sent this notification today")
+- No batching of multiple threshold breaches into single email
+- No user preference for notification frequency (immediate vs daily digest)
 
-**Consequences (separate extensions):**
-- Inconsistent UI across extensions
-- Duplicated boilerplate (storage, auth, sync logic)
-- Users manage multiple extensions
-- Bug fixes need N deployments
-- Configuration scattered
-
-**Consequences (monolithic extension):**
-- 500KB+ extension size (slow load)
-- All site code runs regardless of current site
-- Memory footprint multiplied
-- CSP conflicts between sites
-- Testing requires all sites accessible
-
-**Warning signs:**
-- Extension size > 200KB
-- Content script runs on sites it doesn't understand
-- Multiple manifest.json files
-- "This extension slows down my browser"
-- Debugging requires clearing ALL extension data
+**Consequences:**
+- Email fatigue → users ignore/delete without reading
+- Important alerts buried in noise (P0 bugs lost among Medium priority noise)
+- Support requests to "turn off all these emails"
+- Defeats purpose of notification system
 
 **Prevention:**
+1. **Add notification_sent tracking table**
+   ```sql
+   CREATE TABLE notification_log (
+     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+     user_id VARCHAR(255) NOT NULL,
+     notification_type VARCHAR(50), -- 'threshold_breach', 'weekly_summary'
+     kpi_name VARCHAR(50),
+     sent_at TIMESTAMP DEFAULT NOW(),
+     metadata JSONB
+   );
+   CREATE INDEX idx_notification_log_recent
+     ON notification_log(user_id, notification_type, sent_at DESC);
+   ```
 
-1. **Single extension, dynamic content scripts:**
-```json
-// manifest.json - Register ALL potential sites
-{
-  "host_permissions": [
-    "https://*.grafana.internal/*",
-    "https://jenkins.internal/*",
-    "https://concourse.internal/*",
-    "https://dynatrace.internal/*"
-  ],
-  "content_scripts": [
-    {
-      "matches": ["https://*.grafana.internal/*"],
-      "js": ["content/loader.js"],  // Tiny loader
-      "run_at": "document_idle"
-    },
-    // ... per-site entries with same loader
-  ]
-}
-```
+2. **Implement smart notification logic**
+   ```javascript
+   async shouldSendNotification(userId, kpiName, currentValue, threshold) {
+     // Check if already sent in last 24 hours
+     const recent = await query(`
+       SELECT id FROM notification_log
+       WHERE user_id = $1
+         AND notification_type = 'threshold_breach'
+         AND kpi_name = $2
+         AND sent_at > NOW() - INTERVAL '24 hours'
+       LIMIT 1
+     `, [userId, kpiName]);
 
-2. **Lazy-load site-specific extractors:**
-```javascript
-// content/loader.js - Minimal, runs on all sites
-(async function() {
-  const siteType = detectSiteType(window.location.hostname);
-  if (!siteType) return;  // Not a recognized site
+     if (recent.rows.length > 0) {
+       return false; // Already notified recently
+     }
 
-  // Dynamically load only the needed extractor
-  const extractorPath = `extractors/${siteType}.js`;
-  await import(chrome.runtime.getURL(extractorPath));
-})();
-```
+     // Check if value significantly changed (>10% change)
+     const lastNotification = await getLastNotificationValue(userId, kpiName);
+     if (lastNotification && Math.abs(currentValue - lastNotification) < threshold * 0.1) {
+       return false; // Value hasn't changed meaningfully
+     }
 
-3. **Shared core, site-specific modules:**
-```
-extension/
-  manifest.json
-  service-worker.js       # Shared: storage, sync, messaging
-  content/
-    loader.js             # Shared: site detection, dynamic loading
-    extractors/
-      grafana.js          # Site-specific: Grafana extraction
-      jenkins.js          # Site-specific: Jenkins extraction
-      base.js             # Shared: extraction utilities
-  lib/
-    storage.js            # Shared
-    api.js               # Shared
-  popup/
-    popup.html           # Shared UI
-    popup.js
-```
+     return true;
+   }
+   ```
 
-4. **Configuration-driven site registration:**
-```javascript
-// Sites defined in config, not hardcoded in manifest
-const REGISTERED_SITES = {
-  grafana: {
-    hostPattern: /.*\.grafana\.internal$/,
-    extractorModule: 'grafana',
-    displayName: 'Grafana',
-    icon: 'grafana.png'
-  },
-  jenkins: {
-    hostPattern: /jenkins\.internal$/,
-    extractorModule: 'jenkins',
-    displayName: 'Jenkins',
-    icon: 'jenkins.png'
-  }
-  // Easy to add new sites without manifest changes
-};
-```
+3. **Batch multiple breaches into single email**
+   ```javascript
+   async sendWeeklyDigest(userId) {
+     // Check all thresholds, collect breaches
+     const breaches = await getAllThresholdBreaches(userId);
 
-5. **Per-site enable/disable:**
-   - Users can disable sites they don't use
-   - Disabled sites: content script doesn't load extractor
-   - Reduces memory and potential conflicts
+     if (breaches.length === 0) return;
+
+     // Group by severity
+     const critical = breaches.filter(b => b.status === 'red');
+     const warnings = breaches.filter(b => b.status === 'yellow');
+
+     // Single email with sections
+     await emailService.send({
+       to: user.email,
+       subject: `Bug Dashboard Alert: ${critical.length} critical issues`,
+       body: renderDigestTemplate({ critical, warnings, weekEnding })
+     });
+   }
+   ```
+
+4. **User preferences for notification frequency**
+   ```javascript
+   // user_settings table
+   notification_preferences: {
+     threshold_alerts: 'immediate', // or 'daily', 'weekly', 'off'
+     summary_emails: 'weekly',
+     min_severity: 'yellow' // Don't notify for green zone
+   }
+   ```
+
+5. **Rate limiting per notification type**
+   ```javascript
+   // Max 1 email per KPI per day
+   // Max 5 total notification emails per user per day
+   ```
 
 **Detection:**
-- Monitor extension size per release
-- Track per-site memory usage
-- User survey: "Which sites do you use?"
+- User complaints about too many emails
+- Email open rates <20% (normal is 30-40%)
+- Multiple notifications sent within 5 minutes for same KPI
+
+**Phase to address:** Phase 4 (Notification Logic) - before enabling for production users.
 
 ---
 
 ## Moderate Pitfalls
 
-Mistakes that cause delays, technical debt, or degraded UX.
+Mistakes that cause delays, poor UX, or technical debt.
+
+### Pitfall 5: In-App Notification State Management Complexity
+
+**What goes wrong:** Adding in-app notifications (toast messages, bell icon badge) without centralized state management. Notification state scattered across components, causing:
+- Badge count wrong after dismissing notification
+- Stale notifications showing after refresh
+- No way to mark all as read
+- Duplicate notifications rendered
+
+**Prevention:**
+1. **Use existing NotificationService and React Context**
+   ```javascript
+   // src/contexts/NotificationContext.jsx
+   const NotificationContext = createContext();
+
+   export function NotificationProvider({ children }) {
+     const [notifications, setNotifications] = useState([]);
+     const [unreadCount, setUnreadCount] = useState(0);
+
+     const fetchNotifications = async () => {
+       const data = await apiClient.notifications.list();
+       setNotifications(data);
+       setUnreadCount(data.filter(n => !n.is_read).length);
+     };
+
+     const markAsRead = async (id) => {
+       await apiClient.notifications.update(id, { is_read: true });
+       await fetchNotifications(); // Refresh
+     };
+
+     useEffect(() => {
+       fetchNotifications();
+       const interval = setInterval(fetchNotifications, 60000); // Poll every minute
+       return () => clearInterval(interval);
+     }, []);
+
+     return (
+       <NotificationContext.Provider value={{
+         notifications,
+         unreadCount,
+         markAsRead,
+         refresh: fetchNotifications
+       }}>
+         {children}
+       </NotificationContext.Provider>
+     );
+   }
+   ```
+
+2. **Existing notifications table already in schema** (lines 1-61 in notifications.js)
+   - Don't recreate infrastructure
+   - Extend existing NotificationService for threshold alerts
+
+3. **Badge count in navigation**
+   ```javascript
+   const { unreadCount } = useNotifications();
+   <Bell className="h-4 w-4" />
+   {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
+   ```
+
+**Detection:** Badge count doesn't update, or shows wrong number after actions.
+
+**Phase to address:** Phase 5 (In-App Notifications) - UI layer.
 
 ---
 
-### Pitfall 6: Cross-Site Identity Confusion
+### Pitfall 6: Threshold Configuration Without Validation
 
-**Severity:** MODERATE
-**Phase to address:** Phase 4 (Entity Mapping)
-
-**What goes wrong:** Same person appears as "john.smith" in Jira, "jsmith@company.com" in Jenkins, "John Smith" in Grafana. System can't correlate these are the same person. Workload views show duplicates. Team member assignments are fragmented.
+**What goes wrong:** Users can set thresholds that make no sense (yellow > red, negative values, thresholds beyond data range). Leads to constant false positives or notifications never triggering.
 
 **Prevention:**
-- User identity mapping table (Jira ID <-> Jenkins ID <-> Display Name)
-- Fuzzy matching with manual confirmation
-- "Same person?" UI for disambiguation
-- Store all source identifiers on team member record
+1. **Validation in threshold settings form**
+   ```javascript
+   const thresholdSchema = z.object({
+     kpi_name: z.string(),
+     yellow_threshold: z.number().positive(),
+     red_threshold: z.number().positive(),
+   }).refine(data => {
+     // Yellow must be better than red
+     if (data.kpi_name === 'mttr_vh') {
+       return data.yellow_threshold < data.red_threshold; // Lower is better
+     } else if (data.kpi_name === 'backlog_health_score') {
+       return data.yellow_threshold > data.red_threshold; // Higher is better
+     }
+     return true;
+   }, {
+     message: "Threshold ordering is invalid"
+   });
+   ```
 
-**Detection:**
-- Duplicate names with slight variations in UI
-- Users report "I show up twice"
-- Entity counts exceed expected
+2. **Store threshold direction metadata**
+   ```javascript
+   const KPI_METADATA = {
+     mttr_vh: {
+       direction: 'lower_is_better',
+       unit: 'hours',
+       typical_range: [0, 48]
+     },
+     backlog_health_score: {
+       direction: 'higher_is_better',
+       unit: 'score',
+       typical_range: [0, 100]
+     }
+   };
+   ```
+
+3. **Show suggested thresholds based on historical data**
+   ```javascript
+   // Calculate p75, p90 from last 12 weeks
+   // Suggest yellow = p75, red = p90
+   ```
+
+**Detection:** Users report "never getting alerts" or "getting alerts when things look fine".
+
+**Phase to address:** Phase 6 (Threshold UI) - add validation before allowing input.
 
 ---
 
-### Pitfall 7: Rate Limiting and Extraction Throttling
+### Pitfall 7: Missing Historical Context in Alerts
 
-**Severity:** MODERATE
-**Phase to address:** Phase 2 (Site-Specific Extractors)
-
-**What goes wrong:** Extension extracts data too aggressively. Internal tools notice load. IT/DevOps complains about "rogue scraping." Extension gets blocked or user gets warnings.
+**What goes wrong:** Email says "MTTR is 36 hours" but doesn't show if this is getting better, worse, or how it compares to average. User can't assess urgency without opening dashboard.
 
 **Prevention:**
-- Conservative default throttling (1 extraction per 5 minutes per site)
-- Exponential backoff on errors
-- Respect robots.txt patterns even for internal tools
-- User-configurable extraction frequency with sane limits
-- "Idle detection" - only extract when user is actively viewing
+1. **Include trend context in email**
+   ```javascript
+   emailTemplate = `
+     MTTR for Very High priority bugs: 36 hours (RED)
+     - Your threshold: 24 hours
+     - Last week: 28 hours (↑ 29%)
+     - 4-week average: 22 hours
 
-**Detection:**
-- HTTP 429 responses from targets
-- Complaints from tool administrators
-- Extraction suddenly stops working (IP blocked)
+     This is the worst MTTR in 8 weeks. [View Dashboard →]
+   `;
+   ```
+
+2. **Inline sparkline charts in email (optional)**
+   - Use Chart.js or similar to generate PNG
+   - Embed as inline image in HTML email
+
+3. **Link directly to relevant chart**
+   ```javascript
+   const dashboardLink = `${frontendUrl}/bugs?highlight=mttr_vh&scroll=trends`;
+   ```
+
+**Detection:** Email click-through rates are low (users can't tell if they need to act).
+
+**Phase to address:** Phase 4 (Notification Logic) - enhance email content.
 
 ---
 
-### Pitfall 8: Configuration UI Doesn't Match Mental Model
+### Pitfall 8: Performance Degradation on Weekly Upload
 
-**Severity:** MODERATE
-**Phase to address:** Phase 3 (Configuration UI)
-
-**What goes wrong:** Configuration UI organized by technical concepts (selectors, mappings, transformations) rather than user tasks (capture from Grafana, send alerts to inbox, ignore low-priority items).
+**What goes wrong:** CSV upload takes 30+ seconds once you add:
+- Historical KPI calculations for trends
+- Notification threshold checks
+- Email sending
+All running synchronously in the upload request.
 
 **Prevention:**
-- Task-oriented configuration: "Set up Grafana capture" not "Configure selectors"
-- Wizard-style onboarding for first-time setup
-- Preview extracted data during configuration
-- "Test this configuration" button with real data
+1. **Split upload into phases**
+   ```javascript
+   async uploadCSV(userId, fileBuffer, filename, weekEnding) {
+     // Phase 1: Parse and store (synchronous)
+     const uploadId = await this.storeUploadData(userId, fileBuffer, ...);
 
-**Detection:**
-- Users abandon configuration mid-flow
-- Support tickets: "I don't understand configuration"
-- Configuration left at defaults despite not working
+     // Phase 2: Background processing
+     // Don't await - return immediately to user
+     this.processUploadBackground(uploadId, userId).catch(err => {
+       logger.error('Background processing failed', { uploadId, error: err });
+     });
+
+     return { uploadId, status: 'processing' };
+   }
+
+   async processUploadBackground(uploadId, userId) {
+     // Calculate KPIs
+     await this.calculateKPIs(uploadId);
+
+     // Check thresholds and send notifications
+     await this.checkThresholdsAndNotify(uploadId, userId);
+   }
+   ```
+
+2. **Add processing status to bug_uploads table**
+   ```sql
+   ALTER TABLE bug_uploads ADD COLUMN processing_status VARCHAR(20) DEFAULT 'pending';
+   -- Values: 'pending', 'calculating', 'complete', 'error'
+   ```
+
+3. **Show processing indicator in UI**
+   ```javascript
+   if (upload.processing_status === 'pending') {
+     return <div>Calculating KPIs... <Loader2 className="animate-spin" /></div>;
+   }
+   ```
+
+**Detection:** CSV upload request takes >10 seconds, UI feels sluggish.
+
+**Phase to address:** Phase 2 (Data Model) - design for async from start.
 
 ---
 
-### Pitfall 9: No Visibility Into Capture Health
+### Pitfall 9: No Notification Unsubscribe Mechanism
 
-**Severity:** MODERATE
-**Phase to address:** Phase 2 (Extraction Core)
-
-**What goes wrong:** Extension silently succeeds or fails. Users don't know if capture is working until they check the main app and notice stale data. Problems accumulate undetected.
+**What goes wrong:** Users have no way to disable notifications except contacting support. Violates email best practices and could flag as spam.
 
 **Prevention:**
-- Badge showing capture status on extension icon
-- Last successful capture timestamp per site
-- Error summary: "Jenkins: 3 failures in last hour"
-- Push notification for persistent failures
-- Weekly health report email (optional)
+1. **Add notification preferences to user settings**
+   ```javascript
+   // In existing UserSettingsService
+   notification_preferences: {
+     email_enabled: true,
+     threshold_alerts: ['mttr_vh', 'sla_compliance'], // Which KPIs to alert on
+     frequency: 'immediate', // or 'daily_digest'
+   }
+   ```
 
-**Detection:**
-- Users report stale data days after extraction broke
-- Support tickets start with "I didn't know it wasn't working"
+2. **Unsubscribe link in every email**
+   ```javascript
+   emailTemplate += `
+     <hr>
+     <small>
+       <a href="${frontendUrl}/settings/notifications?token=${unsubToken}">
+         Manage notification preferences
+       </a>
+     </small>
+   `;
+   ```
 
----
+3. **One-click unsubscribe (RFC 8058)**
+   ```javascript
+   headers: {
+     'List-Unsubscribe': `<${apiUrl}/unsubscribe?token=${token}>`,
+     'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+   }
+   ```
 
-### Pitfall 10: Breaking Changes in Configuration Schema
+**Detection:** Users report "can't turn off emails" or mark emails as spam.
 
-**Severity:** MODERATE
-**Phase to address:** Phase 1 (Configuration Architecture)
-
-**What goes wrong:** Team ships config schema v1. Later, schema changes break existing user configs. Migration is incomplete. Users face cryptic errors or lost configurations.
-
-**Prevention:**
-- Config schema versioning from day 1
-- Forward migration for all schema changes
-- Never delete fields, deprecate then remove after N versions
-- Config validation with helpful error messages
-- Test suite for config migrations
-
-**Detection:**
-- Errors after extension update
-- Users report "my configuration is gone"
-- Config validation failures in logs
+**Phase to address:** Phase 4 (Notification Logic) - must have before sending to users.
 
 ---
 
 ## Minor Pitfalls
 
-Annoyances that are fixable without major rework.
+Mistakes that cause annoyance but are easily fixable.
+
+### Pitfall 10: Chart Accessibility Issues
+
+**What goes wrong:** Charts are pure visual (SVG) without text alternatives. Screen readers can't interpret data, keyboard navigation doesn't work.
+
+**Prevention:**
+1. **Add ARIA labels to charts**
+   ```javascript
+   <ResponsiveContainer aria-label="MTTR trend chart showing weekly values">
+     <LineChart data={data} aria-describedby="chart-description">
+       ...
+     </LineChart>
+   </ResponsiveContainer>
+   <div id="chart-description" className="sr-only">
+     Line chart showing MTTR trend over 12 weeks, from {firstWeek} to {lastWeek}.
+     Current value is {currentValue} hours.
+   </div>
+   ```
+
+2. **Provide data table alternative**
+   ```javascript
+   <details>
+     <summary>View data table</summary>
+     <table>
+       <thead><tr><th>Week</th><th>Value</th></tr></thead>
+       <tbody>
+         {data.map(d => <tr><td>{d.week}</td><td>{d.value}</td></tr>)}
+       </tbody>
+     </table>
+   </details>
+   ```
+
+**Detection:** Run Lighthouse accessibility audit, or test with screen reader.
+
+**Phase to address:** Phase 2 (Chart Implementation) - add as part of component creation.
 
 ---
 
-### Pitfall 11: Inconsistent Field Naming Across Sites
+### Pitfall 11: Date/Time Zone Confusion in Trends
 
-**What goes wrong:** Same concept has different names: "priority" (Jira), "severity" (Grafana), "importance" (internal). UI is confusing, queries don't work as expected.
+**What goes wrong:** CSV uploaded in timezone A, displayed in timezone B, weekly groupings get misaligned (Friday bugs show up in next week).
 
 **Prevention:**
-- Canonical field vocabulary document
-- Map site-specific terms to canonical terms
-- UI shows canonical names with "from X" tooltips
+1. **Store all dates in UTC** (already done in schema: `created_date TIMESTAMP`)
+2. **Week boundaries use UTC** (Saturday 00:00 UTC = end of week)
+3. **Display in user's timezone, but calculate in UTC**
+   ```javascript
+   // In chart data transformation
+   const weekLabel = formatInTimeZone(
+     new Date(row.week_ending),
+     userTimezone,
+     'MMM d'
+   );
+   ```
+
+4. **Document timezone behavior in UI**
+   ```
+   "All dates displayed in your local timezone (PST).
+    Weekly boundaries calculated in UTC."
+   ```
+
+**Detection:** Users report "bugs from Friday showing in wrong week".
+
+**Phase to address:** Phase 2 (Chart Implementation) - clarify from start.
 
 ---
 
-### Pitfall 12: Extraction Timing Misalignment
+### Pitfall 12: No Loading States for Trend Charts
 
-**What goes wrong:** Jenkins build completes at 10:00, extraction runs at 10:05, Grafana alert fires at 10:03, extraction runs at 10:10. Related events captured with different timestamps, correlation is lost.
-
-**Prevention:**
-- Capture source timestamp, not extraction timestamp
-- Display source timestamps prominently
-- Event correlation based on source time windows
-
----
-
-### Pitfall 13: Tab Management Overhead
-
-**What goes wrong:** Extension needs active tab on target site to extract. Users must keep Grafana, Jenkins, etc. tabs open. Browser becomes cluttered. Or: extraction only works when tab is visited.
+**What goes wrong:** Trend chart area is blank for 2-3 seconds during data fetch, users think it's broken.
 
 **Prevention:**
-- Background extraction where possible (service worker + webRequest)
-- Document which sites require active tab
-- Tab rotation strategy for multi-site capture
-- Consider: "focus tab briefly to extract" automation
+1. **Chart skeleton loader**
+   ```javascript
+   {trendDataLoading ? (
+     <Card>
+       <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
+       <CardContent>
+         <Skeleton className="h-64 w-full" />
+       </CardContent>
+     </Card>
+   ) : (
+     <TrendChart data={trendData} />
+   )}
+   ```
+
+2. **Stale-while-revalidate pattern**
+   ```javascript
+   // Show cached data immediately, fetch in background
+   const [data, setData] = useState(cachedData);
+   useEffect(() => {
+     fetchTrendData().then(fresh => {
+       setData(fresh);
+       updateCache(fresh);
+     });
+   }, [filters]);
+   ```
+
+**Detection:** Blank chart areas during loading.
+
+**Phase to address:** Phase 2 (Chart Implementation) - add with initial component.
 
 ---
 
 ## Phase-Specific Warnings
 
-| Phase | Topic | Likely Pitfall | Mitigation |
-|-------|-------|----------------|------------|
-| Phase 1 | Config architecture | Complexity explosion | Presets + tiered configuration |
-| Phase 1 | Extension architecture | Monolith vs. N extensions | Single extension, lazy-load extractors |
-| Phase 2 | Selector stability | Multi-site selector maintenance | Fallback chains + health monitoring |
-| Phase 2 | Site-specific extractors | DOM differences per tool | Version detection + graceful degradation |
-| Phase 3 | Data staging | Staging becomes graveyard | Trust tiers + auto-approve rules |
-| Phase 3 | Configuration UI | Technical vs. task-oriented | Wizard + preview + test buttons |
-| Phase 4 | Entity mapping | N x M mapping explosion | Canonical intermediate format |
-| Phase 4 | Identity mapping | Cross-site identity confusion | Identity mapping table + fuzzy match |
-| Phase 5 | Observability | Silent failures | Per-site health dashboard |
-| Phase 5 | Updates | Config schema breaking changes | Versioning + forward migration |
+| Phase Topic | Likely Pitfall | Mitigation |
+|-------------|---------------|------------|
+| Phase 1: Data Model | Time series schema mismatch (Pitfall 1) | Normalize KPI data into time-series table before implementing charts |
+| Phase 2: Trend Charts | Chart re-render thrashing (Pitfall 2) | Memoize data transformations, use React.memo, limit data points |
+| Phase 3: Email Setup | Silent email failures (Pitfall 3) | Configure SAP BTP Mail service, add email queue with retries |
+| Phase 4: Notification Logic | Notification spam (Pitfall 4) | Implement deduplication, batching, and rate limiting |
+| Phase 5: In-App Notifications | State management chaos (Pitfall 5) | Use existing NotificationService + React Context |
+| Phase 6: Threshold UI | Invalid threshold configs (Pitfall 6) | Add validation, show suggested values, prevent nonsensical inputs |
+| Phase 7: Testing | Performance regression on upload (Pitfall 8) | Move heavy calculations to background, add status tracking |
 
 ---
 
-## Multi-Site Specific Warnings
+## Critical Integration Points (Existing System)
 
-### DOM Variability by Tool
+**Don't break these:**
 
-| Tool | Frontend Stack | DOM Stability | Notes |
-|------|---------------|---------------|-------|
-| Grafana | React + Angular | Medium | Version-specific selectors needed |
-| Jenkins | Java + Jelly templates | High | Classic HTML, stable patterns |
-| Concourse | Elm | Medium-High | Consistent but uncommon patterns |
-| Dynatrace | Angular | Low-Medium | Frequent UI updates |
-| Jira | React (Cloud) | Low | Updates break selectors regularly |
+1. **Weekly CSV upload workflow**
+   - Current: Synchronous parse → store → calculate → return
+   - With trends: Must stay under 10s for UX, move heavy work to background
 
-**Recommendation:** Prioritize Jenkins (most stable), then Grafana, then Concourse. Dynatrace and Jira require most maintenance.
+2. **BugService.calculateKPIs() is called on every upload**
+   - Currently stores in JSONB (`weekly_kpis.kpi_data`)
+   - Must also populate normalized time-series table for trend queries
 
-### Data Model Differences
+3. **Existing notification infrastructure** (NotificationService + routes)
+   - Don't create duplicate notification system
+   - Extend for threshold alerts
 
-| Tool | Primary Entity | Identifier | State Model |
-|------|---------------|------------|-------------|
-| Grafana | Alert | alertId + org | alerting/pending/ok/nodata/paused |
-| Jenkins | Build | job/build# | SUCCESS/FAILURE/UNSTABLE/ABORTED |
-| Concourse | Build | pipeline/job/build | succeeded/failed/errored/aborted |
-| Dynatrace | Problem | problemId | open/resolved |
-| Jira | Issue | issueKey | Custom per workflow |
+4. **Multi-tenancy via user_id**
+   - All time-series queries MUST filter by user_id
+   - All notifications MUST filter by user_id
+   - Email queue MUST be per-user
 
-**Recommendation:** Build normalizers early. State mapping tables are easier to maintain than code.
-
----
-
-## Lessons from v1.0 Jira Extension
-
-The current Jira extension demonstrates several patterns and anti-patterns relevant to multi-site expansion:
-
-**What worked:**
-- Fallback selector chains (board.js has 2-3 selectors per field)
-- Page type detection from URL patterns
-- MutationObserver with debouncing
-- CustomEvent communication between page context and content script
-- Sync throttling (30 second minimum between syncs)
-
-**What needs improvement for multi-site:**
-- Selectors are hardcoded per page type (not configurable)
-- No selector health monitoring
-- No visual selector builder
-- No per-site enable/disable
-- Monolithic content script loads all extractors
-- Configuration only via options page (not in-context)
-
-**Code patterns to extract and generalize:**
-```javascript
-// From board.js - reusable pattern
-function findElements(selectorChains) {
-  for (const selectors of selectorChains) {
-    const elements = document.querySelectorAll(selectors);
-    if (elements.length > 0) {
-      return Array.from(elements);
-    }
-  }
-  return [];
-}
-```
+5. **Recharts already used** (MTTRBarChart, BugCategoryChart)
+   - Performance patterns established (ResponsiveContainer, Cell colors)
+   - Use same patterns for trend charts
 
 ---
 
-## Confidence Assessment
+## Sources and Confidence
 
-| Category | Confidence | Basis |
-|----------|------------|-------|
-| Configuration complexity | HIGH | Universal software UX problem |
-| Selector brittleness | HIGH | Direct v1.0 experience |
-| Staging workflow | HIGH | Common pattern failure mode |
-| Entity mapping | MEDIUM-HIGH | Domain expertise, some verification needed |
-| Multi-extension architecture | MEDIUM | Chrome extension patterns established |
-| Cross-site identity | MEDIUM | Depends on source tools |
-| Per-tool DOM stability | LOW-MEDIUM | Needs live verification for SAP instances |
+**Confidence:** HIGH - Based on codebase analysis and domain knowledge of:
+- PostgreSQL time-series data modeling
+- React performance optimization (Recharts memoization)
+- Email notification systems in Node.js/Express
+- SAP BTP Cloud Foundry deployment constraints
 
----
+**Evidence:**
+- Analyzed existing BugService.js (weekly upload pattern, JSONB KPI storage)
+- Analyzed existing BugDashboard.jsx (filter state management, Recharts usage)
+- Analyzed existing NotificationService (infrastructure already present)
+- Analyzed database schema (019_bug_dashboard.sql - no time-series indexes)
+- Reviewed package.json (Recharts 2.15.1, React 18.2.0, pg 8.11.3)
 
-## Sources
+**Low confidence areas:**
+- SAP BTP Mail service configuration specifics (would need to verify service catalog)
+- Exact email delivery rates and spam filter behavior (depends on domain reputation)
 
-**Primary:**
-- v1.0 Jira extension implementation (`/Users/i306072/Documents/GitHub/P-E/extension/`)
-- Existing research files (`/Users/i306072/Documents/GitHub/P-E/.planning/research/`)
-- Chrome Extension Manifest V3 documentation (from training data)
-
-**Verification needed:**
-- DOM structure of SAP internal Grafana, Jenkins, Concourse, Dynatrace instances
-- Actual selector stability across tool versions
-- User feedback on v1.0 Jira configuration experience
-
-**Recommendations for phase-specific research:**
-- Phase 2: Live DOM inspection of each target tool
-- Phase 3: User interviews on data review workflow preferences
-- Phase 4: Entity model analysis of each source tool
-
----
-
-## Quality Gate Verification
-
-- [x] Pitfalls are specific to configurable capture (not generic advice)
-- [x] Multi-site complexity addressed (Pitfalls 2, 4, 5, 6)
-- [x] Data staging/review pitfalls covered (Pitfall 3)
-- [x] Prevention strategies are actionable (code examples, specific approaches)
-- [x] Phase assignments provided for each pitfall
-- [x] Severity indicators included (CRITICAL, HIGH, MODERATE, MINOR)
-- [x] Warning signs documented for early detection
-- [x] Lessons from v1.0 Jira extension incorporated
+These pitfalls are specific to this project's architecture (weekly CSV uploads, PostgreSQL JSONB KPIs, Recharts on React, SAP BTP deployment) and reflect actual integration challenges, not generic advice.

@@ -1,1277 +1,1019 @@
-# Architecture: Configurable Web Capture Framework
+# Architecture Patterns: KPI Trend Charts & Threshold Notifications
 
-**Domain:** Browser Extension + Backend Integration
-**Research Focus:** Evolution from hardcoded Jira capture to configurable multi-site framework
-**Researched:** 2026-01-22
-**Overall Confidence:** HIGH (based on existing v1.0 implementation + Chrome Manifest V3 documentation)
-
----
+**Domain:** Express/React/PostgreSQL Time Series Visualization & Alert System
+**Researched:** 2026-01-28
+**Confidence:** HIGH
 
 ## Executive Summary
 
-The configurable web capture framework evolves the existing Jira extension (v1.0) into a rule-based system supporting multiple sites. Key architectural changes:
+KPI trend charts and threshold notifications integrate seamlessly with the existing Express/React/PostgreSQL architecture. The project already has all foundational pieces: Recharts for visualization, weekly_kpis table for time-series data, notification system for alerts, and established service patterns. No job scheduler or email infrastructure exists yet, requiring new dependencies (node-cron for scheduling, nodemailer for email).
 
-1. **Rules stored in backend** — Not hardcoded in extension
-2. **Dynamic content script registration** — Via `chrome.scripting.registerContentScripts()` API
-3. **Generic extraction engine** — Selector-based, not site-specific code
-4. **Data staging layer** — Inbox table with review workflow before entity mapping
-5. **Entity mapping system** — User-defined rules linking captured data to P&E entities
+**Key architectural decisions:**
+1. **Time-series queries:** Extend BugService with historical KPI queries across multiple weekly_kpis rows
+2. **Trend visualization:** Add Recharts LineChart/AreaChart components following existing chart patterns
+3. **Threshold monitoring:** New ThresholdService evaluates KPIs against configurable thresholds on upload
+4. **Notification delivery:** Extend NotificationService with in-app alerts first, email optional via nodemailer
+5. **Scheduling:** Introduce node-cron for periodic threshold checks (lightweight, no Redis needed)
 
-This preserves the working v1.0 architecture while adding configurability layers.
+**Build order:** Historical queries → Trend charts → Threshold evaluation → Notification integration → (Optional) Email delivery
 
----
-
-## Current Architecture (v1.0 Baseline)
-
-### Component Overview
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         JIRA WEB PAGE (jira.tools.sap)                       │
-│  ┌─────────────────────────────────────────────────────────────────────────┐│
-│  │  content.js (hardcoded page detection)                                   ││
-│  │    └── detectPageType(url) → BOARD | BACKLOG | DETAIL | UNKNOWN         ││
-│  │    └── loadExtractor(pageType) → board.js | backlog.js | detail.js      ││
-│  │    └── extractAndSync() → sends data to service worker                   ││
-│  └─────────────────────────────────────────────────────────────────────────┘│
-└────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      │ chrome.runtime.sendMessage()
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        CHROME EXTENSION RUNTIME                              │
-│  ┌─────────────────────────────────────────────────────────────────────────┐│
-│  │  service-worker.js                                                       ││
-│  │    └── handleSyncIssues(issues) → POST to backend                        ││
-│  │    └── Storage module → chrome.storage.local for auth/state              ││
-│  │    └── Api module → backend communication with retry                     ││
-│  └─────────────────────────────────────────────────────────────────────────┘│
-└────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      │ fetch() with Bearer token
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      EXPRESS.JS BACKEND (SAP BTP)                            │
-│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
-│  │  jira.js (routes)      │   │  JiraService.js                            ││
-│  │    POST /sync          │ → │    syncIssues(userId, issues)              ││
-│  │    GET  /              │ → │    listIssues(userId, filters)             ││
-│  │    POST /mappings      │ → │    createMapping(userId, ...)              ││
-│  └────────────────────────┘   └────────────────────────────────────────────┘│
-└────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            POSTGRESQL                                        │
-│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
-│  │  jira_issues           │   │  jira_team_mappings                        ││
-│  │    user_id             │   │    jira_assignee_id → team_member_id       ││
-│  │    issue_key (unique)  │   │                                             ││
-│  │    summary, status...  │   │                                             ││
-│  └────────────────────────┘   └────────────────────────────────────────────┘│
-└────────────────────────────────────────────────────────────────────────────┘
-```
-
-### v1.0 Hardcoded Elements (to be replaced)
-
-| Location | Hardcoded Element | Purpose |
-|----------|-------------------|---------|
-| `manifest.json` | `"matches": ["https://jira.tools.sap/*"]` | Only Jira site enabled |
-| `content.js` | `detectPageType()` switch | Page type detection |
-| `content.js` | `getExtractorPath()` switch | Extractor selection |
-| `content.js` | `getContainerSelector()` switch | DOM container selectors |
-| `extractors/board.js` | `BOARD_SELECTORS` object | 15+ hardcoded CSS selectors |
-| `extractors/backlog.js` | `BACKLOG_SELECTORS` object | 15+ hardcoded CSS selectors |
-| `extractors/detail.js` | `DETAIL_SELECTORS` object | 15+ hardcoded CSS selectors |
-| `JiraService.js` | Upsert to `jira_issues` | Direct entity storage |
-
----
-
-## Target Architecture (v1.1 Configurable)
+## Recommended Architecture
 
 ### System Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         ANY CONFIGURED WEBSITE                               │
-│  ┌─────────────────────────────────────────────────────────────────────────┐│
-│  │  generic-content.js (rule-driven)                                        ││
-│  │    └── Rules fetched from backend on activation                          ││
-│  │    └── matchRule(url) → finds applicable capture rule                    ││
-│  │    └── extractByRule(rule) → generic selector-based extraction          ││
-│  │    └── sendToStaging() → sends to staging endpoint                       ││
-│  └─────────────────────────────────────────────────────────────────────────┘│
-└────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      │ chrome.runtime.sendMessage()
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        CHROME EXTENSION RUNTIME                              │
-│  ┌─────────────────────────────────────────────────────────────────────────┐│
-│  │  service-worker.js (enhanced)                                            ││
-│  │    └── fetchCaptureRules() → GET /api/capture-rules                      ││
-│  │    └── updateContentScriptRegistrations() → dynamic script registration  ││
-│  │    └── handleStagedCapture(data) → POST /api/capture-inbox               ││
-│  │    └── LEGACY: handleSyncIssues() → preserved for Jira compatibility     ││
-│  └─────────────────────────────────────────────────────────────────────────┘│
-└────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      │ fetch() with Bearer token
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                      EXPRESS.JS BACKEND (SAP BTP)                            │
-│                                                                              │
-│  NEW COMPONENTS                                                              │
-│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
-│  │  captureRules.js       │   │  CaptureRuleService.js                     ││
-│  │    GET  /              │ → │    listRules(userId) → active rules        ││
-│  │    POST /              │ → │    createRule(userId, ruleData)            ││
-│  │    PUT  /:id           │ → │    updateRule(userId, id, updates)         ││
-│  │    DELETE /:id         │ → │    deleteRule(userId, id)                  ││
-│  └────────────────────────┘   └────────────────────────────────────────────┘│
-│                                                                              │
-│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
-│  │  captureInbox.js       │   │  CaptureInboxService.js                    ││
-│  │    GET  /              │ → │    listPending(userId) → review queue      ││
-│  │    POST /              │ → │    stageCapture(userId, data)              ││
-│  │    PUT  /:id/approve   │ → │    approveAndMap(userId, id, mapping)      ││
-│  │    PUT  /:id/reject    │ → │    rejectCapture(userId, id)               ││
-│  │    DELETE /:id         │ → │    deleteCapture(userId, id)               ││
-│  └────────────────────────┘   └────────────────────────────────────────────┘│
-│                                                                              │
-│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
-│  │  entityMappings.js     │   │  EntityMappingService.js                   ││
-│  │    GET  /              │ → │    listMappings(userId)                    ││
-│  │    POST /              │ → │    createMapping(userId, mappingData)      ││
-│  │    PUT  /:id           │ → │    updateMapping(userId, id, updates)      ││
-│  │    DELETE /:id         │ → │    deleteMapping(userId, id)               ││
-│  └────────────────────────┘   └────────────────────────────────────────────┘│
-│                                                                              │
-│  PRESERVED (backwards compatibility)                                         │
-│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
-│  │  jira.js (unchanged)   │   │  JiraService.js (unchanged)                ││
-│  │    POST /sync          │ → │    syncIssues() - direct path for Jira     ││
-│  └────────────────────────┘   └────────────────────────────────────────────┘│
-└────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            POSTGRESQL                                        │
-│                                                                              │
-│  NEW TABLES                                                                  │
-│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
-│  │  capture_rules         │   │  capture_inbox                             ││
-│  │    user_id             │   │    user_id                                 ││
-│  │    name                │   │    rule_id (FK)                            ││
-│  │    url_pattern         │   │    source_url                              ││
-│  │    selectors (JSONB)   │   │    captured_data (JSONB)                   ││
-│  │    enabled             │   │    status (pending|approved|rejected)      ││
-│  │    site_type           │   │    approved_at, mapped_entity_type         ││
-│  └────────────────────────┘   └────────────────────────────────────────────┘│
-│                                                                              │
-│  ┌────────────────────────┐                                                 │
-│  │  entity_mappings       │                                                 │
-│  │    user_id             │                                                 │
-│  │    rule_id (FK)        │                                                 │
-│  │    source_field        │                                                 │
-│  │    target_entity       │                                                 │
-│  │    target_field        │                                                 │
-│  │    transform           │                                                 │
-│  └────────────────────────┘                                                 │
-│                                                                              │
-│  PRESERVED                                                                   │
-│  ┌────────────────────────┐   ┌────────────────────────────────────────────┐│
-│  │  jira_issues           │   │  jira_team_mappings                        ││
-│  │    (unchanged)         │   │    (unchanged)                             ││
-│  └────────────────────────┘   └────────────────────────────────────────────┘│
-└────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                     Frontend (React)                            │
+├─────────────────────────────────────────────────────────────────┤
+│  BugDashboard.jsx                                               │
+│    ├─ KPITrendChart.jsx (NEW)  ← Recharts LineChart           │
+│    ├─ KPICard.jsx (exists)     ← Add trend indicator           │
+│    └─ NotificationBell.jsx (NEW) ← Badge for unread alerts    │
+│                                                                 │
+│  API Calls:                                                     │
+│    ├─ GET /api/bugs/kpis/history?weeks=8&component=X (NEW)    │
+│    ├─ GET /api/notifications (exists)                          │
+│    └─ PUT /api/notifications/:id (mark read - exists)         │
+└─────────────────────────────────────────────────────────────────┘
+                            ↓ HTTP
+┌─────────────────────────────────────────────────────────────────┐
+│                     Backend (Express)                           │
+├─────────────────────────────────────────────────────────────────┤
+│  Routes:                                                        │
+│    ├─ bugs.js (EXTEND)                                         │
+│    │    └─ GET /kpis/history → BugService.getKPIHistory()     │
+│    ├─ notifications.js (exists)                                │
+│    │    └─ GET /api/notifications → NotificationService.list()│
+│    └─ thresholds.js (NEW - optional)                           │
+│         └─ GET /api/thresholds → ThresholdService.list()      │
+│                                                                 │
+│  Services:                                                      │
+│    ├─ BugService.js (EXTEND)                                  │
+│    │    ├─ getKPIHistory(userId, weeks, component)            │
+│    │    └─ uploadCSV() → triggers threshold check (MODIFIED)  │
+│    ├─ ThresholdService.js (NEW)                               │
+│    │    ├─ evaluateKPIs(kpis, uploadId)                       │
+│    │    ├─ createNotificationIfBreached(userId, kpi, value)   │
+│    │    └─ list/create/update/delete thresholds               │
+│    └─ NotificationService.js (exists - no changes needed)     │
+│                                                                 │
+│  Scheduler (NEW):                                              │
+│    └─ scheduler/kpiMonitor.js                                  │
+│         └─ node-cron: 0 8 * * 1 (weekly Monday 8am)           │
+│              └─ Check thresholds for all users/uploads         │
+│                                                                 │
+│  Email (OPTIONAL):                                             │
+│    └─ services/EmailService.js (NEW - only if email needed)   │
+│         └─ sendThresholdAlert(user, kpi, value)               │
+└─────────────────────────────────────────────────────────────────┘
+                            ↓ SQL
+┌─────────────────────────────────────────────────────────────────┐
+│                   PostgreSQL Database                           │
+├─────────────────────────────────────────────────────────────────┤
+│  weekly_kpis (EXISTS)                                          │
+│    ├─ upload_id (FK)                                           │
+│    ├─ component (VARCHAR)                                      │
+│    ├─ kpi_data (JSONB) ← { bug_inflow_rate, sla_vh_percent }  │
+│    └─ calculated_at (TIMESTAMP)                                │
+│                                                                 │
+│  notifications (EXISTS)                                         │
+│    ├─ id, user_id, message, read                              │
+│    ├─ scheduled_date (TIMESTAMP)                               │
+│    └─ created_date (TIMESTAMP)                                 │
+│                                                                 │
+│  kpi_thresholds (NEW - optional)                               │
+│    ├─ id, user_id, kpi_name                                    │
+│    ├─ warning_threshold (NUMERIC)                              │
+│    ├─ critical_threshold (NUMERIC)                             │
+│    └─ notification_enabled (BOOLEAN)                           │
+│                                                                 │
+│  bug_uploads (EXISTS - join key for historical queries)        │
+│    ├─ id, user_id, week_ending                                │
+│    └─ uploaded_at (TIMESTAMP)                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
----
+### Component Boundaries
 
-## Component Details
+| Component | Responsibility | Communicates With | State |
+|-----------|----------------|-------------------|-------|
+| **BugDashboard.jsx** | Orchestrate KPI display, trend charts, filters | KPITrendChart, KPICard, apiClient | Current + EXTEND with historical KPIs |
+| **KPITrendChart.jsx** (NEW) | Render multi-week KPI line chart | Recharts LineChart, apiClient | Read-only (receives data from parent) |
+| **ThresholdService.js** (NEW) | Evaluate KPIs against thresholds, create notifications | BugService (get KPIs), NotificationService (create) | Stateless |
+| **BugService.js** | Provide KPI time-series data | weekly_kpis table (multi-row queries) | EXTEND with history queries |
+| **NotificationService.js** | Store/retrieve notifications | notifications table | EXISTS - no changes |
+| **kpiMonitor.js** (NEW) | Scheduled threshold checks | ThresholdService, BugService | Cron job runner |
+| **EmailService.js** (OPTIONAL) | Send email alerts | nodemailer, SMTP server | NEW - only if email required |
 
-### 1. Capture Rules (NEW)
+### Data Flow
 
-**Purpose:** Store user-defined extraction rules that tell the extension what to capture from which sites.
-
-**Database Schema:**
-
-```sql
-CREATE TABLE capture_rules (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id VARCHAR(100) NOT NULL,
-
-  -- Rule identification
-  name VARCHAR(255) NOT NULL,                    -- "Grafana Dashboard Metrics"
-  description TEXT,                              -- User notes
-
-  -- URL matching
-  url_pattern VARCHAR(1024) NOT NULL,            -- "https://grafana.example.com/d/*"
-  site_type VARCHAR(50),                         -- grafana, jenkins, concourse, dynatrace, custom
-
-  -- Extraction configuration
-  selectors JSONB NOT NULL,                      -- Field selector definitions
-  container_selector VARCHAR(512),               -- Optional: wait for this element
-  extraction_mode VARCHAR(50) DEFAULT 'single',  -- single, list, table
-
-  -- Behavior
-  enabled BOOLEAN DEFAULT true,
-  auto_capture BOOLEAN DEFAULT false,            -- Capture on page load vs manual trigger
-  capture_interval_seconds INTEGER,              -- For polling (null = no polling)
-
-  -- Metadata
-  created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-  UNIQUE(user_id, name)
-);
-
-CREATE INDEX idx_capture_rules_user_id ON capture_rules(user_id);
-CREATE INDEX idx_capture_rules_enabled ON capture_rules(user_id, enabled);
+**Flow 1: Historical KPI Query (Trend Charts)**
+```
+1. User views BugDashboard
+2. Frontend calls GET /api/bugs/kpis/history?weeks=8&component=all
+3. BugService.getKPIHistory():
+   - Queries weekly_kpis table for last 8 weeks (JOIN with bug_uploads on week_ending)
+   - Returns array: [{ week_ending, kpi_data }, ...]
+4. Frontend transforms to Recharts format:
+   [{ week: '2026-01-11', bug_inflow_rate: 6.2, sla_vh_percent: 85 }, ...]
+5. KPITrendChart renders LineChart with multiple lines (one per KPI)
 ```
 
-**Selectors JSONB Structure:**
-
-```json
-{
-  "fields": [
-    {
-      "name": "dashboard_name",
-      "selector": "h1.dashboard-title, [data-testid=\"dashboard-title\"]",
-      "attribute": "textContent",
-      "required": true
-    },
-    {
-      "name": "panel_value",
-      "selector": ".panel-content .stat-value",
-      "attribute": "textContent",
-      "transform": "parseNumber",
-      "multiple": true
-    },
-    {
-      "name": "timestamp",
-      "selector": "[data-testid=\"time-range\"]",
-      "attribute": "data-from",
-      "transform": "parseDate"
-    }
-  ],
-  "identifier": "dashboard_name"
-}
+**Flow 2: Threshold Evaluation (On Upload)**
+```
+1. User uploads CSV via POST /api/bugs/upload
+2. BugService.uploadCSV():
+   - Parses CSV, calculates KPIs, stores in weekly_kpis (existing logic)
+   - NEW: Calls ThresholdService.evaluateKPIs(kpis, uploadId)
+3. ThresholdService.evaluateKPIs():
+   - Fetches thresholds for user (or uses defaults)
+   - Checks each KPI against warning/critical thresholds
+   - If breached: NotificationService.create({ message: "SLA VH below 60%" })
+4. Frontend polls GET /api/notifications or uses existing notification bell
 ```
 
-**Service Interface:**
+**Flow 3: Scheduled Monitoring (Weekly Check)**
+```
+1. Cron job triggers Monday 8am: scheduler/kpiMonitor.js
+2. For each user with uploads:
+   - Fetch most recent upload's KPIs
+   - ThresholdService.evaluateKPIs(kpis, uploadId)
+3. If thresholds breached:
+   - Create in-app notification
+   - (Optional) EmailService.sendThresholdAlert()
+4. User sees notification on next login
+```
 
+## Integration Points
+
+### 1. Existing BugService (server/services/BugService.js)
+
+**Current state:** Provides `getKPIs(userId, uploadId, component)` for single week
+
+**Integration:**
 ```javascript
-class CaptureRuleService {
-  async listRules(userId)                              // All rules for user
-  async listEnabledRules(userId)                       // Only enabled rules (for extension)
-  async createRule(userId, ruleData)                   // Create new rule
-  async updateRule(userId, ruleId, updates)            // Modify rule
-  async deleteRule(userId, ruleId)                     // Remove rule
-  async testRule(userId, ruleId, sampleHtml)           // Validate selectors against sample
-}
-```
-
-### 2. Capture Inbox (NEW)
-
-**Purpose:** Stage captured data for user review before mapping to entities.
-
-**Database Schema:**
-
-```sql
-CREATE TABLE capture_inbox (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id VARCHAR(100) NOT NULL,
-
-  -- Source tracking
-  rule_id UUID REFERENCES capture_rules(id) ON DELETE SET NULL,
-  source_url VARCHAR(2048) NOT NULL,
-  source_title VARCHAR(512),
-
-  -- Captured data
-  captured_data JSONB NOT NULL,                  -- Raw extracted fields
-  captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-  -- Review workflow
-  status VARCHAR(20) DEFAULT 'pending',          -- pending, approved, rejected
-  reviewed_at TIMESTAMP,
-
-  -- Mapping result (after approval)
-  mapped_entity_type VARCHAR(50),                -- task, project, note, metric
-  mapped_entity_id UUID,                         -- FK to created entity
-
-  -- Deduplication
-  content_hash VARCHAR(64),                      -- SHA-256 of captured_data
-
-  created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-  UNIQUE(user_id, content_hash)                  -- Prevent exact duplicates
-);
-
-CREATE INDEX idx_capture_inbox_user_status ON capture_inbox(user_id, status);
-CREATE INDEX idx_capture_inbox_rule ON capture_inbox(rule_id);
-CREATE INDEX idx_capture_inbox_captured_at ON capture_inbox(captured_at);
-```
-
-**Service Interface:**
-
-```javascript
-class CaptureInboxService {
-  async listPending(userId, options)                   // Get items awaiting review
-  async stageCapture(userId, ruleId, data)             // Add new captured data
-  async approveAndMap(userId, captureId, mapping)      // Approve and create entity
-  async rejectCapture(userId, captureId)               // Mark as rejected
-  async bulkApprove(userId, captureIds, mappingRule)   // Batch approval
-  async getStats(userId)                               // Counts by status
-}
-```
-
-**Approval Flow:**
-
-```
-Extension captures data
-        │
-        ▼
-POST /api/capture-inbox
-        │
-        ▼
-┌───────────────────┐
-│   capture_inbox   │   status = 'pending'
-│   (staging table) │
-└───────────────────┘
-        │
-        │  User reviews in Inbox UI
-        ▼
-┌───────────────────┐
-│  Approve action   │   User selects entity type + field mapping
-└───────────────────┘
-        │
-        ▼
-EntityMappingService.applyMapping(captureData, mapping)
-        │
-        ▼
-┌───────────────────┐
-│  Target entity    │   e.g., tasks, projects, notes
-│  table            │
-└───────────────────┘
-        │
-        ▼
-Update capture_inbox:
-  status = 'approved'
-  mapped_entity_type = 'task'
-  mapped_entity_id = <new_task_id>
-```
-
-### 3. Entity Mappings (NEW)
-
-**Purpose:** Define how captured fields map to P&E Manager entities.
-
-**Database Schema:**
-
-```sql
-CREATE TABLE entity_mappings (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id VARCHAR(100) NOT NULL,
-
-  -- Association
-  rule_id UUID REFERENCES capture_rules(id) ON DELETE CASCADE,
-  name VARCHAR(255) NOT NULL,                    -- "Grafana → Task"
-
-  -- Target entity
-  target_entity VARCHAR(50) NOT NULL,            -- task, project, note, metric
-
-  -- Field mappings
-  field_mappings JSONB NOT NULL,                 -- Source → target field rules
-
-  -- Default values
-  defaults JSONB,                                -- Static values to apply
-
-  -- Auto-apply settings
-  auto_apply BOOLEAN DEFAULT false,              -- Skip inbox for this mapping
-
-  created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-  UNIQUE(user_id, rule_id, name)
-);
-
-CREATE INDEX idx_entity_mappings_user ON entity_mappings(user_id);
-CREATE INDEX idx_entity_mappings_rule ON entity_mappings(rule_id);
-```
-
-**Field Mappings JSONB Structure:**
-
-```json
-{
-  "mappings": [
-    {
-      "source": "dashboard_name",
-      "target": "title",
-      "transform": null
-    },
-    {
-      "source": "panel_value",
-      "target": "description",
-      "transform": "template",
-      "template": "Metric value: {{value}}"
-    },
-    {
-      "source": "timestamp",
-      "target": "due_date",
-      "transform": "parseDate"
-    }
-  ]
-}
-```
-
-**Service Interface:**
-
-```javascript
-class EntityMappingService {
-  async listMappings(userId)                           // All mappings
-  async listMappingsForRule(userId, ruleId)            // Mappings for specific rule
-  async createMapping(userId, mappingData)             // Create new mapping
-  async updateMapping(userId, mappingId, updates)      // Modify mapping
-  async deleteMapping(userId, mappingId)               // Remove mapping
-  async applyMapping(captureData, mappingId)           // Execute mapping → create entity
-}
-```
-
----
-
-## Extension Changes
-
-### 4. Dynamic Content Script Registration (MODIFY service-worker.js)
-
-**Current:** Content scripts declared statically in manifest.json
-**Target:** Dynamic registration based on backend rules
-
-**Chrome API Used:** `chrome.scripting.registerContentScripts()`
-
-```javascript
-// service-worker.js additions
-
+// ADD NEW METHOD to BugService.js
 /**
- * Fetch capture rules from backend and register content scripts
+ * Get KPI history across multiple weeks for trend analysis
+ * @param {string} userId - User ID
+ * @param {number} weeks - Number of weeks to retrieve (default 8)
+ * @param {string|null} component - Optional component filter
+ * @returns {Array} - Array of { week_ending, kpi_data, upload_id }
  */
-async function updateContentScriptRegistrations() {
-  const rules = await Api.getCaptureRules();
+async getKPIHistory(userId, weeks = 8, component = null) {
+  const sql = `
+    SELECT
+      bu.week_ending,
+      wk.kpi_data,
+      wk.upload_id,
+      wk.calculated_at
+    FROM weekly_kpis wk
+    JOIN bug_uploads bu ON wk.upload_id = bu.id
+    WHERE bu.user_id = $1
+      AND wk.component IS NOT DISTINCT FROM $2
+    ORDER BY bu.week_ending DESC
+    LIMIT $3
+  `;
 
-  // Unregister all dynamic scripts first
-  const registered = await chrome.scripting.getRegisteredContentScripts();
-  const dynamicIds = registered
-    .filter(s => s.id.startsWith('capture-rule-'))
-    .map(s => s.id);
+  const result = await query(sql, [userId, component, weeks]);
 
-  if (dynamicIds.length > 0) {
-    await chrome.scripting.unregisterContentScripts({ ids: dynamicIds });
-  }
-
-  // Register new scripts for enabled rules
-  const scriptsToRegister = rules
-    .filter(rule => rule.enabled)
-    .map(rule => ({
-      id: `capture-rule-${rule.id}`,
-      matches: [rule.url_pattern],
-      js: ['content/generic-extractor.js'],
-      runAt: 'document_idle',
-      world: 'ISOLATED'
-    }));
-
-  if (scriptsToRegister.length > 0) {
-    await chrome.scripting.registerContentScripts(scriptsToRegister);
-  }
-
-  // Cache rules for content script access
-  await chrome.storage.local.set({ captureRules: rules });
+  // Return in chronological order (oldest first) for charts
+  return result.rows.reverse();
 }
+```
 
-// Refresh registrations on extension startup
-chrome.runtime.onStartup.addListener(updateContentScriptRegistrations);
-chrome.runtime.onInstalled.addListener(updateContentScriptRegistrations);
+**Modification to existing uploadCSV():**
+```javascript
+// In BugService.uploadCSV(), after storing KPIs (line 521)
+// ADD threshold evaluation trigger
+await client.query('COMMIT');
 
-// Message handler for rule refresh
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === 'REFRESH_RULES') {
-    updateContentScriptRegistrations()
-      .then(() => sendResponse({ success: true }))
-      .catch(err => sendResponse({ success: false, error: err.message }));
-    return true;
+// NEW: Evaluate thresholds after successful upload
+const ThresholdService = (await import('./ThresholdService.js')).default;
+await ThresholdService.evaluateKPIs(allKPIs, uploadId, userId);
+
+return { uploadId, bugCount, components, kpis: allKPIs };
+```
+
+### 2. Existing Bug Routes (server/routes/bugs.js)
+
+**Current state:** Provides `/kpis`, `/list`, `/upload` endpoints
+
+**Integration:**
+```javascript
+// ADD NEW ROUTE to bugs.js (after existing /kpis route)
+/**
+ * GET /api/bugs/kpis/history
+ * Get KPI history for trend analysis
+ * Query params: weeks (default 8), component (optional)
+ */
+router.get('/kpis/history', async (req, res) => {
+  try {
+    const { weeks = 8, component } = req.query;
+
+    const history = await BugService.getKPIHistory(
+      req.user.id,
+      parseInt(weeks, 10),
+      component === 'all' ? null : component
+    );
+
+    res.json(history);
+  } catch (error) {
+    console.error('GET /api/bugs/kpis/history error:', error);
+    res.status(500).json({ error: 'Internal Server Error', message: error.message });
   }
 });
 ```
 
-**Manifest Changes:**
+### 3. Existing Notifications (No Changes Needed)
 
-```json
-{
-  "permissions": [
-    "storage",
-    "activeTab",
-    "webNavigation",
-    "scripting"           // NEW: Required for dynamic registration
-  ],
+**Current state:** NotificationService and routes already exist for CRUD operations
 
-  "host_permissions": [
-    "https://jira.tools.sap/*",
-    "https://*.grafana.com/*",           // NEW: Example additional sites
-    "https://*.jenkins.io/*",
-    "https://pe-manager-backend.cfapps.eu01-canary.hana.ondemand.com/*",
-    "http://localhost:3001/*"
-  ],
+**Integration:** Use as-is. ThresholdService will call `NotificationService.create()`:
+```javascript
+// Example call from ThresholdService
+await NotificationService.create(userId, {
+  message: `⚠️ SLA VH Compliance dropped to ${slaVhPercent.toFixed(1)}% (threshold: 60%)`,
+  read: false,
+  scheduled_date: null
+});
+```
 
-  "content_scripts": [
-    // PRESERVED: Jira hardcoded for backwards compatibility
-    {
-      "matches": ["https://jira.tools.sap/*"],
-      "js": ["content/content.js"],
-      "run_at": "document_idle",
-      "all_frames": false
+### 4. Frontend BugDashboard (src/pages/BugDashboard.jsx)
+
+**Current state:** Displays single-week KPIs in cards with status colors
+
+**Integration:**
+```javascript
+// ADD historical KPI state and fetch
+const [historicalKPIs, setHistoricalKPIs] = useState([]);
+
+useEffect(() => {
+  // Existing single-week KPI fetch remains unchanged
+  // ADD parallel historical fetch for trends
+  async function loadHistoricalData() {
+    if (!selectedComponent) return;
+
+    try {
+      const history = await apiClient.bugs.getKPIHistory(
+        8, // last 8 weeks
+        selectedComponent === 'all' ? null : selectedComponent
+      );
+      setHistoricalKPIs(history);
+    } catch (err) {
+      console.error('Failed to load historical KPIs:', err);
     }
-    // Dynamic scripts registered via chrome.scripting API
-  ]
+  }
+
+  loadHistoricalData();
+}, [selectedComponent]);
+
+// PASS historicalKPIs to new KPITrendChart component
+<KPITrendChart data={historicalKPIs} kpiName="bug_inflow_rate" />
+```
+
+### 5. Frontend API Client (src/api/apiClient.js)
+
+**Current state:** Has `bugs.getKPIs()`, `bugs.listUploads()`, `bugs.uploadCSV()`
+
+**Integration:**
+```javascript
+// ADD to bugs client in apiClient.js (around line 400-500)
+bugs: {
+  // ... existing methods ...
+
+  async getKPIHistory(weeks = 8, component = null) {
+    const params = new URLSearchParams({ weeks: weeks.toString() });
+    if (component) params.append('component', component);
+
+    return fetchWithAuth(`${API_BASE_URL}/bugs/kpis/history?${params.toString()}`);
+  }
 }
 ```
 
-### 5. Generic Extractor Content Script (NEW)
+## New Components Needed
 
-**Purpose:** Rule-driven extraction that works with any site's selectors.
+### 1. ThresholdService.js (NEW)
 
-**File:** `extension/content/generic-extractor.js`
+**Location:** `server/services/ThresholdService.js`
+**Purpose:** Evaluate KPIs against thresholds and create notifications
 
 ```javascript
-/**
- * Generic Extractor - Rule-driven DOM extraction
- *
- * Loaded dynamically by chrome.scripting.registerContentScripts()
- * for URLs matching user-defined capture rules.
- */
+import { query } from '../db/connection.js';
+import NotificationService from './NotificationService.js';
 
-(function() {
-  'use strict';
+// Default thresholds (can be overridden per-user in kpi_thresholds table)
+const DEFAULT_THRESHOLDS = {
+  bug_inflow_rate: { warning: 8, critical: 10 },     // bugs/week
+  median_ttfr_hours: { warning: 48, critical: 72 },  // hours
+  sla_vh_percent: { warning: 60, critical: 50 },     // % (inverted: lower is worse)
+  sla_high_percent: { warning: 60, critical: 50 },
+  backlog_health_score: { warning: 50, critical: 30 } // score (inverted)
+};
 
-  console.log('[PE-Capture] Generic extractor loaded for:', window.location.href);
-
-  let currentRule = null;
-
+class ThresholdService {
   /**
-   * Find matching rule for current URL
+   * Evaluate KPIs and create notifications if thresholds breached
    */
-  async function findMatchingRule() {
-    const { captureRules = [] } = await chrome.storage.local.get('captureRules');
+  async evaluateKPIs(kpis, uploadId, userId) {
+    // Check each KPI with threshold
+    for (const [kpiName, thresholds] of Object.entries(DEFAULT_THRESHOLDS)) {
+      const value = kpis[kpiName];
+      if (value === null || value === undefined) continue;
 
-    return captureRules.find(rule => {
-      if (!rule.enabled) return false;
+      const breachLevel = this.checkThreshold(kpiName, value, thresholds);
 
-      // Convert glob pattern to regex
-      const pattern = rule.url_pattern
-        .replace(/\*/g, '.*')
-        .replace(/\?/g, '.');
-      const regex = new RegExp(`^${pattern}$`);
-
-      return regex.test(window.location.href);
-    });
-  }
-
-  /**
-   * Extract data using rule's selectors
-   */
-  function extractByRule(rule) {
-    const { selectors } = rule;
-    const extracted = {};
-
-    for (const field of selectors.fields) {
-      try {
-        if (field.multiple) {
-          const elements = document.querySelectorAll(field.selector);
-          extracted[field.name] = Array.from(elements).map(el =>
-            extractValue(el, field)
-          );
-        } else {
-          const element = document.querySelector(field.selector);
-          extracted[field.name] = element ? extractValue(element, field) : null;
-        }
-      } catch (error) {
-        console.warn(`[PE-Capture] Failed to extract ${field.name}:`, error);
-        extracted[field.name] = null;
+      if (breachLevel) {
+        await this.createNotification(userId, kpiName, value, breachLevel);
       }
     }
-
-    return extracted;
   }
 
   /**
-   * Extract value from element based on field config
+   * Check if KPI breaches threshold
+   * @returns {string|null} - 'warning' or 'critical' or null
    */
-  function extractValue(element, field) {
-    let value;
+  checkThreshold(kpiName, value, thresholds) {
+    const isInverted = ['sla_vh_percent', 'sla_high_percent', 'backlog_health_score'].includes(kpiName);
 
-    switch (field.attribute) {
-      case 'textContent':
-        value = element.textContent?.trim();
-        break;
-      case 'innerHTML':
-        value = element.innerHTML;
-        break;
-      case 'href':
-        value = element.href;
-        break;
-      default:
-        value = element.getAttribute(field.attribute);
+    if (isInverted) {
+      // Lower is worse
+      if (value <= thresholds.critical) return 'critical';
+      if (value <= thresholds.warning) return 'warning';
+    } else {
+      // Higher is worse
+      if (value >= thresholds.critical) return 'critical';
+      if (value >= thresholds.warning) return 'warning';
     }
 
-    if (field.transform && value) {
-      value = applyTransform(value, field.transform);
-    }
-
-    return value;
+    return null;
   }
 
-  /**
-   * Apply transform function to extracted value
-   */
-  function applyTransform(value, transform) {
-    switch (transform) {
-      case 'parseNumber':
-        return parseFloat(value.replace(/[^0-9.-]/g, ''));
-      case 'parseDate':
-        return new Date(value).toISOString();
-      case 'trim':
-        return value.trim();
-      case 'lowercase':
-        return value.toLowerCase();
-      default:
-        return value;
-    }
-  }
-
-  /**
-   * Send extracted data to service worker for staging
-   */
-  async function sendToStaging(data) {
-    if (!currentRule || Object.values(data).every(v => v === null)) {
-      console.log('[PE-Capture] No data to capture');
-      return;
-    }
-
-    const payload = {
-      rule_id: currentRule.id,
-      source_url: window.location.href,
-      source_title: document.title,
-      captured_data: data
+  async createNotification(userId, kpiName, value, level) {
+    const emoji = level === 'critical' ? '🚨' : '⚠️';
+    const labels = {
+      bug_inflow_rate: 'Bug Inflow Rate',
+      median_ttfr_hours: 'Time to First Response',
+      sla_vh_percent: 'SLA VH Compliance',
+      sla_high_percent: 'SLA High Compliance',
+      backlog_health_score: 'Backlog Health Score'
     };
 
-    try {
-      const response = await chrome.runtime.sendMessage({
-        type: 'STAGE_CAPTURE',
-        payload
-      });
+    const message = `${emoji} ${labels[kpiName]} ${level}: ${value.toFixed(1)}`;
 
-      if (response.success) {
-        console.log('[PE-Capture] Data staged successfully');
-      } else {
-        console.error('[PE-Capture] Staging failed:', response.error);
-      }
-    } catch (error) {
-      console.error('[PE-Capture] Failed to send to service worker:', error);
-    }
-  }
-
-  /**
-   * Initialize extraction
-   */
-  async function init() {
-    currentRule = await findMatchingRule();
-
-    if (!currentRule) {
-      console.log('[PE-Capture] No matching rule for this URL');
-      return;
-    }
-
-    console.log('[PE-Capture] Using rule:', currentRule.name);
-
-    // Wait for container element if specified
-    if (currentRule.container_selector) {
-      await waitForElement(currentRule.container_selector);
-    }
-
-    // Perform extraction
-    if (currentRule.auto_capture) {
-      const data = extractByRule(currentRule);
-      await sendToStaging(data);
-    }
-
-    // Set up polling if configured
-    if (currentRule.capture_interval_seconds) {
-      setInterval(async () => {
-        const data = extractByRule(currentRule);
-        await sendToStaging(data);
-      }, currentRule.capture_interval_seconds * 1000);
-    }
-  }
-
-  /**
-   * Wait for element to appear
-   */
-  function waitForElement(selector, timeout = 15000) {
-    return new Promise((resolve) => {
-      const element = document.querySelector(selector);
-      if (element) {
-        resolve(element);
-        return;
-      }
-
-      const observer = new MutationObserver(() => {
-        const el = document.querySelector(selector);
-        if (el) {
-          observer.disconnect();
-          resolve(el);
-        }
-      });
-
-      observer.observe(document.body, { childList: true, subtree: true });
-
-      setTimeout(() => {
-        observer.disconnect();
-        resolve(null);
-      }, timeout);
+    await NotificationService.create(userId, {
+      message,
+      read: false
     });
   }
+}
 
-  // Listen for manual extraction trigger
-  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === 'TRIGGER_EXTRACTION') {
-      (async () => {
-        if (!currentRule) {
-          currentRule = await findMatchingRule();
-        }
-        if (currentRule) {
-          const data = extractByRule(currentRule);
-          await sendToStaging(data);
-          sendResponse({ success: true, data });
-        } else {
-          sendResponse({ success: false, error: 'No matching rule' });
-        }
-      })();
-      return true;
+export default new ThresholdService();
+```
+
+### 2. KPITrendChart.jsx (NEW)
+
+**Location:** `src/components/bugs/KPITrendChart.jsx`
+**Purpose:** Render multi-week trend line chart for a single KPI
+
+```javascript
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { format } from 'date-fns';
+
+const KPI_LABELS = {
+  bug_inflow_rate: 'Bug Inflow Rate',
+  median_ttfr_hours: 'Time to First Response',
+  sla_vh_percent: 'SLA VH Compliance',
+  sla_high_percent: 'SLA High Compliance',
+  backlog_health_score: 'Backlog Health Score'
+};
+
+const KPI_UNITS = {
+  bug_inflow_rate: '/week',
+  median_ttfr_hours: 'hours',
+  sla_vh_percent: '%',
+  sla_high_percent: '%',
+  backlog_health_score: 'score'
+};
+
+/**
+ * KPITrendChart - Line chart showing KPI trend over time
+ * @param {Array} data - Historical KPI data from getKPIHistory()
+ * @param {string} kpiName - KPI field name (e.g., 'bug_inflow_rate')
+ */
+export function KPITrendChart({ data, kpiName }) {
+  // Transform data for Recharts
+  const chartData = data.map(item => ({
+    week: format(new Date(item.week_ending), 'MM/dd'),
+    value: item.kpi_data[kpiName] || 0
+  }));
+
+  if (chartData.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>{KPI_LABELS[kpiName]} Trend</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          Not enough historical data
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{KPI_LABELS[kpiName]} Trend (8 weeks)</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="week" />
+              <YAxis unit={KPI_UNITS[kpiName]} />
+              <Tooltip
+                formatter={(value) => [value.toFixed(1), KPI_LABELS[kpiName]]}
+              />
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+### 3. kpiMonitor.js (NEW - Optional)
+
+**Location:** `server/scheduler/kpiMonitor.js`
+**Purpose:** Scheduled job for periodic threshold checks
+
+```javascript
+import cron from 'node-cron';
+import { query } from '../db/connection.js';
+import ThresholdService from '../services/ThresholdService.js';
+
+/**
+ * Weekly KPI monitoring job
+ * Runs every Monday at 8:00 AM
+ */
+export function startKPIMonitor() {
+  // Cron pattern: minute hour day month weekday
+  // 0 8 * * 1 = Every Monday at 8:00 AM
+  cron.schedule('0 8 * * 1', async () => {
+    console.log('[KPI Monitor] Running weekly threshold check...');
+
+    try {
+      // Get all users with recent uploads
+      const result = await query(`
+        SELECT DISTINCT bu.user_id, wk.upload_id, wk.kpi_data
+        FROM bug_uploads bu
+        JOIN weekly_kpis wk ON bu.id = wk.upload_id
+        WHERE wk.component IS NULL  -- All components aggregate
+          AND bu.week_ending >= CURRENT_DATE - INTERVAL '7 days'
+      `);
+
+      for (const row of result.rows) {
+        await ThresholdService.evaluateKPIs(
+          row.kpi_data,
+          row.upload_id,
+          row.user_id
+        );
+      }
+
+      console.log(`[KPI Monitor] Checked ${result.rows.length} uploads`);
+    } catch (error) {
+      console.error('[KPI Monitor] Error:', error);
     }
   });
 
-  // Initialize
-  init();
-})();
-```
-
-### 6. Service Worker Additions (MODIFY service-worker.js)
-
-**New message handlers for configurable capture:**
-
-```javascript
-// Add to handleMessage() switch statement
-
-case 'STAGE_CAPTURE':
-  return await handleStageCapture(message.payload);
-
-case 'GET_CAPTURE_RULES':
-  return await handleGetCaptureRules();
-
-case 'TRIGGER_EXTRACTION':
-  // Forward to active tab's content script
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (tab) {
-    return await chrome.tabs.sendMessage(tab.id, message);
-  }
-  return { success: false, error: 'No active tab' };
-
-// New handlers
-
-async function handleStageCapture(payload) {
-  const isConfigured = await Storage.isConfigured();
-  if (!isConfigured) {
-    return { success: false, error: 'Extension not configured' };
-  }
-
-  try {
-    const result = await Api.stageCapture(payload);
-    return { success: true, data: result };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
-
-async function handleGetCaptureRules() {
-  const { captureRules = [] } = await chrome.storage.local.get('captureRules');
-  return { success: true, data: captureRules };
+  console.log('[KPI Monitor] Started (runs Mondays 8am)');
 }
 ```
 
----
+**Integration:** Add to `server/index.js`:
+```javascript
+// After all routes mounted, before app.listen()
+import { startKPIMonitor } from './scheduler/kpiMonitor.js';
 
-## Backend Routes
+if (process.env.NODE_ENV === 'production') {
+  startKPIMonitor();
+}
+```
 
-### 7. New API Endpoints
+### 4. EmailService.js (OPTIONAL - Only if email required)
 
-**File:** `server/routes/captureRules.js`
+**Location:** `server/services/EmailService.js`
+**Purpose:** Send email alerts for threshold breaches
+
+**Required:** `npm install nodemailer` (not currently installed)
 
 ```javascript
-import express from 'express';
-import CaptureRuleService from '../services/CaptureRuleService.js';
-import { authMiddleware } from '../middleware/auth.js';
+import nodemailer from 'nodemailer';
 
-const router = express.Router();
-router.use(authMiddleware);
+class EmailService {
+  constructor() {
+    this.transporter = nodemailer.createTransporter({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+  }
 
-// GET /api/capture-rules - List all rules (for UI)
-router.get('/', async (req, res) => {
-  const rules = await CaptureRuleService.listRules(req.user.id);
-  res.json(rules);
-});
+  async sendThresholdAlert(userEmail, kpiName, value, level) {
+    const subject = `[${level.toUpperCase()}] Bug Dashboard Alert: ${kpiName}`;
+    const html = `
+      <h2>KPI Threshold Alert</h2>
+      <p><strong>${kpiName}</strong> has breached the ${level} threshold.</p>
+      <p>Current value: <strong>${value.toFixed(1)}</strong></p>
+      <p><a href="${process.env.FRONTEND_URL}/bug-dashboard">View Dashboard</a></p>
+    `;
 
-// GET /api/capture-rules/enabled - List enabled rules (for extension)
-router.get('/enabled', async (req, res) => {
-  const rules = await CaptureRuleService.listEnabledRules(req.user.id);
-  res.json(rules);
-});
+    await this.transporter.sendMail({
+      from: process.env.SMTP_FROM || 'noreply@example.com',
+      to: userEmail,
+      subject,
+      html
+    });
+  }
+}
 
-// POST /api/capture-rules - Create rule
-router.post('/', async (req, res) => {
-  const rule = await CaptureRuleService.createRule(req.user.id, req.body);
-  res.status(201).json(rule);
-});
-
-// PUT /api/capture-rules/:id - Update rule
-router.put('/:id', async (req, res) => {
-  const rule = await CaptureRuleService.updateRule(req.user.id, req.params.id, req.body);
-  res.json(rule);
-});
-
-// DELETE /api/capture-rules/:id - Delete rule
-router.delete('/:id', async (req, res) => {
-  await CaptureRuleService.deleteRule(req.user.id, req.params.id);
-  res.status(204).send();
-});
-
-export default router;
+export default new EmailService();
 ```
 
-**File:** `server/routes/captureInbox.js`
+## Modified Components
+
+### BugService.js Modifications
+
+**File:** `server/services/BugService.js`
+
+**Changes:**
+1. Add `getKPIHistory()` method (see Integration Points section)
+2. Modify `uploadCSV()` to call ThresholdService after commit:
 
 ```javascript
-import express from 'express';
-import CaptureInboxService from '../services/CaptureInboxService.js';
-import { authMiddleware } from '../middleware/auth.js';
+// Line 523, after await client.query('COMMIT');
+// ADD:
+import ThresholdService from './ThresholdService.js';
 
-const router = express.Router();
-router.use(authMiddleware);
+// Evaluate thresholds (fire-and-forget, don't block response)
+ThresholdService.evaluateKPIs(allKPIs, uploadId, userId)
+  .catch(err => console.error('Threshold evaluation failed:', err));
 
-// GET /api/capture-inbox - List pending items
-router.get('/', async (req, res) => {
-  const { status = 'pending', limit = 50, offset = 0 } = req.query;
-  const items = await CaptureInboxService.listItems(req.user.id, { status, limit, offset });
-  res.json(items);
+return { uploadId, bugCount, components, kpis: allKPIs };
+```
+
+### BugDashboard.jsx Modifications
+
+**File:** `src/pages/BugDashboard.jsx`
+
+**Changes:**
+1. Add historical KPIs state and fetch
+2. Add KPITrendChart component to layout
+3. Add trend indicator to existing KPICard
+
+```javascript
+// After existing state declarations (line 54)
+const [historicalKPIs, setHistoricalKPIs] = useState([]);
+
+// Add new useEffect for historical data
+useEffect(() => {
+  if (selectedSprint !== 'all' || !selectedUploadId) return;
+
+  async function loadHistoricalKPIs() {
+    try {
+      const history = await apiClient.bugs.getKPIHistory(
+        8,
+        selectedComponent === 'all' ? null : selectedComponent
+      );
+      setHistoricalKPIs(history);
+    } catch (err) {
+      console.error('Failed to load historical KPIs:', err);
+    }
+  }
+
+  loadHistoricalKPIs();
+}, [selectedUploadId, selectedComponent]);
+
+// In render, after KPIGrid (line 364):
+{/* Trend Charts */}
+{historicalKPIs.length > 1 && (
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <KPITrendChart data={historicalKPIs} kpiName="bug_inflow_rate" />
+    <KPITrendChart data={historicalKPIs} kpiName="sla_vh_percent" />
+  </div>
+)}
+```
+
+### apiClient.js Modifications
+
+**File:** `src/api/apiClient.js`
+
+**Changes:** Add `getKPIHistory()` method to bugs client (see Integration Points section)
+
+## Data Flow Changes
+
+### Current State (Single Week)
+```
+Upload CSV → BugService.uploadCSV() → Calculate KPIs → Store in weekly_kpis
+Frontend → GET /api/bugs/kpis?uploadId=X → Single KPI object → KPICard
+```
+
+### New State (Trends + Alerts)
+```
+Upload CSV → BugService.uploadCSV()
+  → Calculate KPIs
+  → Store in weekly_kpis
+  → ThresholdService.evaluateKPIs()
+     → Check thresholds
+     → NotificationService.create() if breached
+
+Frontend → GET /api/bugs/kpis/history?weeks=8
+  → Array of KPIs (8 weeks)
+  → KPITrendChart (LineChart)
+
+Frontend → GET /api/notifications
+  → Unread notification count
+  → NotificationBell badge
+```
+
+## Suggested Build Order
+
+**Phase 1: Historical Queries & Trend Charts**
+1. Add `BugService.getKPIHistory()` method
+2. Add `GET /api/bugs/kpis/history` route
+3. Add `apiClient.bugs.getKPIHistory()` frontend method
+4. Create `KPITrendChart.jsx` component
+5. Integrate trend charts into BugDashboard
+
+**Dependencies:** None (extends existing patterns)
+**Risk:** Low - read-only queries, no schema changes
+
+**Phase 2: Threshold Evaluation**
+1. Create `ThresholdService.js` with default thresholds
+2. Modify `BugService.uploadCSV()` to call ThresholdService
+3. Test threshold detection with sample uploads
+
+**Dependencies:** Phase 1 complete
+**Risk:** Medium - side effect on upload, needs error handling
+
+**Phase 3: Notification Integration**
+1. Modify BugDashboard to fetch notifications
+2. Add notification bell with unread badge
+3. Link threshold alerts to KPI cards (click notification → scroll to KPI)
+
+**Dependencies:** Phase 2 complete, NotificationService exists
+**Risk:** Low - UI changes only
+
+**Phase 4 (Optional): Scheduled Monitoring**
+1. Install `node-cron` package
+2. Create `scheduler/kpiMonitor.js`
+3. Integrate into `server/index.js`
+4. Add environment variable `ENABLE_KPI_MONITORING=true`
+
+**Dependencies:** Phase 2 complete
+**Risk:** Medium - new process management, needs monitoring
+
+**Phase 5 (Optional): Email Notifications**
+1. Install `nodemailer` package
+2. Create `EmailService.js`
+3. Add SMTP environment variables
+4. Modify ThresholdService to call EmailService
+5. Add user preference for email alerts
+
+**Dependencies:** Phase 2 complete
+**Risk:** High - external SMTP dependency, deliverability issues
+
+## Architecture Patterns
+
+### Pattern 1: Time-Series Query with JOIN
+
+**What:** Query multiple weeks of KPIs efficiently
+**When:** Historical trend display, week-over-week comparison
+**Example:**
+```sql
+SELECT
+  bu.week_ending,
+  wk.kpi_data,
+  wk.calculated_at
+FROM weekly_kpis wk
+JOIN bug_uploads bu ON wk.upload_id = bu.id
+WHERE bu.user_id = $1
+  AND wk.component IS NOT DISTINCT FROM $2
+ORDER BY bu.week_ending DESC
+LIMIT 8;
+```
+
+**Why this works:**
+- `week_ending` provides X-axis for charts
+- `kpi_data` JSONB contains all KPI values
+- `IS NOT DISTINCT FROM` handles NULL component correctly (all components aggregate)
+- `LIMIT` prevents unbounded queries
+
+### Pattern 2: Fire-and-Forget Threshold Check
+
+**What:** Evaluate thresholds asynchronously after upload
+**When:** Upload success, don't block response
+**Example:**
+```javascript
+await client.query('COMMIT');
+
+// Don't await - fire-and-forget
+ThresholdService.evaluateKPIs(kpis, uploadId, userId)
+  .catch(err => console.error('Threshold eval failed:', err));
+
+return { uploadId, bugCount, components, kpis };
+```
+
+**Why this works:**
+- Upload response not delayed by notification creation
+- Errors in threshold logic don't break upload
+- User gets immediate feedback, notifications appear shortly after
+
+### Pattern 3: Default Thresholds with Override Option
+
+**What:** Hardcode sensible defaults, allow per-user customization later
+**When:** MVP threshold system
+**Example:**
+```javascript
+const DEFAULT_THRESHOLDS = {
+  bug_inflow_rate: { warning: 8, critical: 10 }
+};
+
+async getThresholds(userId, kpiName) {
+  // Future: query kpi_thresholds table for user overrides
+  // For now: return defaults
+  return DEFAULT_THRESHOLDS[kpiName];
+}
+```
+
+**Why this works:**
+- Immediate value without configuration UI
+- Extensible to per-user thresholds later
+- Single source of truth in code
+
+### Pattern 4: Notification as Event Log
+
+**What:** Store all threshold breaches as notifications, mark read when acknowledged
+**When:** Threshold breach detected
+**Example:**
+```javascript
+await NotificationService.create(userId, {
+  message: '🚨 SLA VH Compliance critical: 45% (threshold: 50%)',
+  read: false,
+  scheduled_date: null
 });
-
-// GET /api/capture-inbox/stats - Get counts by status
-router.get('/stats', async (req, res) => {
-  const stats = await CaptureInboxService.getStats(req.user.id);
-  res.json(stats);
-});
-
-// POST /api/capture-inbox - Stage new capture (from extension)
-router.post('/', async (req, res) => {
-  const capture = await CaptureInboxService.stageCapture(req.user.id, req.body);
-  res.status(201).json(capture);
-});
-
-// PUT /api/capture-inbox/:id/approve - Approve and map to entity
-router.put('/:id/approve', async (req, res) => {
-  const { mapping } = req.body;
-  const result = await CaptureInboxService.approveAndMap(
-    req.user.id,
-    req.params.id,
-    mapping
-  );
-  res.json(result);
-});
-
-// PUT /api/capture-inbox/:id/reject - Reject capture
-router.put('/:id/reject', async (req, res) => {
-  await CaptureInboxService.rejectCapture(req.user.id, req.params.id);
-  res.status(204).send();
-});
-
-// DELETE /api/capture-inbox/:id - Delete capture
-router.delete('/:id', async (req, res) => {
-  await CaptureInboxService.deleteCapture(req.user.id, req.params.id);
-  res.status(204).send();
-});
-
-export default router;
 ```
 
----
+**Why this works:**
+- Persistent audit trail of alerts
+- User can review past breaches
+- Existing notification system handles read/unread state
+- No new tables needed
 
-## Data Flow Diagrams
+### Pattern 5: Recharts LineChart for Trends
 
-### Flow 1: Rule Creation and Extension Sync
-
-```
-┌──────────────┐    1. User creates rule    ┌──────────────────┐
-│  Frontend    │ ─────────────────────────► │  Backend         │
-│  (Rule UI)   │    POST /capture-rules     │  (CaptureRule    │
-│              │                            │   Service)       │
-└──────────────┘                            └──────────────────┘
-                                                    │
-                                                    │ 2. Stored in DB
-                                                    ▼
-                                            ┌──────────────────┐
-                                            │  capture_rules   │
-                                            │  table           │
-                                            └──────────────────┘
-┌──────────────┐    3. Extension fetches    ┌──────────────────┐
-│  Extension   │ ◄───────────────────────── │  Backend         │
-│  (Service    │    GET /capture-rules/     │                  │
-│   Worker)    │       enabled              │                  │
-└──────────────┘                            └──────────────────┘
-       │
-       │ 4. chrome.scripting.registerContentScripts()
-       ▼
-┌──────────────────────────────────────────────────────────────┐
-│  Chrome registers content script for rule.url_pattern        │
-│  Next visit to matching URL → generic-extractor.js loads     │
-└──────────────────────────────────────────────────────────────┘
+**What:** Use existing Recharts patterns for multi-week trends
+**When:** Displaying KPI over time
+**Example:**
+```jsx
+<ResponsiveContainer width="100%" height="100%">
+  <LineChart data={chartData}>
+    <CartesianGrid strokeDasharray="3 3" />
+    <XAxis dataKey="week" />
+    <YAxis />
+    <Tooltip />
+    <Line type="monotone" dataKey="value" stroke="#3b82f6" />
+  </LineChart>
+</ResponsiveContainer>
 ```
 
-### Flow 2: Capture and Staging
+**Why this works:**
+- Consistent with existing Metrics.jsx patterns
+- ResponsiveContainer handles sizing
+- LineChart built-in to Recharts (no new dependencies)
 
-```
-┌──────────────┐    1. User visits URL     ┌──────────────────┐
-│  Website     │ ─────────────────────────►│  Content Script  │
-│  (Grafana)   │    matching rule pattern  │  (generic-       │
-│              │                           │   extractor.js)  │
-└──────────────┘                           └──────────────────┘
-                                                   │
-                                                   │ 2. Extract by selectors
-                                                   ▼
-                                           ┌──────────────────┐
-                                           │  Extracted data: │
-                                           │  { dashboard:    │
-                                           │    "Prod-API",   │
-                                           │    value: 99.5 } │
-                                           └──────────────────┘
-                                                   │
-                                                   │ 3. chrome.runtime.sendMessage()
-                                                   ▼
-┌──────────────┐    4. POST /capture-inbox ┌──────────────────┐
-│  Service     │ ─────────────────────────►│  Backend         │
-│  Worker      │                           │  (CaptureInbox   │
-│              │                           │   Service)       │
-└──────────────┘                           └──────────────────┘
-                                                   │
-                                                   │ 5. Staged (pending)
-                                                   ▼
-                                           ┌──────────────────┐
-                                           │  capture_inbox   │
-                                           │  status='pending'│
-                                           └──────────────────┘
-```
+## Anti-Patterns to Avoid
 
-### Flow 3: Review and Approval
+### Anti-Pattern 1: Real-Time Threshold Monitoring
 
-```
-┌──────────────┐    1. Load inbox          ┌──────────────────┐
-│  Frontend    │ ─────────────────────────►│  Backend         │
-│  (Inbox UI)  │    GET /capture-inbox     │                  │
-│              │    ?status=pending        │                  │
-└──────────────┘                           └──────────────────┘
-       │
-       │ 2. Display pending items
-       ▼
-┌──────────────────────────────────────────────────────────────┐
-│  User sees: "Prod-API Dashboard - Grafana - 2 hours ago"     │
-│  [Approve as Task] [Approve as Note] [Reject]                │
-└──────────────────────────────────────────────────────────────┘
-       │
-       │ 3. User clicks "Approve as Task" with mapping
-       ▼
-┌──────────────┐    4. PUT /:id/approve    ┌──────────────────┐
-│  Frontend    │ ─────────────────────────►│  Backend         │
-│              │    { mapping: {           │  (CaptureInbox   │
-│              │      entity: 'task',      │   Service)       │
-│              │      fields: {...}        │                  │
-│              │    }}                     └──────────────────┘
-└──────────────┘                                   │
-                                                   │ 5. Create entity
-                                                   ▼
-                                           ┌──────────────────┐
-                                           │  tasks table     │
-                                           │  (new task)      │
-                                           └──────────────────┘
-                                                   │
-                                                   │ 6. Update inbox
-                                                   ▼
-                                           ┌──────────────────┐
-                                           │  capture_inbox   │
-                                           │  status='approved'│
-                                           │  mapped_entity_id│
-                                           └──────────────────┘
-```
+**What:** Running threshold checks on every KPI query
+**Why bad:** Performance overhead, redundant checks
+**Instead:** Check thresholds only on upload and scheduled jobs
 
----
+### Anti-Pattern 2: Storing Trend Data Separately
 
-## Build Order and Dependencies
+**What:** Creating a new `kpi_trends` table
+**Why bad:** Duplicates data already in `weekly_kpis`
+**Instead:** Query `weekly_kpis` with JOIN for historical data
 
-### Dependency Graph
+### Anti-Pattern 3: Synchronous Email Sending
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           INFRASTRUCTURE                                     │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │  018_configurable_capture.sql (migration)                              │  │
-│  │    - capture_rules table                                               │  │
-│  │    - capture_inbox table                                               │  │
-│  │    - entity_mappings table                                             │  │
-│  │    - Indexes and triggers                                              │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                                       │ depends on
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           BACKEND SERVICES                                   │
-│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐  │
-│  │  CaptureRuleService │  │  CaptureInboxService│  │EntityMappingService │  │
-│  │                     │  │                     │  │                     │  │
-│  │  - CRUD operations  │  │  - Stage capture    │  │  - Define mappings  │  │
-│  │  - Rule validation  │  │  - Approve/reject   │  │  - Apply mappings   │  │
-│  │                     │  │  - Deduplication    │  │  - Transform data   │  │
-│  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                                       │ depends on
-                                       ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           BACKEND ROUTES                                     │
-│  ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐  │
-│  │  captureRules.js    │  │  captureInbox.js    │  │  entityMappings.js  │  │
-│  │  /api/capture-rules │  │  /api/capture-inbox │  │  /api/entity-       │  │
-│  │                     │  │                     │  │      mappings       │  │
-│  └─────────────────────┘  └─────────────────────┘  └─────────────────────┘  │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                       │
-                    ┌──────────────────┴──────────────────┐
-                    │                                      │
-                    ▼                                      ▼
-┌─────────────────────────────────┐    ┌─────────────────────────────────────┐
-│       EXTENSION CHANGES         │    │         FRONTEND UI                  │
-│  ┌───────────────────────────┐  │    │  ┌─────────────────────────────────┐│
-│  │  service-worker.js mods   │  │    │  │  Rule Builder UI                ││
-│  │  - Dynamic registration   │  │    │  │  - Create/edit capture rules    ││
-│  │  - STAGE_CAPTURE handler  │  │    │  │  - Selector tester              ││
-│  │  - Rule sync              │  │    │  │                                 ││
-│  └───────────────────────────┘  │    │  └─────────────────────────────────┘│
-│  ┌───────────────────────────┐  │    │  ┌─────────────────────────────────┐│
-│  │  generic-extractor.js     │  │    │  │  Inbox UI                       ││
-│  │  - Rule-driven extraction │  │    │  │  - Review pending captures      ││
-│  │  - Selector execution     │  │    │  │  - Approve/reject workflow      ││
-│  │  - Transform application  │  │    │  │  - Entity mapping selection     ││
-│  └───────────────────────────┘  │    │  └─────────────────────────────────┘│
-│  ┌───────────────────────────┐  │    │  ┌─────────────────────────────────┐│
-│  │  manifest.json mods       │  │    │  │  Mapping Editor UI              ││
-│  │  - scripting permission   │  │    │  │  - Field mapping configuration  ││
-│  │  - Host permissions       │  │    │  │  - Transform selection          ││
-│  └───────────────────────────┘  │    │  │  - Auto-apply settings          ││
-└─────────────────────────────────┘    │  └─────────────────────────────────┘│
-                                       └─────────────────────────────────────┘
-```
+**What:** Await email send in upload flow
+**Why bad:** Blocks response on SMTP latency/failures
+**Instead:** Fire-and-forget or background job queue
 
-### Suggested Phase Order
+### Anti-Pattern 4: Client-Side Threshold Logic
 
-**Phase 1: Backend Foundation (Week 1)**
-- Database migration (`018_configurable_capture.sql`)
-- CaptureRuleService
-- CaptureInboxService
-- EntityMappingService
-- REST routes for all three
-- Test with curl/Postman
+**What:** Calculating threshold breaches in React
+**Why bad:** No notifications for users not viewing dashboard
+**Instead:** Server-side evaluation creates persistent notifications
 
-**Phase 2: Extension Core (Week 2)**
-- Modify manifest.json (add `scripting` permission)
-- Service worker changes for dynamic registration
-- Service worker changes for STAGE_CAPTURE
-- Api.js additions (getCaptureRules, stageCapture)
-- Test rule sync and dynamic registration
+### Anti-Pattern 5: Hardcoded Chart Count
 
-**Phase 3: Generic Extractor (Week 3)**
-- generic-extractor.js implementation
-- Selector execution engine
-- Transform functions
-- Test with sample rule on real site
+**What:** Always showing 8 weeks of trend
+**Why bad:** Fails when <8 weeks of data exist
+**Instead:** Handle `chartData.length === 0` and show "Not enough data"
 
-**Phase 4: Inbox UI (Week 4)**
-- CaptureInbox page component
-- Pending items list
-- Approve/reject workflow
-- Entity type selection
-- Field mapping UI
+## Scalability Considerations
 
-**Phase 5: Rule Builder UI (Week 5)**
-- CaptureRules page component
-- Rule creation form
-- URL pattern builder
-- Selector tester (paste HTML, test selectors)
-- Enable/disable toggle
+| Concern | At 10 uploads | At 100 uploads | At 1000 uploads |
+|---------|--------------|----------------|-----------------|
+| **Historical query** | <10ms | <50ms | Needs index on (user_id, week_ending) |
+| **Threshold checks** | Synchronous OK | Synchronous OK | Move to background job queue |
+| **Notification storage** | No issue | No issue | Add pagination to notification list |
+| **Chart rendering** | Instant | Instant | Limit to 12 weeks max |
+| **Email delivery** | Nodemailer OK | Nodemailer OK | Consider SendGrid/SES |
 
-**Phase 6: Advanced Features (Week 6)**
-- Entity mapping configuration UI
-- Auto-apply rules
-- Bulk approval
-- Polling configuration
+## Technology Decisions
 
-### Critical Path
+### Decision 1: node-cron vs Bull/Agenda
 
-```
-Migration → Services → Routes → Extension Core → Generic Extractor → Inbox UI
+**Choice:** node-cron (if scheduling needed)
+
+**Rationale:**
+- **Pros:** Lightweight (no Redis), simple cron syntax, sufficient for weekly checks
+- **Cons:** No persistence (jobs lost on restart), no distributed scheduling
+- **Alternatives considered:**
+  - Bull: Requires Redis, overkill for weekly jobs
+  - Agenda: Requires MongoDB, not in current stack
+- **When to reconsider:** If need >1 concurrent worker or job history
+
+### Decision 2: Recharts LineChart vs AreaChart
+
+**Choice:** LineChart for trends
+
+**Rationale:**
+- **Pros:** Cleaner for multi-KPI overlay, already used in Metrics.jsx
+- **Cons:** Less visual emphasis than AreaChart
+- **Alternatives considered:**
+  - AreaChart: Good for single KPI, but cluttered with multiple lines
+  - ComposedChart: Overkill for simple trends
+- **When to reconsider:** If need to show confidence intervals or ranges
+
+### Decision 3: In-App Notifications Only vs Email
+
+**Choice:** In-app notifications first, email optional
+
+**Rationale:**
+- **Pros:** No external dependencies, existing notification system works
+- **Cons:** Requires login to see alerts
+- **Alternatives considered:**
+  - Email-only: Misses users with SMTP issues
+  - Push notifications: Requires PWA setup
+- **When to reconsider:** User feedback requests email alerts
+
+### Decision 4: Default Thresholds vs Configuration UI
+
+**Choice:** Default thresholds hardcoded, configuration deferred
+
+**Rationale:**
+- **Pros:** Immediate value, no UI development, sensible defaults for domain
+- **Cons:** Not customizable per team
+- **Alternatives considered:**
+  - User-configurable from day 1: 2x development time
+  - Per-component thresholds: Complex UX
+- **When to reconsider:** Multiple users with different threshold needs
+
+## Dependencies
+
+### New Dependencies Required
+
+| Package | Version | Purpose | When Needed |
+|---------|---------|---------|-------------|
+| node-cron | ^3.0.3 | Scheduled jobs | Phase 4 (optional) |
+| nodemailer | ^6.9.8 | Email alerts | Phase 5 (optional) |
+
+### No New Dependencies (Using Existing)
+
+- Recharts 2.15.1 - Already installed, LineChart available
+- date-fns 3.6.0 - Already installed, format() for chart labels
+- Express 4.18.2 - Existing routes extended
+- pg 8.11.3 - Existing query patterns
+
+## Database Schema Changes
+
+### Option A: No Schema Changes (Recommended for MVP)
+
+Use default thresholds in code, store notifications in existing `notifications` table.
+
+**Pros:**
+- No migration needed
+- Immediate deployment
+- Notifications already work
+
+**Cons:**
+- Thresholds not customizable without code changes
+- No threshold history/audit
+
+### Option B: Add kpi_thresholds Table (Future Enhancement)
+
+```sql
+CREATE TABLE IF NOT EXISTS kpi_thresholds (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id VARCHAR(255) NOT NULL,
+  kpi_name VARCHAR(100) NOT NULL,
+  warning_threshold NUMERIC,
+  critical_threshold NUMERIC,
+  notification_enabled BOOLEAN DEFAULT true,
+  email_enabled BOOLEAN DEFAULT false,
+  created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, kpi_name)
+);
+
+CREATE INDEX idx_kpi_thresholds_user_id ON kpi_thresholds(user_id);
 ```
 
-**Cannot parallelize:**
-- Services depend on migration
-- Routes depend on services
-- Extension changes depend on routes (need API endpoints)
-- Generic extractor depends on extension core (message handling)
-- Inbox UI depends on all backend pieces
+**When to add:** User requests customizable thresholds
 
-**Can parallelize:**
-- Rule Builder UI and Inbox UI (both need backend, independent of each other)
-- Entity Mapping UI can start after Phase 4
+## Testing Strategy
 
----
+### Unit Tests
 
-## Migration Path from v1.0
+**BugService.getKPIHistory():**
+```javascript
+// Mock query response with 3 weeks
+const mockWeeks = [
+  { week_ending: '2026-01-11', kpi_data: { bug_inflow_rate: 6.5 } },
+  { week_ending: '2026-01-18', kpi_data: { bug_inflow_rate: 7.2 } },
+  { week_ending: '2026-01-25', kpi_data: { bug_inflow_rate: 8.9 } }
+];
 
-### Backwards Compatibility Strategy
+// Assert returned in chronological order (oldest first)
+expect(result[0].week_ending).toBe('2026-01-11');
+```
 
-**The existing Jira flow remains untouched:**
+**ThresholdService.checkThreshold():**
+```javascript
+// Lower-is-worse KPI (bug inflow)
+expect(checkThreshold('bug_inflow_rate', 10.5, { warning: 8, critical: 10 }))
+  .toBe('critical');
 
-1. **Content scripts:** `content.js` + extractors remain for `jira.tools.sap`
-2. **Service worker:** `handleSyncIssues()` preserved for Jira
-3. **Backend:** `/api/jira-issues/sync` unchanged
-4. **Database:** `jira_issues` table unchanged
+// Higher-is-worse KPI (SLA %)
+expect(checkThreshold('sla_vh_percent', 55, { warning: 60, critical: 50 }))
+  .toBe('warning');
+```
 
-**New capture system runs in parallel:**
+### Integration Tests
 
-1. Dynamic scripts registered for non-Jira rules only
-2. New data flows to `capture_inbox`, not `jira_issues`
-3. After approval, mapped to appropriate entity tables
+**Historical Query:**
+```javascript
+// Insert 3 weeks of test data
+// Query getKPIHistory(userId, 2, null)
+// Assert returns 2 most recent weeks
+```
 
-### Migration Options
+**Threshold on Upload:**
+```javascript
+// Upload CSV with SLA VH = 45% (below critical 50%)
+// Assert notification created with "critical" in message
+```
 
-**Option A: Gradual (Recommended)**
-- Keep Jira hardcoded indefinitely
-- New sites use configurable system
-- Eventually create Jira rule + mapping for consistency
+### Manual Testing
 
-**Option B: Full Migration (Future)**
-- Create Jira capture rule that matches existing selectors
-- Create entity mapping: Jira fields → jira_issues table
-- Set auto_apply=true to skip inbox
-- Remove hardcoded Jira content scripts
-- Jira data still goes to jira_issues via mapping
-
----
-
-## Integration Points with v1.0 Extension
-
-| Component | Status | Integration Notes |
-|-----------|--------|-------------------|
-| `manifest.json` | MODIFY | Add `scripting` permission, expand `host_permissions` |
-| `service-worker.js` | MODIFY | Add rule sync, dynamic registration, STAGE_CAPTURE handler |
-| `lib/storage.js` | MODIFY | Add captureRules cache key |
-| `lib/api.js` | MODIFY | Add getCaptureRules(), stageCapture() methods |
-| `content/content.js` | PRESERVE | Keep for Jira backwards compatibility |
-| `content/extractors/*.js` | PRESERVE | Keep for Jira backwards compatibility |
-| `content/generic-extractor.js` | NEW | Rule-driven extraction engine |
-| `popup/popup.html` | MODIFY | Add rule status indicator |
-
----
-
-## New vs Modified Components Summary
-
-### New Components
-
-| Component | Type | Location |
-|-----------|------|----------|
-| capture_rules table | Database | migration 018 |
-| capture_inbox table | Database | migration 018 |
-| entity_mappings table | Database | migration 018 |
-| CaptureRuleService.js | Backend Service | server/services/ |
-| CaptureInboxService.js | Backend Service | server/services/ |
-| EntityMappingService.js | Backend Service | server/services/ |
-| captureRules.js | Backend Route | server/routes/ |
-| captureInbox.js | Backend Route | server/routes/ |
-| entityMappings.js | Backend Route | server/routes/ |
-| generic-extractor.js | Extension Content | extension/content/ |
-| CaptureRules.jsx | Frontend Page | src/pages/ |
-| CaptureInbox.jsx | Frontend Page | src/pages/ |
-| RuleBuilder.jsx | Frontend Component | src/components/capture/ |
-| InboxItem.jsx | Frontend Component | src/components/capture/ |
-
-### Modified Components
-
-| Component | Changes |
-|-----------|---------|
-| manifest.json | Add scripting permission, expand host_permissions |
-| service-worker.js | Add dynamic registration, STAGE_CAPTURE handler |
-| lib/storage.js | Add captureRules cache key |
-| lib/api.js | Add getCaptureRules(), stageCapture() methods |
-| server/index.js | Mount new routes |
-| src/pages/Layout.jsx | Add Inbox nav item with badge |
-
-### Preserved Components (No Changes)
-
-| Component | Reason |
-|-----------|--------|
-| content/content.js | Jira backwards compatibility |
-| content/extractors/*.js | Jira backwards compatibility |
-| server/routes/jira.js | Jira backwards compatibility |
-| server/services/JiraService.js | Jira backwards compatibility |
-| jira_issues table | Jira backwards compatibility |
-| jira_team_mappings table | Jira backwards compatibility |
-
----
+1. Upload CSV with SLA VH < 50% → Check notification created
+2. View dashboard → See 8-week trend chart (if 8 weeks uploaded)
+3. Mark notification as read → Badge count decreases
+4. Filter by component → Trend chart updates
 
 ## Sources
 
-**Confidence Level:** HIGH
+### Primary (HIGH confidence)
+- `/Users/i306072/Documents/GitHub/P-E/server/services/BugService.js` - Existing KPI calculation and storage patterns
+- `/Users/i306072/Documents/GitHub/P-E/server/services/NotificationService.js` - Existing notification CRUD operations
+- `/Users/i306072/Documents/GitHub/P-E/server/db/019_bug_dashboard.sql` - weekly_kpis table schema with JSONB kpi_data
+- `/Users/i306072/Documents/GitHub/P-E/src/pages/BugDashboard.jsx` - Current dashboard structure and filter patterns
+- `/Users/i306072/Documents/GitHub/P-E/.planning/phases/12-dashboard-ui/12-RESEARCH.md` - Recharts patterns already established
 
-**Based on:**
+### Secondary (MEDIUM confidence)
+- Recharts documentation - LineChart API verified in package.json v2.15.1
+- node-cron documentation - Cron syntax for scheduling (not yet installed)
+- PostgreSQL time-series query patterns - JOIN performance characteristics
 
-1. **Existing v1.0 Implementation (PRIMARY SOURCE)**
-   - `/extension/manifest.json` - Current manifest structure
-   - `/extension/service-worker.js` - Message handling patterns
-   - `/extension/content/content.js` - Page detection and extraction flow
-   - `/extension/content/extractors/*.js` - Selector-based extraction patterns
-   - `/server/services/JiraService.js` - Service layer patterns
-   - `/server/routes/jira.js` - Route handler patterns
-
-2. **Chrome Extension Documentation (Verified)**
-   - `chrome.scripting.registerContentScripts()` API for dynamic registration
-   - `chrome.scripting.executeScript()` for programmatic injection
-   - Content script isolated world execution model
-   - Service worker lifecycle and storage patterns
-
-3. **P&E Manager Codebase Patterns (Verified)**
-   - Multi-tenancy enforcement via user_id
-   - Service → Routes → Database layering
-   - Entity abstraction in frontend
-   - PostgreSQL JSONB for flexible schemas
-
-**Sources:**
-- [Chrome Content Scripts Documentation](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts)
-- [Chrome Scripting API Reference](https://developer.chrome.com/docs/extensions/reference/api/scripting)
-
----
-
-*Research generated: 2026-01-22*
+### Tertiary (LOW confidence)
+- None - all patterns verified against existing codebase
