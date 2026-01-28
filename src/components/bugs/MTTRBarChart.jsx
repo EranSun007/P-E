@@ -70,7 +70,7 @@ export function MTTRBarChart({ mttrByPriority }) {
                 <XAxis type="number" unit="h" />
                 <YAxis dataKey="priority" type="category" width={80} />
                 <Tooltip
-                  formatter={(value, name, props) => [
+                  formatter={(value, _name, props) => [
                     `${value.toFixed(1)}h - ${props.payload.count} bugs`,
                     'MTTR',
                   ]}
