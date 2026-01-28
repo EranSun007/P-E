@@ -333,6 +333,43 @@ class BugService {
   // ============================================
 
   /**
+   * Calculate bug inflow rate using 4-week rolling window
+   * Groups bugs by ISO week of creation, then calculates average of recent 4 weeks
+   * @param {Array} bugs - Array of bug objects with created_date
+   * @returns {number} - Average bugs per week (4-week rolling average)
+   */
+  calculateBugInflowRate(bugs) {
+    // Group bugs by ISO week of creation
+    const weeklyGroups = {};
+    for (const bug of bugs) {
+      if (!bug.created_date) continue;
+      const weekKey = this.getWeekKey(new Date(bug.created_date));
+      weeklyGroups[weekKey] = (weeklyGroups[weekKey] || 0) + 1;
+    }
+
+    // Sort weeks chronologically
+    const weeks = Object.keys(weeklyGroups).sort();
+
+    // Handle edge cases
+    if (weeks.length === 0) return 0;
+
+    // If less than 4 weeks of data, return average of available weeks
+    if (weeks.length < 4) {
+      const totalBugs = Object.values(weeklyGroups).reduce((a, b) => a + b, 0);
+      return weeks.length > 0 ? totalBugs / weeks.length : 0;
+    }
+
+    // Calculate 4-week rolling window (most recent 4 weeks)
+    const recentWeeks = weeks.slice(-4);
+    const recentBugCount = recentWeeks.reduce(
+      (sum, week) => sum + (weeklyGroups[week] || 0),
+      0
+    );
+
+    return recentBugCount / 4;
+  }
+
+  /**
    * Calculate all 9 KPIs (KPI-01 through KPI-09) from bug array
    * @param {Array} bugs - Array of bug objects
    * @returns {Object} - KPI values object
@@ -343,8 +380,8 @@ class BugService {
     const openBugs = bugs.filter(b => openStatuses.includes(b.status));
     const resolvedBugs = bugs.filter(b => b.resolution_time_hours !== null);
 
-    // KPI 1: Bug Inflow Rate (simplified - bugs per week, actual needs 4-week rolling)
-    const bugInflowRate = totalBugs / 4; // Assume 4-week dataset
+    // KPI 1: Bug Inflow Rate (4-week rolling window)
+    const bugInflowRate = this.calculateBugInflowRate(bugs);
 
     // KPI 2: Time to First Response (using resolution time as proxy - TTFR not in CSV)
     const sortedTimes = resolvedBugs
