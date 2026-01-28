@@ -249,7 +249,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 13-01-PLAN.md — Historical KPI query with JOIN optimization
+- [x] 13-01-PLAN.md — Historical KPI query with JOIN optimization
 
 ### Phase 14: Trend Charts
 **Goal**: User can view KPI trends over time with visual threshold zones
@@ -324,7 +324,7 @@ v1.3: 13 -> 14 (depends on 13) -> 15 (depends on 13) -> 16 (depends on 15)
 | 10. Backend Foundation | v1.2 | 2/2 | Complete | 2026-01-27 |
 | 11. CSV Upload | v1.2 | 1/1 | Complete | 2026-01-28 |
 | 12. Dashboard UI | v1.2 | 2/2 | Complete | 2026-01-28 |
-| 13. Historical KPI Storage | v1.3 | 0/1 | Not started | - |
+| 13. Historical KPI Storage | v1.3 | 1/1 | Complete | 2026-01-28 |
 | 14. Trend Charts | v1.3 | 0/2 | Not started | - |
 | 15. Threshold Detection & In-App Notifications | v1.3 | 0/2 | Not started | - |
 | 16. Email Notifications & Preferences | v1.3 | 0/2 | Not started | - |

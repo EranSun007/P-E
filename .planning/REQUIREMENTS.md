@@ -68,7 +68,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 13 | Pending |
+| INFRA-01 | Phase 13 | Complete |
 | TREND-01 | Phase 14 | Pending |
 | TREND-02 | Phase 14 | Pending |
 | TREND-03 | Phase 14 | Pending |
