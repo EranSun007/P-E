@@ -106,6 +106,11 @@ const MIGRATIONS = [
     version: '020_notification_types',
     name: 'Add notification type and metadata for KPI alerts',
     file: '020_notification_types.sql'
+  },
+  {
+    version: '021_email_notifications',
+    name: 'Email notification queue for failure logging',
+    file: '021_email_notifications.sql'
   }
 ];
 
