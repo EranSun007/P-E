@@ -14,7 +14,9 @@ import {
   Download,
   Upload,
   Database,
-  Loader2
+  Loader2,
+  Github,
+  Bell
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +50,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import PasswordChangeForm from "@/components/auth/PasswordChangeForm";
 import UserManagement from "@/components/auth/UserManagement";
+import GitHubSettings from "@/components/github/GitHubSettings";
+import EmailPreferences from "@/components/settings/EmailPreferences";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function SettingsPage() {
@@ -272,6 +276,8 @@ export default function SettingsPage() {
     { id: "tags", label: "Tags", icon: Tag },
     { id: "account", label: "Account", icon: User },
     ...(isAdmin ? [{ id: "users", label: "Users", icon: User }] : []),
+    { id: "github", label: "GitHub", icon: Github },
+    { id: "notifications", label: "Notifications", icon: Bell },
     { id: "data", label: "Data", icon: Database }
   ];
 
@@ -512,6 +518,10 @@ export default function SettingsPage() {
                 </Card>
               ) : tab.id === 'users' ? (
                 <UserManagement />
+              ) : tab.id === 'github' ? (
+                <GitHubSettings />
+              ) : tab.id === 'notifications' ? (
+                <EmailPreferences />
               ) : tab.id !== 'account' ? (
                 <Card>
                   <CardHeader>
