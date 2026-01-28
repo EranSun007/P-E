@@ -571,6 +571,32 @@ export const apiClient = {
       return fetchWithAuth(`${API_BASE_URL}/bugs/list?${params.toString()}`);
     },
 
+    // Date-range queries (Sprint/Takt filter)
+    async listBugsByDateRange(startDate, endDate, filters = {}) {
+      const params = new URLSearchParams();
+      params.append('startDate', startDate);
+      params.append('endDate', endDate);
+      if (filters.component) params.append('component', filters.component);
+      if (filters.status) params.append('status', filters.status);
+      if (filters.priority) params.append('priority', filters.priority);
+      if (filters.limit) params.append('limit', filters.limit);
+      if (filters.offset) params.append('offset', filters.offset);
+      return fetchWithAuth(`${API_BASE_URL}/bugs/by-date-range?${params.toString()}`);
+    },
+
+    async getKPIsByDateRange(startDate, endDate, component = null) {
+      let url = `${API_BASE_URL}/bugs/kpis-by-date-range?startDate=${startDate}&endDate=${endDate}`;
+      if (component) url += `&component=${encodeURIComponent(component)}`;
+      return fetchWithAuth(url);
+    },
+
+    // Get historical KPIs for trend analysis
+    async getKPIHistory(weeks = 12, component = null) {
+      let url = `${API_BASE_URL}/bugs/kpis/history?weeks=${weeks}`;
+      if (component) url += `&component=${encodeURIComponent(component)}`;
+      return fetchWithAuth(url);
+    },
+
     // Note: Upload uses XMLHttpRequest for progress tracking, not fetchWithAuth
     // See CSVUploadDialog for upload implementation
   },
