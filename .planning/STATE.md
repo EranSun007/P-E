@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Single dashboard showing health and status across all team tools without switching contexts
-**Current focus:** v1.2 DevOps Bug Dashboard — Phase 12 in progress
+**Current focus:** v1.2 DevOps Bug Dashboard — COMPLETE
 
 ## Current Position
 
-Phase: 12 of 12 (Dashboard UI) — IN PROGRESS
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-01-28 — Completed 12-01-PLAN.md (KPI Dashboard UI)
+Phase: 12 of 12 (Dashboard UI) — COMPLETE
+Plan: 2 of 2 in current phase
+Status: v1.2 milestone complete
+Last activity: 2026-01-28 — Completed 12-02-PLAN.md (Charts and Aging Bugs Table)
 
-Progress: [████......] 80% (4/5 plans, 2/3 phases)
+Progress: [██████████] 100% (5/5 plans, 3/3 phases)
 
 ## Performance Metrics
 
@@ -29,10 +29,10 @@ Progress: [████......] 80% (4/5 plans, 2/3 phases)
 - Total execution time: ~31 min
 
 **v1.2 DevOps Bug Dashboard:**
-- Estimated plans: 5 (Phase 10: 2, Phase 11: 1, Phase 12: 2)
-- Completed: 4
-- Average duration: 4.2 min
-- Total execution time: 17 min
+- Total plans completed: 5 (Phase 10: 2, Phase 11: 1, Phase 12: 2)
+- Phases: 10-12 (3 phases)
+- Average duration: 3.9 min
+- Total execution time: ~20 min
 
 ## Accumulated Context
 
@@ -78,6 +78,11 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - Tailwind green/yellow/red/neutral status colors
 - Responsive grid 1/2/3/4 columns for KPI cards
 
+**Phase 12-02 decisions:**
+- JIRA URL configurable via env var with SAP default
+- Parallel fetch for KPIs and bugs data
+- Named exports plus default exports for flexibility
+
 ### Pending Todos
 
 None.
@@ -89,15 +94,15 @@ None.
 - Large CSV files (1000+ bugs) will need performance testing
 - KPI formulas should be validated with sample production data before launch
 
-## v1.2 Feature Summary
+## v1.2 Feature Summary - COMPLETE
 
 **DevOps Bug Dashboard:**
 - Weekly CSV upload from JIRA exports
-- 10 KPIs: Bug Inflow, TTFR, MTTR (by priority), SLA Compliance, Open Bug Age, Automated Ratio, Category Distribution, Workload Distribution, Backlog Health Score
+- 9 KPIs: Bug Inflow, TTFR, MTTR (by priority), SLA Compliance, Open Bug Age, Automated Ratio, Category Distribution, Workload Distribution, Backlog Health Score
 - Status indicators: Green (on target), Yellow (warning), Red (critical)
 - Filtering by component and week
 - Aging bugs table with JIRA links
-- Charts: MTTR by priority, category distribution
+- Charts: MTTR by priority bar chart, category distribution donut chart
 
 **Target Thresholds:**
 - Bug Inflow: <=6/week (green), 6.1-8 (yellow), >8 (red)
@@ -107,8 +112,8 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-28 05:59 UTC
-Stopped at: Completed 12-01-PLAN.md
+Last session: 2026-01-28 06:05 UTC
+Stopped at: Completed 12-02-PLAN.md (v1.2 milestone complete)
 Resume file: None
 
 ## Next Steps
@@ -121,4 +126,6 @@ Resume file: None
 6. ~~Execute 11-01: CSV Upload UI~~ Done
 7. ~~Plan Phase 12: KPI Dashboard UI~~ Done
 8. ~~Execute 12-01: KPI Dashboard UI~~ Done
-9. Execute 12-02: Charts and Aging Bugs Table
+9. ~~Execute 12-02: Charts and Aging Bugs Table~~ Done
+
+**v1.2 DevOps Bug Dashboard milestone complete!**
