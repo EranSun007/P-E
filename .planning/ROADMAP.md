@@ -263,11 +263,11 @@ Plans:
   5. Hovering over data point shows exact KPI value and date
   6. KPI cards show mini sparkline visualizations
   7. KPI cards display trend arrows indicating direction (up/down/flat)
-**Plans**: 2 plans
+**Plans**: 2/2 complete
 
 Plans:
-- [ ] 14-01-PLAN.md — KPITrendChart component with Recharts LineChart
-- [ ] 14-02-PLAN.md — Sparklines and trend indicators on KPI cards
+- [x] 14-01-PLAN.md — KPITrendChart component with Recharts LineChart
+- [x] 14-02-PLAN.md — Sparklines and trend indicators on KPI cards
 
 ### Phase 15: Threshold Detection & In-App Notifications
 **Goal**: System detects threshold breaches and alerts users within the app
@@ -325,6 +325,6 @@ v1.3: 13 -> 14 (depends on 13) -> 15 (depends on 13) -> 16 (depends on 15)
 | 11. CSV Upload | v1.2 | 1/1 | Complete | 2026-01-28 |
 | 12. Dashboard UI | v1.2 | 2/2 | Complete | 2026-01-28 |
 | 13. Historical KPI Storage | v1.3 | 1/1 | Complete | 2026-01-28 |
-| 14. Trend Charts | v1.3 | 0/2 | Planned | - |
+| 14. Trend Charts | v1.3 | 2/2 | Complete | 2026-01-28 |
 | 15. Threshold Detection & In-App Notifications | v1.3 | 0/2 | Not started | - |
 | 16. Email Notifications & Preferences | v1.3 | 0/2 | Not started | - |

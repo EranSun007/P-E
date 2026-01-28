@@ -9,13 +9,13 @@ Requirements for KPI Insights & Alerts milestone. Each maps to roadmap phases.
 
 ### Trend Charts
 
-- [ ] **TREND-01**: User can view time-series line chart of any KPI over multiple weeks
-- [ ] **TREND-02**: User can select which KPI to display on trend chart
-- [ ] **TREND-03**: User can select time range (4, 8, or 12 weeks)
-- [ ] **TREND-04**: Trend chart shows threshold zones as colored bands (green/yellow/red areas)
-- [ ] **TREND-05**: Tooltip on hover shows exact KPI value and date
-- [ ] **TREND-06**: KPI cards display sparklines showing mini trend visualization
-- [ ] **TREND-07**: KPI cards show trend direction indicators (↑↓→ arrows)
+- [x] **TREND-01**: User can view time-series line chart of any KPI over multiple weeks
+- [x] **TREND-02**: User can select which KPI to display on trend chart
+- [x] **TREND-03**: User can select time range (4, 8, or 12 weeks)
+- [x] **TREND-04**: Trend chart shows threshold zones as colored bands (green/yellow/red areas)
+- [x] **TREND-05**: Tooltip on hover shows exact KPI value and date
+- [x] **TREND-06**: KPI cards display sparklines showing mini trend visualization
+- [x] **TREND-07**: KPI cards show trend direction indicators (↑↓→ arrows)
 
 ### Notifications
 
@@ -29,7 +29,7 @@ Requirements for KPI Insights & Alerts milestone. Each maps to roadmap phases.
 
 ### Infrastructure
 
-- [ ] **INFRA-01**: Historical KPI data stored for trend queries
+- [x] **INFRA-01**: Historical KPI data stored for trend queries
 - [ ] **INFRA-02**: Notification deduplication prevents alert spam on re-uploads
 - [ ] **INFRA-03**: Email delivery with retry logic for reliability
 
@@ -69,13 +69,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | INFRA-01 | Phase 13 | Complete |
-| TREND-01 | Phase 14 | Pending |
-| TREND-02 | Phase 14 | Pending |
-| TREND-03 | Phase 14 | Pending |
-| TREND-04 | Phase 14 | Pending |
-| TREND-05 | Phase 14 | Pending |
-| TREND-06 | Phase 14 | Pending |
-| TREND-07 | Phase 14 | Pending |
+| TREND-01 | Phase 14 | Complete |
+| TREND-02 | Phase 14 | Complete |
+| TREND-03 | Phase 14 | Complete |
+| TREND-04 | Phase 14 | Complete |
+| TREND-05 | Phase 14 | Complete |
+| TREND-06 | Phase 14 | Complete |
+| TREND-07 | Phase 14 | Complete |
 | NOTIF-01 | Phase 15 | Pending |
 | NOTIF-02 | Phase 15 | Pending |
 | NOTIF-03 | Phase 15 | Pending |
@@ -99,4 +99,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-28*
-*Last updated: 2026-01-28 after roadmap creation*
+*Last updated: 2026-01-28 after Phase 14 completion*
