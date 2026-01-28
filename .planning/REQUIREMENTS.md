@@ -100,12 +100,12 @@
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| UPLOAD-01 | Phase 11 | Pending |
-| UPLOAD-02 | Phase 11 | Pending |
+| UPLOAD-01 | Phase 11 | Complete |
+| UPLOAD-02 | Phase 11 | Complete |
 | UPLOAD-03 | Phase 10 | Complete |
-| UPLOAD-04 | Phase 11 | Pending |
-| UPLOAD-05 | Phase 11 | Pending |
-| UPLOAD-06 | Phase 11 | Pending |
+| UPLOAD-04 | Phase 11 | Complete |
+| UPLOAD-05 | Phase 11 | Complete |
+| UPLOAD-06 | Phase 11 | Complete |
 | DB-01 | Phase 10 | Complete |
 | DB-02 | Phase 10 | Complete |
 | DB-03 | Phase 10 | Complete |
@@ -120,7 +120,7 @@
 | KPI-07 | Phase 10 | Complete |
 | KPI-08 | Phase 10 | Complete |
 | KPI-09 | Phase 10 | Complete |
-| API-01 | Phase 11 | Pending |
+| API-01 | Phase 11 | Complete |
 | API-02 | Phase 10 | Complete |
 | API-03 | Phase 10 | Complete |
 | API-04 | Phase 10 | Complete |
@@ -134,7 +134,7 @@
 | DASH-07 | Phase 12 | Pending |
 | DASH-08 | Phase 12 | Pending |
 
-*Traceability table updated by roadmap generator — 2026-01-27*
+*Traceability table updated — 2026-01-28*
 
 ---
 
