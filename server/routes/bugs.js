@@ -1,6 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import BugService from '../services/BugService.js';
+import ThresholdService from '../services/ThresholdService.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -66,7 +67,15 @@ router.post('/upload', upload.single('csvFile'), async (req, res) => {
       weekEnding
     );
 
+    // Return response immediately to the client
     res.json(result);
+
+    // Fire-and-forget threshold check (async, no await)
+    // Runs after response is sent, doesn't block upload flow
+    if (result.kpis) {
+      ThresholdService.evaluateAndNotify(req.user.id, result.kpis, weekEnding)
+        .catch(err => console.error('Threshold notification failed:', err));
+    }
   } catch (error) {
     console.error('POST /api/bugs/upload error:', error);
 
