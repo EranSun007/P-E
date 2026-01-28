@@ -1,7 +1,9 @@
 // src/components/bugs/KPIGrid.jsx
-// Grid layout for displaying all 9 KPI cards
+// Grid layout for displaying all 9 KPI cards with sparklines and trend arrows
 
-import { KPICard, getKPIStatus } from './KPICard';
+import { useState, useEffect } from 'react';
+import { KPICard, getKPIStatus, calculateTrend } from './KPICard';
+import { apiClient } from '@/api/apiClient';
 import {
   Bug,
   Clock,
@@ -116,12 +118,42 @@ function formatValue(value, key) {
 
 /**
  * KPIGrid Component
- * Renders all 9 KPIs in a responsive grid layout
+ * Renders all 9 KPIs in a responsive grid layout with sparklines and trend arrows
  *
  * @param {Object} props
  * @param {Object} props.kpis - KPI data object from API
+ * @param {string|null} props.component - Component filter (null for all)
  */
-export function KPIGrid({ kpis }) {
+export function KPIGrid({ kpis, component = null }) {
+  const [historyData, setHistoryData] = useState({});
+
+  // Fetch 4-week KPI history for sparklines
+  useEffect(() => {
+    async function loadHistory() {
+      try {
+        const history = await apiClient.bugs.getKPIHistory(4, component);
+
+        // Transform history into per-KPI arrays
+        // history is sorted DESC (newest first), reverse for sparkline (oldest to newest)
+        const kpiHistory = {};
+        const reversedHistory = [...history].reverse();
+
+        for (const config of KPI_CONFIG) {
+          kpiHistory[config.key] = reversedHistory.map(
+            (h) => h.kpi_data?.[config.key] ?? null
+          );
+        }
+
+        setHistoryData(kpiHistory);
+      } catch (error) {
+        console.error('Failed to load KPI history:', error);
+        setHistoryData({});
+      }
+    }
+
+    loadHistory();
+  }, [component]);
+
   if (!kpis) {
     return null;
   }
@@ -132,6 +164,8 @@ export function KPIGrid({ kpis }) {
         const value = kpis[config.key];
         const formattedValue = formatValue(value, config.key);
         const status = getKPIStatus(config.key, value);
+        const kpiHistoryData = historyData[config.key] || [];
+        const trend = calculateTrend(kpiHistoryData, config.key);
 
         return (
           <KPICard
@@ -142,6 +176,8 @@ export function KPIGrid({ kpis }) {
             status={status}
             description={config.description}
             icon={config.icon}
+            historyData={kpiHistoryData}
+            trend={trend}
           />
         );
       })}

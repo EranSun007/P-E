@@ -362,7 +362,10 @@ const BugDashboard = () => {
       {/* KPI Grid */}
       {kpis ? (
         <>
-          <KPIGrid kpis={kpis} />
+          <KPIGrid
+            kpis={kpis}
+            component={selectedComponent === 'all' ? null : selectedComponent}
+          />
 
           {/* KPI Trend Chart */}
           <KPITrendChart
