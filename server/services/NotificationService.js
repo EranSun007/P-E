@@ -55,6 +55,48 @@ class NotificationService {
     }
   }
 
+  async createWithType(userId, notificationData) {
+    try {
+      const {
+        message,
+        read = false,
+        scheduled_date = null,
+        notification_type = 'general',
+        metadata = {},
+      } = notificationData;
+
+      if (!message) {
+        throw new Error('Missing required field: message');
+      }
+
+      const sql = `
+        INSERT INTO notifications (user_id, message, read, scheduled_date, notification_type, metadata)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *
+      `;
+
+      const values = [userId, message, read, scheduled_date, notification_type, JSON.stringify(metadata)];
+      const result = await query(sql, values);
+      return result.rows[0];
+    } catch (error) {
+      console.error('NotificationService.createWithType error:', error);
+      throw new Error('Failed to create notification');
+    }
+  }
+
+  async getUnreadCount(userId) {
+    try {
+      const result = await query(
+        'SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND read = false',
+        [userId]
+      );
+      return parseInt(result.rows[0].count, 10);
+    } catch (error) {
+      console.error('NotificationService.getUnreadCount error:', error);
+      throw new Error('Failed to get unread count');
+    }
+  }
+
   async update(userId, notificationId, updates) {
     try {
       const currentResult = await query(
@@ -66,7 +108,7 @@ class NotificationService {
         throw new Error('Notification not found or access denied');
       }
 
-      const allowedFields = ['message', 'read', 'scheduled_date'];
+      const allowedFields = ['message', 'read', 'scheduled_date', 'notification_type', 'metadata'];
       const updateFields = [];
       const values = [];
       let paramIndex = 1;

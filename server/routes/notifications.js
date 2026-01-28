@@ -15,6 +15,18 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/notifications/unread-count
+// Returns count of unread notifications for badge display
+router.get('/unread-count', async (req, res) => {
+  try {
+    const count = await NotificationService.getUnreadCount(req.user.id);
+    res.json({ count });
+  } catch (error) {
+    console.error('GET /api/notifications/unread-count error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const notification = await NotificationService.get(req.user.id, req.params.id);
