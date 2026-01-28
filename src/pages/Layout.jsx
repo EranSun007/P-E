@@ -157,6 +157,12 @@ export default function Layout({ children, currentPageName }) {
       icon: FileCode,
       href: createPageUrl("CaptureRules"),
       current: currentPageName === "CaptureRules"
+    },
+    {
+      name: "Bug Dashboard",
+      icon: Bug,
+      href: createPageUrl("BugDashboard"),
+      current: currentPageName === "BugDashboard"
     }
   ];
 

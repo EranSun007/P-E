@@ -59,6 +59,9 @@ const Releases = lazy(() => retryImport(() => import(/* webpackChunkName: "pages
 const CaptureInbox = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-capture-inbox" */ "./CaptureInbox"), 3, 1000));
 const CaptureRules = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-capture-rules" */ "./CaptureRules"), 3, 1000));
 
+// Bug Dashboard Pages
+const BugDashboard = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-bug-dashboard" */ "./BugDashboard"), 3, 1000));
+
 const PAGES = {
     
     Tasks: Tasks,
@@ -107,6 +110,8 @@ const PAGES = {
 
     CaptureRules: CaptureRules,
 
+    // Bug Dashboard
+    BugDashboard: BugDashboard,
 }
 
 function _getCurrentPage(url) {
@@ -183,8 +188,11 @@ function PagesContent() {
                         <Route path="/releases" element={<Releases />} />
 
                         {/* Capture Framework Routes */}
-                        <Route path="/capture-inbox" element={<CaptureInbox />} />
-                        <Route path="/capture-rules" element={<CaptureRules />} />
+                        <Route path="/captureinbox" element={<CaptureInbox />} />
+                        <Route path="/capturerules" element={<CaptureRules />} />
+
+                        {/* Bug Dashboard */}
+                        <Route path="/bugs" element={<BugDashboard />} />
 
                     </Routes>
                 </Suspense>
