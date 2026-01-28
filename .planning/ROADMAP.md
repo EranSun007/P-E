@@ -310,7 +310,7 @@ Plans:
 
 **Milestone Goal:** Fix component extraction and filtering bugs, add table enhancements and UI polish to complete the bug dashboard vision.
 
-- [ ] **Phase 17: Core Bug Fixes** - Fix component extraction, filtering, category chart, and inflow calculation
+- [x] **Phase 17: Core Bug Fixes** - Fix component extraction, filtering, category chart, and inflow calculation
 - [ ] **Phase 18: Table Enhancements & UI Polish** - Age indicators, component column, sorting, trend chart, UI improvements
 
 ### Phase 17: Core Bug Fixes
@@ -326,8 +326,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 17-01-PLAN.md — Component extraction logic and filter dropdown population
-- [ ] 17-02-PLAN.md — Rolling window calculation and filter verification
+- [x] 17-01-PLAN.md — Component extraction logic and filter dropdown population
+- [x] 17-02-PLAN.md — Rolling window calculation and filter verification
 
 ### Phase 18: Table Enhancements & UI Polish
 **Goal**: Aging bugs table is enhanced with visual indicators and sorting, UI has clear labels and feedback
@@ -373,5 +373,5 @@ v1.4: 17 -> 18 (depends on 17)
 | 14. Trend Charts | v1.3 | 2/2 | Complete | 2026-01-28 |
 | 15. Threshold Detection & In-App Notifications | v1.3 | 2/2 | Complete | 2026-01-28 |
 | 16. Email Notifications & Preferences | v1.3 | 2/2 | Complete | 2026-01-28 |
-| 17. Core Bug Fixes | v1.4 | 0/2 | In progress | - |
+| 17. Core Bug Fixes | v1.4 | 2/2 | Complete | 2026-01-28 |
 | 18. Table Enhancements & UI Polish | v1.4 | 0/2 | Not started | - |

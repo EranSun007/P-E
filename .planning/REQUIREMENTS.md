@@ -9,11 +9,11 @@ Requirements for Bug Dashboard Fixes & Enhancements milestone. Each maps to road
 
 ### Bug Fixes
 
-- [ ] **FIX-01**: Component extraction logic correctly categorizes bugs from labels/summary
-- [ ] **FIX-02**: Component filter dropdown populated from uploaded data with "All Components" default
-- [ ] **FIX-03**: Component filter updates all KPIs, charts, and table when changed
-- [ ] **FIX-04**: Category distribution chart shows correct multi-category breakdown
-- [ ] **FIX-05**: Bug inflow rate uses correct 4-week rolling window formula
+- [x] **FIX-01**: Component extraction logic correctly categorizes bugs from labels/summary
+- [x] **FIX-02**: Component filter dropdown populated from uploaded data with "All Components" default
+- [x] **FIX-03**: Component filter updates all KPIs, charts, and table when changed
+- [x] **FIX-04**: Category distribution chart shows correct multi-category breakdown
+- [x] **FIX-05**: Bug inflow rate uses correct 4-week rolling window formula
 
 ### Table Enhancements
 
@@ -67,11 +67,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-01 | Phase 17 | Pending |
-| FIX-02 | Phase 17 | Pending |
-| FIX-03 | Phase 17 | Pending |
-| FIX-04 | Phase 17 | Pending |
-| FIX-05 | Phase 17 | Pending |
+| FIX-01 | Phase 17 | Complete |
+| FIX-02 | Phase 17 | Complete |
+| FIX-03 | Phase 17 | Complete |
+| FIX-04 | Phase 17 | Complete |
+| FIX-05 | Phase 17 | Complete |
 | TABLE-01 | Phase 18 | Pending |
 | TABLE-02 | Phase 18 | Pending |
 | TABLE-03 | Phase 18 | Pending |
