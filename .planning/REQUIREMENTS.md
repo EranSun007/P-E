@@ -1,54 +1,54 @@
-# Requirements: P&E Manager v1.3
+# Requirements: P&E Manager v1.4
 
 **Defined:** 2026-01-28
 **Core Value:** Single dashboard showing health and status across all team tools without switching contexts
 
-## v1.3 Requirements
+## v1.4 Requirements
 
-Requirements for KPI Insights & Alerts milestone. Each maps to roadmap phases.
+Requirements for Bug Dashboard Fixes & Enhancements milestone. Each maps to roadmap phases.
 
-### Trend Charts
+### Bug Fixes
 
-- [x] **TREND-01**: User can view time-series line chart of any KPI over multiple weeks
-- [x] **TREND-02**: User can select which KPI to display on trend chart
-- [x] **TREND-03**: User can select time range (4, 8, or 12 weeks)
-- [x] **TREND-04**: Trend chart shows threshold zones as colored bands (green/yellow/red areas)
-- [x] **TREND-05**: Tooltip on hover shows exact KPI value and date
-- [x] **TREND-06**: KPI cards display sparklines showing mini trend visualization
-- [x] **TREND-07**: KPI cards show trend direction indicators (↑↓→ arrows)
+- [ ] **FIX-01**: Component extraction logic correctly categorizes bugs from labels/summary
+- [ ] **FIX-02**: Component filter dropdown populated from uploaded data with "All Components" default
+- [ ] **FIX-03**: Component filter updates all KPIs, charts, and table when changed
+- [ ] **FIX-04**: Category distribution chart shows correct multi-category breakdown
+- [ ] **FIX-05**: Bug inflow rate uses correct 4-week rolling window formula
 
-### Notifications
+### Table Enhancements
 
-- [x] **NOTIF-01**: System detects when KPI crosses into red zone on CSV upload
-- [x] **NOTIF-02**: System creates in-app notification when threshold breached
-- [x] **NOTIF-03**: Notification bell icon shows unread count badge in header
-- [x] **NOTIF-04**: User can view notification panel with list of alerts
-- [x] **NOTIF-05**: User can mark notifications as read
-- [ ] **NOTIF-06**: System sends email notification when KPI hits red zone
-- [ ] **NOTIF-07**: User can configure notification preferences per KPI
+- [ ] **TABLE-01**: Aging bugs table shows visual age indicators (🔴🟡🟢)
+- [ ] **TABLE-02**: Aging bugs table includes component column with badge display
+- [ ] **TABLE-03**: All table columns are sortable with sort indicators
 
-### Infrastructure
+### Visualization
 
-- [x] **INFRA-01**: Historical KPI data stored for trend queries
-- [x] **INFRA-02**: Notification deduplication prevents alert spam on re-uploads
-- [ ] **INFRA-03**: Email delivery with retry logic for reliability
+- [ ] **VIS-01**: Weekly inflow trend chart displays when multiple weeks uploaded
+
+### UI Polish
+
+- [ ] **UI-01**: Filter dropdowns have clear, descriptive labels
+- [ ] **UI-02**: Component filter badge shows when filtered (not "All")
 
 ## Future Requirements
 
-Deferred to v1.4 or later. Tracked but not in current roadmap.
+Deferred to v1.5 or later. Tracked but not in current roadmap.
 
-### Advanced Trends
+### Table Features
 
-- **TREND-F01**: Multi-KPI comparison view on single chart
-- **TREND-F02**: Export trend data to CSV
-- **TREND-F03**: Trend annotations with comments
+- **TABLE-F01**: Search functionality for bugs (filter by key, summary, assignee)
+- **TABLE-F02**: Bulk actions on selected bugs
 
-### Advanced Notifications
+### Visualization Features
 
-- **NOTIF-F01**: Slack/Teams integration for alerts
-- **NOTIF-F02**: Notification snooze for X weeks
-- **NOTIF-F03**: Notification grouping (multiple red KPIs = single notification)
-- **NOTIF-F04**: Scheduled monitoring (check thresholds even without upload)
+- **VIS-F01**: KPI status badges on cards (✅ On Target / 🟡 Warning / 🔴 Critical)
+- **VIS-F02**: Multi-KPI comparison view on trend charts
+- **VIS-F03**: Export trend data to CSV
+
+### Advanced Features
+
+- **ADV-F01**: Custom threshold configuration UI
+- **ADV-F02**: Per-component threshold overrides
 
 ## Out of Scope
 
@@ -56,11 +56,10 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Real-time KPI updates | Weekly CSV workflow is the data source |
-| Predictive forecasting | Complexity exceeds value for current use case |
-| Custom threshold definitions | Fixed thresholds from specification sufficient |
-| Mobile push notifications | Web-only application |
-| AI-based anomaly detection | Over-engineering for v1 |
+| Direct JIRA API integration | CSV export is the data source per design |
+| Real-time bug updates | Weekly CSV upload workflow |
+| Bug modification/write-back | Read-only analytics |
+| Custom KPI definitions | Fixed set of 9 KPIs |
 
 ## Traceability
 
@@ -68,35 +67,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 13 | Complete |
-| TREND-01 | Phase 14 | Complete |
-| TREND-02 | Phase 14 | Complete |
-| TREND-03 | Phase 14 | Complete |
-| TREND-04 | Phase 14 | Complete |
-| TREND-05 | Phase 14 | Complete |
-| TREND-06 | Phase 14 | Complete |
-| TREND-07 | Phase 14 | Complete |
-| NOTIF-01 | Phase 15 | Complete |
-| NOTIF-02 | Phase 15 | Complete |
-| NOTIF-03 | Phase 15 | Complete |
-| NOTIF-04 | Phase 15 | Complete |
-| NOTIF-05 | Phase 15 | Complete |
-| INFRA-02 | Phase 15 | Complete |
-| NOTIF-06 | Phase 16 | Pending |
-| NOTIF-07 | Phase 16 | Pending |
-| INFRA-03 | Phase 16 | Pending |
+| FIX-01 | Phase 17 | Pending |
+| FIX-02 | Phase 17 | Pending |
+| FIX-03 | Phase 17 | Pending |
+| FIX-04 | Phase 17 | Pending |
+| FIX-05 | Phase 17 | Pending |
+| TABLE-01 | Phase 18 | Pending |
+| TABLE-02 | Phase 18 | Pending |
+| TABLE-03 | Phase 18 | Pending |
+| VIS-01 | Phase 18 | Pending |
+| UI-01 | Phase 18 | Pending |
+| UI-02 | Phase 18 | Pending |
 
 **Coverage:**
-- v1.3 requirements: 17 total
-- Mapped to phases: 17 (100%)
+- v1.4 requirements: 11 total
+- Mapped to phases: 11 (100%)
 - Unmapped: 0 ✓
 
 **Phase distribution:**
-- Phase 13: 1 requirement (INFRA-01)
-- Phase 14: 7 requirements (TREND-01 through TREND-07)
-- Phase 15: 6 requirements (NOTIF-01 through NOTIF-05, INFRA-02)
-- Phase 16: 3 requirements (NOTIF-06, NOTIF-07, INFRA-03)
+- Phase 17: 5 requirements (FIX-01 through FIX-05)
+- Phase 18: 6 requirements (TABLE-01 through TABLE-03, VIS-01, UI-01, UI-02)
 
 ---
 *Requirements defined: 2026-01-28*
-*Last updated: 2026-01-28 after Phase 15 completion*
+*Last updated: 2026-01-28 after initial definition*
