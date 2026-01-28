@@ -1,7 +1,7 @@
 // src/pages/BugDashboard.jsx
 // Bug Dashboard page with KPI cards, filters, and CSV upload
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -20,6 +20,13 @@ import { CriticalAlertBanner } from '@/components/bugs/CriticalAlertBanner';
 import { AgingBugsTable } from '@/components/bugs/AgingBugsTable';
 import { MTTRBarChart } from '@/components/bugs/MTTRBarChart';
 import { BugCategoryChart } from '@/components/bugs/BugCategoryChart';
+import { KPITrendChart } from '@/components/bugs/KPITrendChart';
+import {
+  getCurrentCycle,
+  getPreviousCycleId,
+  listSprints,
+  formatDateRange,
+} from '@/utils/releaseCycles';
 
 /**
  * BugDashboard Page
@@ -33,6 +40,8 @@ import { BugCategoryChart } from '@/components/bugs/BugCategoryChart';
  * - CSV upload for importing JIRA data
  */
 const BugDashboard = () => {
+  console.log('[BugDashboard] Component rendering');
+
   // Upload dialog state
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [lastUpload, setLastUpload] = useState(null);
@@ -40,6 +49,7 @@ const BugDashboard = () => {
   // Data state
   const [uploads, setUploads] = useState([]);
   const [selectedUploadId, setSelectedUploadId] = useState(null);
+  const [selectedSprint, setSelectedSprint] = useState('all'); // 'all' or sprint ID like '2601a'
   const [selectedComponent, setSelectedComponent] = useState('all');
   const [kpis, setKPIs] = useState(null);
   const [bugs, setBugs] = useState([]);
@@ -48,6 +58,27 @@ const BugDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [kpisLoading, setKpisLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  /**
+   * Generate sprint options (6 sprints before and after current)
+   */
+  const sprintOptions = useMemo(() => {
+    console.log('[BugDashboard] Generating sprint options');
+    try {
+      const currentCycle = getCurrentCycle();
+      console.log('[BugDashboard] Current cycle:', currentCycle?.id);
+      // Go back 3 cycles (6 sprints) from 2 cycles before current
+      const startCycleId = getPreviousCycleId(getPreviousCycleId(getPreviousCycleId(currentCycle.id)));
+      console.log('[BugDashboard] Start cycle ID:', startCycleId);
+      // Get 6 cycles (12 sprints total)
+      const sprints = listSprints(startCycleId, 6);
+      console.log('[BugDashboard] Generated sprints:', sprints?.length);
+      return sprints;
+    } catch (err) {
+      console.error('[BugDashboard] Failed to generate sprint options:', err);
+      return [];
+    }
+  }, []);
 
   /**
    * Load uploads list on mount
@@ -74,10 +105,11 @@ const BugDashboard = () => {
   }, []);
 
   /**
-   * Load KPIs and bugs when upload or component changes
+   * Load KPIs and bugs when upload, sprint, or component changes
    */
   useEffect(() => {
-    if (!selectedUploadId) {
+    // Need either an upload selected (for "All Time") or a sprint selected
+    if (selectedSprint === 'all' && !selectedUploadId) {
       setKPIs(null);
       setBugs([]);
       return;
@@ -86,16 +118,46 @@ const BugDashboard = () => {
     async function loadData() {
       try {
         setKpisLoading(true);
-        const [kpiData, bugData] = await Promise.all([
-          apiClient.bugs.getKPIs(
-            selectedUploadId,
-            selectedComponent === 'all' ? null : selectedComponent
-          ),
-          apiClient.bugs.listBugs(selectedUploadId, {
-            component: selectedComponent === 'all' ? null : selectedComponent,
-            limit: 100,
-          }),
-        ]);
+        const componentFilter = selectedComponent === 'all' ? null : selectedComponent;
+
+        let kpiData, bugData;
+
+        if (selectedSprint !== 'all') {
+          // Sprint selected - use date range queries
+          const sprint = sprintOptions.find((s) => s.id === selectedSprint);
+          if (!sprint) {
+            setKPIs(null);
+            setBugs([]);
+            return;
+          }
+
+          const startDate = format(sprint.startDate, 'yyyy-MM-dd');
+          const endDate = format(sprint.endDate, 'yyyy-MM-dd');
+
+          [kpiData, bugData] = await Promise.all([
+            apiClient.bugs.getKPIsByDateRange(startDate, endDate, componentFilter),
+            apiClient.bugs.listBugsByDateRange(startDate, endDate, {
+              component: componentFilter,
+              limit: 100,
+            }),
+          ]);
+        } else {
+          // "All Time" - use upload-based queries (most recent upload)
+          if (!selectedUploadId) {
+            setKPIs(null);
+            setBugs([]);
+            return;
+          }
+
+          [kpiData, bugData] = await Promise.all([
+            apiClient.bugs.getKPIs(selectedUploadId, componentFilter),
+            apiClient.bugs.listBugs(selectedUploadId, {
+              component: componentFilter,
+              limit: 100,
+            }),
+          ]);
+        }
+
         setKPIs(kpiData);
         setBugs(bugData);
         setError(null);
@@ -107,13 +169,24 @@ const BugDashboard = () => {
       }
     }
     loadData();
-  }, [selectedUploadId, selectedComponent]);
+  }, [selectedUploadId, selectedSprint, selectedComponent, sprintOptions]);
 
   /**
-   * Extract components list from KPIs data
+   * Allowed components for the dropdown filter
+   */
+  const ALLOWED_COMPONENTS = [
+    'JPaaS Metering Reporting',
+    'JPaaS Metering Service',
+    'Metering-as-a-Service',
+    'Unified Metering',
+    'Usage Data Management',
+  ];
+
+  /**
+   * Extract components list from KPIs data, filtered to allowed components only
    */
   const components = kpis?.category_distribution
-    ? Object.keys(kpis.category_distribution)
+    ? Object.keys(kpis.category_distribution).filter(comp => ALLOWED_COMPONENTS.includes(comp))
     : [];
 
   /**
@@ -140,8 +213,20 @@ const BugDashboard = () => {
     setSelectedComponent('all');
   };
 
+  /**
+   * Handle sprint filter change
+   */
+  const handleSprintChange = (value) => {
+    setSelectedSprint(value);
+    // Reset component filter when changing sprint
+    setSelectedComponent('all');
+  };
+
+  console.log('[BugDashboard] State:', { loading, error, uploadsCount: uploads.length, selectedUploadId, selectedSprint });
+
   // Initial loading state
   if (loading) {
+    console.log('[BugDashboard] Rendering loading state');
     return (
       <div className="space-y-6">
         <PageHeader onUploadClick={() => setUploadDialogOpen(true)} />
@@ -212,19 +297,36 @@ const BugDashboard = () => {
 
       {/* Filter Bar */}
       <div className="flex flex-wrap gap-4">
-        {/* Week Filter */}
-        <Select value={selectedUploadId || ''} onValueChange={handleWeekChange}>
-          <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="Select week" />
+        {/* Sprint/Takt Filter */}
+        <Select value={selectedSprint} onValueChange={handleSprintChange}>
+          <SelectTrigger className="w-[260px]">
+            <SelectValue placeholder="Select sprint" />
           </SelectTrigger>
           <SelectContent>
-            {uploads.map((upload) => (
-              <SelectItem key={upload.id} value={upload.id}>
-                Week of {format(new Date(upload.week_ending), 'MMM d, yyyy')}
+            <SelectItem value="all">All Time (Latest Upload)</SelectItem>
+            {sprintOptions.map((sprint) => sprint?.id && (
+              <SelectItem key={sprint.id} value={sprint.id}>
+                Sprint {sprint.id} ({formatDateRange(sprint.startDate, sprint.endDate)})
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+
+        {/* Week Filter - only show when "All Time" is selected */}
+        {selectedSprint === 'all' && (
+          <Select value={selectedUploadId || ''} onValueChange={handleWeekChange}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Select week" />
+            </SelectTrigger>
+            <SelectContent>
+              {uploads.map((upload) => (
+                <SelectItem key={upload.id} value={upload.id}>
+                  Week of {format(new Date(upload.week_ending), 'MMM d, yyyy')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {/* Component Filter */}
         <Select
@@ -232,7 +334,7 @@ const BugDashboard = () => {
           onValueChange={setSelectedComponent}
           disabled={components.length === 0}
         >
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[220px]">
             <SelectValue placeholder="All components" />
           </SelectTrigger>
           <SelectContent>
@@ -261,6 +363,11 @@ const BugDashboard = () => {
       {kpis ? (
         <>
           <KPIGrid kpis={kpis} />
+
+          {/* KPI Trend Chart */}
+          <KPITrendChart
+            component={selectedComponent === 'all' ? null : selectedComponent}
+          />
 
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
