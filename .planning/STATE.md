@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-27)
 
 **Core value:** Single dashboard showing health and status across all team tools without switching contexts
-**Current focus:** v1.2 DevOps Bug Dashboard — Phase 12 planned
+**Current focus:** v1.2 DevOps Bug Dashboard — Phase 12 in progress
 
 ## Current Position
 
-Phase: 12 of 12 (Dashboard UI) — PLANNED
-Plan: 0 of 2 in current phase
-Status: Ready for execution
-Last activity: 2026-01-28 — Planned Phase 12 (2 plans)
+Phase: 12 of 12 (Dashboard UI) — IN PROGRESS
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-01-28 — Completed 12-01-PLAN.md (KPI Dashboard UI)
 
-Progress: [███.......] 60% (3/5 plans, 2/3 phases)
+Progress: [████......] 80% (4/5 plans, 2/3 phases)
 
 ## Performance Metrics
 
@@ -30,9 +30,9 @@ Progress: [███.......] 60% (3/5 plans, 2/3 phases)
 
 **v1.2 DevOps Bug Dashboard:**
 - Estimated plans: 5 (Phase 10: 2, Phase 11: 1, Phase 12: 2)
-- Completed: 3
-- Average duration: 4.6 min
-- Total execution time: 14 min
+- Completed: 4
+- Average duration: 4.2 min
+- Total execution time: 17 min
 
 ## Accumulated Context
 
@@ -73,6 +73,11 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - Saturday date snapping (better UX than error messages)
 - AlertDialog for duplicate confirmation (consistent UI pattern)
 
+**Phase 12-01 decisions:**
+- 5 KPIs with thresholds (actionable), 4 informational (neutral status)
+- Tailwind green/yellow/red/neutral status colors
+- Responsive grid 1/2/3/4 columns for KPI cards
+
 ### Pending Todos
 
 None.
@@ -102,8 +107,8 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-01-28 07:48 UTC
-Stopped at: Planned Phase 12 (Dashboard UI)
+Last session: 2026-01-28 05:59 UTC
+Stopped at: Completed 12-01-PLAN.md
 Resume file: None
 
 ## Next Steps
@@ -115,4 +120,5 @@ Resume file: None
 5. ~~Phase 10 verified~~ Done
 6. ~~Execute 11-01: CSV Upload UI~~ Done
 7. ~~Plan Phase 12: KPI Dashboard UI~~ Done
-8. Execute Phase 12: KPI Dashboard UI
+8. ~~Execute 12-01: KPI Dashboard UI~~ Done
+9. Execute 12-02: Charts and Aging Bugs Table
