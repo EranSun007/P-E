@@ -10,17 +10,59 @@ import { Readable } from 'stream';
  */
 class BugService {
   // Required CSV columns for validation (UPLOAD-03)
-  static REQUIRED_COLUMNS = ['Key', 'Summary', 'Priority', 'Status', 'Created', 'Resolved', 'Reporter', 'Assignee', 'Labels'];
+  // Map of required fields to acceptable column name variations (case-insensitive)
+  static COLUMN_MAPPINGS = {
+    key: ['key', 'issue key', 'issue_key', 'issuekey'],
+    summary: ['summary'],
+    priority: ['priority'],
+    status: ['status'],
+    created: ['created', 'created date', 'createddate'],
+    resolved: ['resolved', 'resolved date', 'resolveddate', 'resolution date'],
+    reporter: ['reporter'],
+    assignee: ['assignee'],
+    labels: ['labels', 'label'],
+    components: ['component/s', 'components', 'component']
+  };
 
-  // Component extraction priority order
-  static COMPONENT_PATTERNS = [
-    { pattern: 'deploy', component: 'deployment' },
-    { pattern: 'foss', component: 'foss-vulnerabilities' },
-    { pattern: 'vulnerability', component: 'foss-vulnerabilities' },
-    { pattern: 'broker', component: 'service-broker' },
-    { pattern: 'cm-metering', component: 'cm-metering' },
-    { pattern: 'sdm-metering', component: 'sdm-metering' }
+  // Known JIRA component names (from Component/s column)
+  // Expected values: Usage Data Management, Unified Metering, Metering-as-a-Service, JPaaS Metering Service, JPaaS Metering Reporting
+  static KNOWN_COMPONENTS = [
+    'Usage Data Management',
+    'Unified Metering',
+    'Metering-as-a-Service',
+    'JPaaS Metering Service',
+    'JPaaS Metering Reporting'
   ];
+
+  /**
+   * Find the actual column name from CSV headers that matches a required field
+   * @param {Object} row - The CSV row object
+   * @param {string} field - The required field name (key in COLUMN_MAPPINGS)
+   * @returns {string|null} - The actual column name found, or null if not found
+   */
+  findColumnName(row, field) {
+    const acceptableNames = BugService.COLUMN_MAPPINGS[field] || [field];
+    const rowKeys = Object.keys(row);
+
+    for (const name of acceptableNames) {
+      // Try exact match first (case-insensitive)
+      const found = rowKeys.find(k => k.toLowerCase() === name.toLowerCase());
+      if (found) return found;
+    }
+    return null;
+  }
+
+  /**
+   * Get value from row using flexible column name matching
+   * @param {Object} row - The CSV row object
+   * @param {string} field - The required field name
+   * @param {Object} columnMap - Pre-computed column name mapping
+   * @returns {string|null} - The value or null if not found
+   */
+  getColumnValue(row, field, columnMap) {
+    const colName = columnMap[field];
+    return colName ? row[colName] : null;
+  }
 
   /**
    * Parse CSV buffer into bug objects with validation
@@ -32,31 +74,83 @@ class BugService {
     return new Promise((resolve, reject) => {
       const bugs = [];
       let headersValidated = false;
+      let columnMap = {}; // Maps our field names to actual CSV column names
 
-      const stream = parse({ headers: true, trim: true })
+      // Track duplicate headers and rename them (Jira exports have duplicate column names)
+      const headerCounts = {};
+      const renameHeaders = (headers) => {
+        return headers.map(header => {
+          if (headerCounts[header] === undefined) {
+            headerCounts[header] = 0;
+            return header;
+          }
+          headerCounts[header]++;
+          return `${header}_${headerCounts[header]}`;
+        });
+      };
+
+      const stream = parse({
+        headers: renameHeaders,
+        trim: true,
+        ignoreEmpty: true
+      })
         .on('data', (row) => {
-          // Validate headers on first row
+          // Validate headers and build column map on first row
           if (!headersValidated) {
-            const missingColumns = BugService.REQUIRED_COLUMNS.filter(col => !(col in row));
-            if (missingColumns.length > 0) {
+            const missingFields = [];
+            for (const field of Object.keys(BugService.COLUMN_MAPPINGS)) {
+              const actualColName = this.findColumnName(row, field);
+              if (actualColName) {
+                columnMap[field] = actualColName;
+              } else if (field !== 'resolved') { // Resolved is optional
+                missingFields.push(field);
+              }
+            }
+
+            if (missingFields.length > 0) {
               stream.destroy();
-              reject(new Error(`Missing required columns: ${missingColumns.join(', ')}`));
+              reject(new Error(`Missing required columns: ${missingFields.join(', ')}. Found columns: ${Object.keys(row).slice(0, 15).join(', ')}...`));
               return;
             }
             headersValidated = true;
           }
 
-          // Map CSV row to bug object
+          // Combine all Labels columns (Labels, Labels_1, Labels_2, etc.)
+          const allLabels = [];
+          const labelsColName = columnMap.labels;
+          for (const [key, value] of Object.entries(row)) {
+            // Match the labels column and any numbered variants
+            if (labelsColName && (key === labelsColName || key.startsWith(labelsColName + '_'))) {
+              if (value) {
+                allLabels.push(...value.split(',').map(l => l.trim()).filter(Boolean));
+              }
+            }
+          }
+
+          // Combine all Component/s columns (Component/s, Component/s_1, etc.)
+          const allComponents = [];
+          const componentsColName = columnMap.components;
+          for (const [key, value] of Object.entries(row)) {
+            // Match the components column and any numbered variants
+            if (componentsColName && (key === componentsColName || key.startsWith(componentsColName + '_'))) {
+              if (value) {
+                allComponents.push(...value.split(',').map(c => c.trim()).filter(Boolean));
+              }
+            }
+          }
+
+          // Map CSV row to bug object using flexible column names
           bugs.push({
-            bug_key: row.Key,
-            summary: row.Summary,
-            priority: row.Priority,
-            status: row.Status,
-            created_date: this.parseDate(row.Created),
-            resolved_date: row.Resolved ? this.parseDate(row.Resolved) : null,
-            reporter: row.Reporter,
-            assignee: row.Assignee || null,
-            labels: row.Labels ? row.Labels.split(',').map(l => l.trim()).filter(Boolean) : [],
+            bug_key: this.getColumnValue(row, 'key', columnMap),
+            summary: this.getColumnValue(row, 'summary', columnMap),
+            priority: this.getColumnValue(row, 'priority', columnMap),
+            status: this.getColumnValue(row, 'status', columnMap),
+            created_date: this.parseDate(this.getColumnValue(row, 'created', columnMap)),
+            resolved_date: this.parseDate(this.getColumnValue(row, 'resolved', columnMap)),
+            reporter: this.getColumnValue(row, 'reporter', columnMap),
+            assignee: this.getColumnValue(row, 'assignee', columnMap) || null,
+            labels: [...new Set(allLabels)], // Deduplicate labels
+            csv_components: [...new Set(allComponents)], // Store components from CSV
             raw_data: row
           });
         })
@@ -96,18 +190,14 @@ class BugService {
   }
 
   /**
-   * Extract component from labels and summary
-   * Priority order: deployment > foss > service-broker > cm-metering > sdm-metering > other
+   * Extract component from JIRA Component/s column
+   * Uses the first component from the CSV if available, otherwise 'other'
    */
   extractComponent(bug) {
-    const labelsStr = (bug.labels || []).join(' ').toLowerCase();
-    const summary = (bug.summary || '').toLowerCase();
-    const combined = `${labelsStr} ${summary}`;
-
-    for (const { pattern, component } of BugService.COMPONENT_PATTERNS) {
-      if (combined.includes(pattern)) {
-        return component;
-      }
+    // Use component from CSV Component/s column (primary source)
+    if (bug.csv_components && bug.csv_components.length > 0) {
+      // Return the first component (or could join multiple with comma)
+      return bug.csv_components[0];
     }
     return 'other';
   }
@@ -535,6 +625,149 @@ class BugService {
       ...result.rows[0].kpi_data,
       calculated_at: result.rows[0].calculated_at,
       component: component
+    };
+  }
+
+  /**
+   * Get historical KPI data for trend charts
+   * @param {string} userId - User ID for multi-tenancy
+   * @param {number} weeks - Number of weeks to retrieve (4, 8, or 12)
+   * @param {string|null} component - Optional component filter (NULL = all components)
+   * @returns {Array} - Array of KPI objects with week_ending dates
+   */
+  async getKPIHistory(userId, weeks = 12, component = null) {
+    // Validate weeks parameter - only allow 4, 8, or 12
+    const validWeeks = [4, 8, 12];
+    const weekCount = validWeeks.includes(weeks) ? weeks : 12;
+
+    const sql = `
+      SELECT
+        wk.kpi_data,
+        wk.calculated_at,
+        wk.component,
+        bu.week_ending
+      FROM weekly_kpis wk
+      JOIN bug_uploads bu ON wk.upload_id = bu.id
+      WHERE bu.user_id = $1
+        AND wk.component IS NOT DISTINCT FROM $2
+      ORDER BY bu.week_ending DESC
+      LIMIT $3
+    `;
+
+    const result = await query(sql, [userId, component, weekCount]);
+
+    // Return array of KPI objects with week_ending dates for chart X-axis
+    return result.rows.map(row => ({
+      week_ending: row.week_ending,
+      component: row.component,
+      kpi_data: row.kpi_data,
+      calculated_at: row.calculated_at
+    }));
+  }
+
+  // ============================================
+  // Date Range Query Methods (Sprint/Takt Filter)
+  // ============================================
+
+  /**
+   * List bugs across all uploads within a date range (by created_date)
+   * @param {string} userId - User ID for multi-tenancy
+   * @param {Date|string} startDate - Start of date range (inclusive)
+   * @param {Date|string} endDate - End of date range (inclusive)
+   * @param {Object} filters - Optional filters (component, priority, status, limit, offset)
+   * @returns {Array} - Bugs within the date range
+   */
+  async listBugsByDateRange(userId, startDate, endDate, filters = {}) {
+    let sql = `
+      SELECT b.id, b.bug_key, b.summary, b.priority, b.status, b.created_date,
+             b.resolved_date, b.resolution_time_hours, b.reporter, b.assignee,
+             b.labels, b.component, bu.week_ending
+      FROM bugs b
+      JOIN bug_uploads bu ON b.upload_id = bu.id
+      WHERE bu.user_id = $1
+        AND b.created_date >= $2
+        AND b.created_date <= $3
+    `;
+    const params = [userId, startDate, endDate];
+    let paramIndex = 4;
+
+    if (filters.priority) {
+      sql += ` AND b.priority = $${paramIndex}`;
+      params.push(filters.priority);
+      paramIndex++;
+    }
+
+    if (filters.status) {
+      sql += ` AND b.status = $${paramIndex}`;
+      params.push(filters.status);
+      paramIndex++;
+    }
+
+    if (filters.component) {
+      sql += ` AND b.component = $${paramIndex}`;
+      params.push(filters.component);
+      paramIndex++;
+    }
+
+    // Order by priority (VH first), then by age
+    sql += ` ORDER BY
+      CASE b.priority
+        WHEN 'Very High' THEN 1
+        WHEN 'High' THEN 2
+        WHEN 'Medium' THEN 3
+        WHEN 'Low' THEN 4
+        ELSE 5
+      END,
+      b.created_date ASC
+    `;
+
+    // Pagination
+    const limit = filters.limit || 100;
+    const offset = filters.offset || 0;
+    sql += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(limit, offset);
+
+    const result = await query(sql, params);
+    return result.rows;
+  }
+
+  /**
+   * Get KPIs for bugs within a date range (calculated on the fly)
+   * @param {string} userId - User ID for multi-tenancy
+   * @param {Date|string} startDate - Start of date range (inclusive)
+   * @param {Date|string} endDate - End of date range (inclusive)
+   * @param {string|null} component - Optional component filter
+   * @returns {Object} - Calculated KPIs for bugs in the date range
+   */
+  async getKPIsByDateRange(userId, startDate, endDate, component = null) {
+    let sql = `
+      SELECT b.id, b.bug_key, b.summary, b.priority, b.status, b.created_date,
+             b.resolved_date, b.resolution_time_hours, b.reporter, b.assignee,
+             b.labels, b.component
+      FROM bugs b
+      JOIN bug_uploads bu ON b.upload_id = bu.id
+      WHERE bu.user_id = $1
+        AND b.created_date >= $2
+        AND b.created_date <= $3
+    `;
+    const params = [userId, startDate, endDate];
+
+    if (component) {
+      sql += ` AND b.component = $4`;
+      params.push(component);
+    }
+
+    const result = await query(sql, params);
+    const bugs = result.rows;
+
+    // Calculate KPIs from the bugs
+    const kpis = this.calculateKPIs(bugs);
+
+    return {
+      ...kpis,
+      calculated_at: new Date().toISOString(),
+      component: component,
+      date_range: { startDate, endDate }
     };
   }
 }
