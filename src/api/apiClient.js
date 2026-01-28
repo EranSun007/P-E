@@ -627,4 +627,33 @@ export const apiClient = {
     // Note: Upload uses XMLHttpRequest for progress tracking, not fetchWithAuth
     // See CSVUploadDialog for upload implementation
   },
+
+  // Email Preferences API (v1.3)
+  emailPreferences: {
+    // List all email preferences for current user
+    async list() {
+      return fetchWithAuth(`${API_BASE_URL}/email-preferences`);
+    },
+
+    // Get single preference by KPI key
+    async get(kpiKey) {
+      return fetchWithAuth(`${API_BASE_URL}/email-preferences/${kpiKey}`);
+    },
+
+    // Update preference for a KPI
+    async update(kpiKey, data) {
+      return fetchWithAuth(`${API_BASE_URL}/email-preferences/${kpiKey}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
+
+    // Delete preference for a KPI
+    async delete(kpiKey) {
+      await fetchWithAuth(`${API_BASE_URL}/email-preferences/${kpiKey}`, {
+        method: 'DELETE',
+      });
+      return true;
+    },
+  },
 };
