@@ -190,15 +190,63 @@ class BugService {
   }
 
   /**
-   * Extract component from JIRA Component/s column
-   * Uses the first component from the CSV if available, otherwise 'other'
+   * Extract component from bug data using priority-based extraction
+   * Priority 1: Labels array (most explicit)
+   * Priority 2: Summary text (contextual)
+   * Priority 3: CSV Component/s column (legacy/backup)
+   * Default: 'other'
    */
   extractComponent(bug) {
-    // Use component from CSV Component/s column (primary source)
+    // Priority 1: Check labels array for component keywords (case-insensitive)
+    if (bug.labels && bug.labels.length > 0) {
+      const labelsText = bug.labels.join(' ').toLowerCase();
+
+      // Check for specific component patterns in labels
+      if (labelsText.includes('deploy') && labelsText.includes('metering')) {
+        return 'deploy-metering';
+      }
+      if (labelsText.includes('service') && labelsText.includes('broker')) {
+        return 'service-broker';
+      }
+      if (labelsText.includes('foss') || labelsText.includes('vulnerabilit')) {
+        return 'foss-vulnerabilities';
+      }
+      if (labelsText.includes('cm-metering')) {
+        return 'cm-metering';
+      }
+      if (labelsText.includes('sdm-metering')) {
+        return 'sdm-metering';
+      }
+    }
+
+    // Priority 2: Check summary text for component keywords (case-insensitive)
+    if (bug.summary) {
+      const summaryText = bug.summary.toLowerCase();
+
+      // Same pattern matching as labels
+      if (summaryText.includes('deploy') && summaryText.includes('metering')) {
+        return 'deploy-metering';
+      }
+      if (summaryText.includes('service') && summaryText.includes('broker')) {
+        return 'service-broker';
+      }
+      if (summaryText.includes('foss') || summaryText.includes('vulnerabilit')) {
+        return 'foss-vulnerabilities';
+      }
+      if (summaryText.includes('cm-metering')) {
+        return 'cm-metering';
+      }
+      if (summaryText.includes('sdm-metering')) {
+        return 'sdm-metering';
+      }
+    }
+
+    // Priority 3: Fall back to CSV Component/s column
     if (bug.csv_components && bug.csv_components.length > 0) {
-      // Return the first component (or could join multiple with comma)
       return bug.csv_components[0];
     }
+
+    // Default: No match found
     return 'other';
   }
 
