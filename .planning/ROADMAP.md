@@ -6,6 +6,7 @@
 - **v1.1 Web Capture Framework** - Phases 6-9 (shipped 2026-01-22) — [Archive](milestones/v1.1-ROADMAP.md)
 - **v1.2 DevOps Bug Dashboard** - Phases 10-12 (shipped 2026-01-28) — [Archive](milestones/v1.2-ROADMAP.md)
 - **v1.3 KPI Insights & Alerts** - Phases 13-16 (shipped 2026-01-28) — [Archive](milestones/v1.3-ROADMAP.md)
+- **v1.4 Bug Dashboard Fixes & Enhancements** - Phases 17-18 (in progress)
 
 ## Phases
 
@@ -232,7 +233,8 @@ Plans:
 
 </details>
 
-## v1.3 KPI Insights & Alerts (SHIPPED 2026-01-28)
+<details>
+<summary>v1.3 KPI Insights & Alerts (Phases 13-16) - SHIPPED 2026-01-28</summary>
 
 **Milestone Goal:** Add historical KPI trend visualization and proactive notifications when performance degrades.
 
@@ -302,6 +304,48 @@ Plans:
 - [x] 16-01-PLAN.md — EmailService with nodemailer, SMTP config, retry logic, preferences API
 - [x] 16-02-PLAN.md — Email preferences UI in Settings page
 
+</details>
+
+## v1.4 Bug Dashboard Fixes & Enhancements (IN PROGRESS)
+
+**Milestone Goal:** Fix component extraction and filtering bugs, add table enhancements and UI polish to complete the bug dashboard vision.
+
+- [ ] **Phase 17: Core Bug Fixes** - Fix component extraction, filtering, category chart, and inflow calculation
+- [ ] **Phase 18: Table Enhancements & UI Polish** - Age indicators, component column, sorting, trend chart, UI improvements
+
+### Phase 17: Core Bug Fixes
+**Goal**: Component extraction, filtering, and KPI calculations work correctly
+**Depends on**: Phase 16 (v1.3 complete)
+**Requirements**: FIX-01, FIX-02, FIX-03, FIX-04, FIX-05
+**Success Criteria** (what must be TRUE):
+  1. Bugs are correctly categorized into components (deploy-metering, service-broker, foss-vulnerabilities, cm-metering, sdm-metering, other) based on labels and summary text
+  2. Component filter dropdown shows all components found in uploaded data with "All Components" as default option
+  3. Selecting a component filter updates all 9 KPI cards, all charts, and the aging bugs table simultaneously
+  4. Category distribution chart displays accurate breakdown across all bug categories
+  5. Bug inflow rate calculation uses correct 4-week rolling window formula per specification
+**Plans**: TBD
+
+Plans:
+- [ ] 17-01-PLAN.md — Component extraction logic and filter dropdown population
+- [ ] 17-02-PLAN.md — Filter integration and KPI/chart/table updates
+
+### Phase 18: Table Enhancements & UI Polish
+**Goal**: Aging bugs table is enhanced with visual indicators and sorting, UI has clear labels and feedback
+**Depends on**: Phase 17 (core bugs must be fixed first)
+**Requirements**: TABLE-01, TABLE-02, TABLE-03, VIS-01, UI-01, UI-02
+**Success Criteria** (what must be TRUE):
+  1. Aging bugs table shows visual age indicators (red for >14 days, yellow for 7-14 days, green for <7 days)
+  2. Aging bugs table includes component column with badge-style display
+  3. All columns in aging bugs table are sortable with visible sort direction indicators
+  4. Weekly inflow trend chart displays when user has uploaded multiple weeks of data
+  5. Filter dropdowns have clear, descriptive labels (e.g., "Filter by Component", "Filter by Week")
+  6. Component filter shows badge indicator when filtered (displays component name, hidden when "All")
+**Plans**: TBD
+
+Plans:
+- [ ] 18-01-PLAN.md — Table enhancements (age indicators, component column, sorting)
+- [ ] 18-02-PLAN.md — Weekly inflow chart and UI polish
+
 ## Progress
 
 **Execution Order:**
@@ -309,6 +353,7 @@ v1.0: 1 -> 2 -> 3 -> 4/5 parallel
 v1.1: 6 -> 7 (depends on 6), 8 (depends on 6), 9 (depends on 6+7)
 v1.2: 10 -> 11 (depends on 10) -> 12 (depends on 10+11)
 v1.3: 13 -> 14 (depends on 13) -> 15 (depends on 13) -> 16 (depends on 15)
+v1.4: 17 -> 18 (depends on 17)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -328,3 +373,5 @@ v1.3: 13 -> 14 (depends on 13) -> 15 (depends on 13) -> 16 (depends on 15)
 | 14. Trend Charts | v1.3 | 2/2 | Complete | 2026-01-28 |
 | 15. Threshold Detection & In-App Notifications | v1.3 | 2/2 | Complete | 2026-01-28 |
 | 16. Email Notifications & Preferences | v1.3 | 2/2 | Complete | 2026-01-28 |
+| 17. Core Bug Fixes | v1.4 | 0/2 | Not started | - |
+| 18. Table Enhancements & UI Polish | v1.4 | 0/2 | Not started | - |
