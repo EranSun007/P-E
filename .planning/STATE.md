@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-28)
 ## Current Position
 
 Phase: 17 of 18 (Core Bug Fixes)
-Plan: 1 of 2
-Status: In progress
-Last activity: 2026-01-28 — Completed 17-01-PLAN.md
+Plan: 2 of 2
+Status: Phase complete
+Last activity: 2026-01-28 — Completed 17-02-PLAN.md
 
-Progress: [###########################...] 91% (32/35 plans complete)
+Progress: [############################..] 94% (33/35 plans complete)
 
 ## Performance Metrics
 
@@ -39,14 +39,14 @@ Progress: [###########################...] 91% (32/35 plans complete)
 - Shipped: 2026-01-28
 
 **v1.4 Bug Dashboard Fixes & Enhancements:**
-- Total plans: 4 (Phase 17: 1 complete, Phase 18: 0)
+- Total plans: 4 (Phase 17: 2 complete, Phase 18: 0)
 - Phases: 17-18 (2 phases)
 - Status: In progress
 
 **Cumulative:**
 - Total milestones: 4 shipped, 1 in progress
 - Total phases: 18
-- Total plans: 35 (32 complete, 3 pending)
+- Total plans: 35 (33 complete, 2 pending)
 
 ## Accumulated Context
 
@@ -64,6 +64,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - Fire-and-forget notification pattern (proven v1.3)
 - Multi-source extraction with priority fallback (proven v1.4)
 - Dynamic UI filter population from backend aggregations (proven v1.4)
+- Rolling window calculations for time-series KPIs (proven v1.4)
 
 ### Pending Todos
 
@@ -76,13 +77,12 @@ None - starting fresh milestone.
 
 ## Session Continuity
 
-Last session: 2026-01-28T19:05:45Z
-Stopped at: Completed 17-01-PLAN.md (Component Extraction and Filter Population)
+Last session: 2026-01-28T19:09:49Z
+Stopped at: Completed 17-02-PLAN.md (Rolling Window Calculation and Filter Verification)
 Resume file: None
 
 ## Next Steps
 
-1. Execute 17-02-PLAN.md - Aging Calculation and Bug Details
-2. `/gsd:plan-phase 18` - Plan Table Enhancements & UI Polish phase
-3. Execute Phase 18 plans
-4. Ship v1.4 milestone
+1. `/gsd:plan-phase 18` - Plan Table Enhancements & UI Polish phase
+2. Execute Phase 18 plans
+3. Ship v1.4 milestone
