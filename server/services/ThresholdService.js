@@ -1,5 +1,6 @@
 import { query } from '../db/connection.js';
 import NotificationService from './NotificationService.js';
+import EmailService from './EmailService.js';
 
 /**
  * KPI threshold definitions for status determination
@@ -132,6 +133,11 @@ class ThresholdService {
       });
 
       console.log(`ThresholdService: Created notification for ${kpiKey}`);
+
+      // Fire-and-forget email - don't await, don't block
+      EmailService.sendKPIAlert(userId, kpiKey, value, weekEnding)
+        .catch(err => console.error('ThresholdService: Email failed for', kpiKey, err.message));
+
       return notification;
     } catch (error) {
       console.error(`ThresholdService: Failed to create notification for ${kpiKey}:`, error);
