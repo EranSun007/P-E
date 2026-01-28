@@ -246,10 +246,10 @@ Plans:
   3. Query accepts component filter matching dashboard
   4. Response includes week_ending dates for X-axis rendering
   5. Query performance under 500ms for 12-week dataset
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 13-01: Historical query implementation with JOIN optimization
+- [ ] 13-01-PLAN.md — Historical KPI query with JOIN optimization
 
 ### Phase 14: Trend Charts
 **Goal**: User can view KPI trends over time with visual threshold zones
