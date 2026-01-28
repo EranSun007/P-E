@@ -225,8 +225,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 12-01-PLAN.md — Dashboard page with KPI cards, filters, and alert banner
-- [ ] 12-02-PLAN.md — Aging bugs table and charts (MTTR, category distribution)
+- [ ] 12-01-PLAN.md — KPI cards with status colors, filter dropdowns, critical alert banner
+- [ ] 12-02-PLAN.md — Aging bugs table with JIRA links, MTTR bar chart, category donut chart
 
 ## Progress
 
@@ -248,7 +248,7 @@ v1.2: 10 -> 11 (depends on 10) -> 12 (depends on 10+11)
 | 9. Rule Builder UI | v1.1 | 2/2 | Complete | 2026-01-22 |
 | 10. Backend Foundation | v1.2 | 2/2 | Complete | 2026-01-27 |
 | 11. CSV Upload | v1.2 | 1/1 | Complete | 2026-01-28 |
-| 12. Dashboard UI | v1.2 | 0/2 | Pending | — |
+| 12. Dashboard UI | v1.2 | 0/2 | Planned | — |
 
 ## v1.2 Requirement Coverage
 
