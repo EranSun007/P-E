@@ -17,6 +17,9 @@ import { apiClient } from '@/api/apiClient';
 import CSVUploadDialog from '@/components/bugs/CSVUploadDialog';
 import { KPIGrid } from '@/components/bugs/KPIGrid';
 import { CriticalAlertBanner } from '@/components/bugs/CriticalAlertBanner';
+import { AgingBugsTable } from '@/components/bugs/AgingBugsTable';
+import { MTTRBarChart } from '@/components/bugs/MTTRBarChart';
+import { BugCategoryChart } from '@/components/bugs/BugCategoryChart';
 
 /**
  * BugDashboard Page
@@ -39,6 +42,7 @@ const BugDashboard = () => {
   const [selectedUploadId, setSelectedUploadId] = useState(null);
   const [selectedComponent, setSelectedComponent] = useState('all');
   const [kpis, setKPIs] = useState(null);
+  const [bugs, setBugs] = useState([]);
 
   // UI state
   const [loading, setLoading] = useState(true);
@@ -70,31 +74,39 @@ const BugDashboard = () => {
   }, []);
 
   /**
-   * Load KPIs when upload or component changes
+   * Load KPIs and bugs when upload or component changes
    */
   useEffect(() => {
     if (!selectedUploadId) {
       setKPIs(null);
+      setBugs([]);
       return;
     }
 
-    async function loadKPIs() {
+    async function loadData() {
       try {
         setKpisLoading(true);
-        const kpiData = await apiClient.bugs.getKPIs(
-          selectedUploadId,
-          selectedComponent === 'all' ? null : selectedComponent
-        );
+        const [kpiData, bugData] = await Promise.all([
+          apiClient.bugs.getKPIs(
+            selectedUploadId,
+            selectedComponent === 'all' ? null : selectedComponent
+          ),
+          apiClient.bugs.listBugs(selectedUploadId, {
+            component: selectedComponent === 'all' ? null : selectedComponent,
+            limit: 100,
+          }),
+        ]);
         setKPIs(kpiData);
+        setBugs(bugData);
         setError(null);
       } catch (err) {
-        console.error('Failed to load KPIs:', err);
-        setError(err.message || 'Failed to load KPIs');
+        console.error('Failed to load data:', err);
+        setError(err.message || 'Failed to load data');
       } finally {
         setKpisLoading(false);
       }
     }
-    loadKPIs();
+    loadData();
   }, [selectedUploadId, selectedComponent]);
 
   /**
@@ -247,7 +259,18 @@ const BugDashboard = () => {
 
       {/* KPI Grid */}
       {kpis ? (
-        <KPIGrid kpis={kpis} />
+        <>
+          <KPIGrid kpis={kpis} />
+
+          {/* Charts Row */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <MTTRBarChart mttrByPriority={kpis?.mttr_by_priority} />
+            <BugCategoryChart categoryDistribution={kpis?.category_distribution} />
+          </div>
+
+          {/* Aging Bugs Table */}
+          <AgingBugsTable bugs={bugs} />
+        </>
       ) : (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
