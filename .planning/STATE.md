@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-28)
 
 ## Current Position
 
-Phase: 14 - Trend Charts
-Plan: 2 of 2
-Status: Phase 14 verified, ready for Phase 15
-Last activity: 2026-01-28 — Phase 14 verified
+Phase: 15 - Threshold Detection & In-App Notifications
+Plan: 1 of 2
+Status: In progress
+Last activity: 2026-01-28 — Completed 15-01-PLAN.md (ThresholdService)
 
-Progress: [████░░░░░░] 50% (Phase 14/16 complete)
+Progress: [█████░░░░░] 52% (27/31 plans complete)
 
 ## Performance Metrics
 
@@ -36,7 +36,7 @@ Progress: [████░░░░░░] 50% (Phase 14/16 complete)
 **v1.3 KPI Insights & Alerts (current):**
 - Total plans: 7 (Phase 13: 1, Phase 14: 2, Phase 15: 2, Phase 16: 2)
 - Phases: 13-16 (4 phases)
-- Completed: 3 plans (Phase 13: 1, Phase 14: 2)
+- Completed: 4 plans (Phase 13: 1, Phase 14: 2, Phase 15: 1)
 
 **Cumulative:**
 - Total milestones: 4 (3 shipped, 1 in progress)
@@ -62,8 +62,9 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - Historical KPI queries via JOIN (weekly_kpis + bug_uploads for week_ending) — implemented in 13-01
 - Week count validation: only 4, 8, or 12 weeks (default 12) — implemented in 13-01
 - Component filter using IS NOT DISTINCT FROM for NULL handling — implemented in 13-01
-- Threshold evaluation fire-and-forget pattern (async after upload)
-- Reuse existing NotificationService for in-app alerts
+- Threshold evaluation fire-and-forget pattern (async after upload) — implemented in 15-01
+- Reuse existing NotificationService for in-app alerts — implemented in 15-01
+- 24-hour deduplication window prevents alert spam — implemented in 15-01
 - Email delivery with nodemailer (SAP BTP Mail service)
 - Default thresholds in code (defer configuration UI to v2)
 - Sparkline size fixed at 60x24px for consistent card layout — implemented in 14-02
@@ -71,21 +72,21 @@ Decisions are logged in PROJECT.md Key Decisions table.
 
 ### Pending Todos
 
-None — Phase 14 complete.
+None — Phase 15-01 complete.
 
 ### Blockers/Concerns
 
-None — Phase 14 verified, trend charts ready.
+None — ThresholdService ready, unread-count endpoint available.
 
 ## Session Continuity
 
 Last session: 2026-01-28
-Stopped at: Phase 14 verified (ready for Phase 15)
+Stopped at: Completed 15-01-PLAN.md
 Resume file: None
 
 ## Next Steps
 
-1. Plan Phase 15 (Threshold Detection & In-App Notifications) via `/gsd:plan-phase 15`
-2. Execute Phase 15 plans
+1. Execute Phase 15-02 plan (Frontend notification badge and list)
+2. Verify Phase 15 completion
 3. Plan and execute Phase 16 (Email Notifications)
 4. Ship v1.3 milestone
