@@ -283,8 +283,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 15-01-PLAN.md — ThresholdService with breach detection, deduplication, unread count endpoint
-- [ ] 15-02-PLAN.md — NotificationBell component and notification panel UI
+- [x] 15-01-PLAN.md — ThresholdService with breach detection, deduplication, unread count endpoint
+- [x] 15-02-PLAN.md — NotificationBell component and notification panel UI
 
 ### Phase 16: Email Notifications & Preferences
 **Goal**: Users receive email alerts when critical thresholds breached
@@ -326,5 +326,5 @@ v1.3: 13 -> 14 (depends on 13) -> 15 (depends on 13) -> 16 (depends on 15)
 | 12. Dashboard UI | v1.2 | 2/2 | Complete | 2026-01-28 |
 | 13. Historical KPI Storage | v1.3 | 1/1 | Complete | 2026-01-28 |
 | 14. Trend Charts | v1.3 | 2/2 | Complete | 2026-01-28 |
-| 15. Threshold Detection & In-App Notifications | v1.3 | 0/2 | Not started | - |
+| 15. Threshold Detection & In-App Notifications | v1.3 | 2/2 | Complete | 2026-01-28 |
 | 16. Email Notifications & Preferences | v1.3 | 0/2 | Not started | - |

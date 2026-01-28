@@ -19,18 +19,18 @@ Requirements for KPI Insights & Alerts milestone. Each maps to roadmap phases.
 
 ### Notifications
 
-- [ ] **NOTIF-01**: System detects when KPI crosses into red zone on CSV upload
-- [ ] **NOTIF-02**: System creates in-app notification when threshold breached
-- [ ] **NOTIF-03**: Notification bell icon shows unread count badge in header
-- [ ] **NOTIF-04**: User can view notification panel with list of alerts
-- [ ] **NOTIF-05**: User can mark notifications as read
+- [x] **NOTIF-01**: System detects when KPI crosses into red zone on CSV upload
+- [x] **NOTIF-02**: System creates in-app notification when threshold breached
+- [x] **NOTIF-03**: Notification bell icon shows unread count badge in header
+- [x] **NOTIF-04**: User can view notification panel with list of alerts
+- [x] **NOTIF-05**: User can mark notifications as read
 - [ ] **NOTIF-06**: System sends email notification when KPI hits red zone
 - [ ] **NOTIF-07**: User can configure notification preferences per KPI
 
 ### Infrastructure
 
 - [x] **INFRA-01**: Historical KPI data stored for trend queries
-- [ ] **INFRA-02**: Notification deduplication prevents alert spam on re-uploads
+- [x] **INFRA-02**: Notification deduplication prevents alert spam on re-uploads
 - [ ] **INFRA-03**: Email delivery with retry logic for reliability
 
 ## Future Requirements
@@ -76,12 +76,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TREND-05 | Phase 14 | Complete |
 | TREND-06 | Phase 14 | Complete |
 | TREND-07 | Phase 14 | Complete |
-| NOTIF-01 | Phase 15 | Pending |
-| NOTIF-02 | Phase 15 | Pending |
-| NOTIF-03 | Phase 15 | Pending |
-| NOTIF-04 | Phase 15 | Pending |
-| NOTIF-05 | Phase 15 | Pending |
-| INFRA-02 | Phase 15 | Pending |
+| NOTIF-01 | Phase 15 | Complete |
+| NOTIF-02 | Phase 15 | Complete |
+| NOTIF-03 | Phase 15 | Complete |
+| NOTIF-04 | Phase 15 | Complete |
+| NOTIF-05 | Phase 15 | Complete |
+| INFRA-02 | Phase 15 | Complete |
 | NOTIF-06 | Phase 16 | Pending |
 | NOTIF-07 | Phase 16 | Pending |
 | INFRA-03 | Phase 16 | Pending |
@@ -99,4 +99,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-01-28*
-*Last updated: 2026-01-28 after Phase 14 completion*
+*Last updated: 2026-01-28 after Phase 15 completion*
