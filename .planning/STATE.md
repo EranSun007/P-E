@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-28)
 ## Current Position
 
 Phase: 16 - Email Notifications & Preferences
-Plan: 0 of 2
-Status: Phase 16 planned, ready for execution
-Last activity: 2026-01-28 — Phase 16 plans created and verified
+Plan: 1 of 2
+Status: In progress - 16-01 complete, 16-02 remaining
+Last activity: 2026-01-28 - Completed 16-01-PLAN.md
 
-Progress: [██████░░░░] 58% (28/31 plans complete)
+Progress: [██████░░░░] 61% (29/31 plans complete)
 
 ## Performance Metrics
 
@@ -36,7 +36,7 @@ Progress: [██████░░░░] 58% (28/31 plans complete)
 **v1.3 KPI Insights & Alerts (current):**
 - Total plans: 7 (Phase 13: 1, Phase 14: 2, Phase 15: 2, Phase 16: 2)
 - Phases: 13-16 (4 phases)
-- Completed: 5 plans (Phase 13: 1, Phase 14: 2, Phase 15: 2)
+- Completed: 6 plans (Phase 13: 1, Phase 14: 2, Phase 15: 2, Phase 16: 1)
 
 **Cumulative:**
 - Total milestones: 4 (3 shipped, 1 in progress)
@@ -65,7 +65,9 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - Threshold evaluation fire-and-forget pattern (async after upload) - implemented in 15-01
 - Reuse existing NotificationService for in-app alerts - implemented in 15-01
 - 24-hour deduplication window prevents alert spam - implemented in 15-01
-- Email delivery with nodemailer (SAP BTP Mail service)
+- Email delivery with nodemailer and p-retry - implemented in 16-01
+- Fire-and-forget email after in-app notification - implemented in 16-01
+- Email preferences stored as JSON in UserSettingsService - implemented in 16-01
 - Default thresholds in code (defer configuration UI to v2)
 - Sparkline size fixed at 60x24px for consistent card layout - implemented in 14-02
 - 5% threshold for flat vs up/down trend detection - implemented in 14-02
@@ -74,21 +76,22 @@ Decisions are logged in PROJECT.md Key Decisions table.
 
 ### Pending Todos
 
-None — Phase 16 planned.
+None - executing Phase 16.
 
 ### Blockers/Concerns
 
-**SMTP configuration required** — Phase 16 requires environment variables for email delivery:
+**SMTP configuration required** - Phase 16 requires environment variables for email delivery:
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
+- Without configuration, EmailService logs skip messages (safe for dev)
 
 ## Session Continuity
 
 Last session: 2026-01-28
-Stopped at: Phase 16 planned
+Stopped at: Completed 16-01-PLAN.md
 Resume file: None
 
 ## Next Steps
 
-1. Execute Phase 16 plans via `/gsd:execute-phase 16`
+1. Execute 16-02-PLAN.md (Email Preferences UI)
 2. Verify Phase 16 completion
 3. Ship v1.3 milestone
