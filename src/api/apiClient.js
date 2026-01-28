@@ -329,6 +329,33 @@ function createEntityMappingClient() {
   };
 }
 
+// Create Notification client with custom methods
+function createNotificationClient() {
+  const baseClient = createEntityClient('/notifications');
+
+  return {
+    ...baseClient,
+
+    // Get count of unread notifications
+    async getUnreadCount() {
+      return fetchWithAuth(`${API_BASE_URL}/notifications/unread-count`);
+    },
+
+    // Mark notification as read (convenience wrapper)
+    async markAsRead(id) {
+      return baseClient.update(id, { read: true });
+    },
+
+    // Mark all notifications as read
+    async markAllAsRead() {
+      const notifications = await baseClient.list();
+      const unread = notifications.filter(n => !n.read);
+      await Promise.all(unread.map(n => baseClient.update(n.id, { read: true })));
+      return { updated: unread.length };
+    },
+  };
+}
+
 export const apiClient = {
   entities: {
     Task: createEntityClient('/tasks'),
@@ -338,7 +365,7 @@ export const apiClient = {
     OneOnOne: createEntityClient('/one-on-ones'),
     Meeting: createEntityClient('/meetings'),
     CalendarEvent: createEntityClient('/calendar-events'),
-    Notification: createEntityClient('/notifications'),
+    Notification: createNotificationClient(),
     Reminder: createEntityClient('/reminders'),
     Comment: createEntityClient('/comments'),
     TaskAttribute: createTaskAttributeClient(),
