@@ -9,9 +9,9 @@ import ProjectProgressSlider from "@/components/projects/ProjectProgressSlider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { format, parseISO } from "date-fns";
-import { 
+import {
   ChevronDown, ChevronRight, MessageSquare,
-  Users, Plus, Calendar as CalendarIcon, 
+  Users, Plus, Calendar as CalendarIcon,
   MoreHorizontal, CheckSquare, Edit, Trash2,
   ArrowUpCircle, Circle, CheckCircle2,
   Folders
@@ -35,6 +35,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { logger } from "@/utils/logger";
 import { AppContext } from "@/contexts/AppContext.jsx";
+import { useAI } from "@/contexts/AIContext";
+import { formatProjectsContext } from "@/utils/contextFormatter";
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
@@ -278,6 +280,54 @@ export default function ProjectsPage() {
       { name: 'On Hold', value: statusCounts.on_hold, color: '#fbbf24' }
     ];
   };
+
+  // AI Context Registration
+  const { updatePageContext } = useAI();
+
+  // Enhance projects with task data for context
+  const projectsWithTasks = React.useMemo(() => {
+    return (Array.isArray(projects) ? projects : []).map(project => ({
+      ...project,
+      tasks: projectTasks[project.id] || []
+    }));
+  }, [projects, projectTasks]);
+
+  // Register projects context for AI
+  useEffect(() => {
+    const contextSummary = formatProjectsContext(projectsWithTasks, {}, editingProject);
+
+    updatePageContext({
+      page: '/projects',
+      summary: contextSummary,
+      selection: editingProject ? { id: editingProject.id, type: 'project' } : null,
+      data: {
+        projectCount: projectsWithTasks.length,
+        activeCount: projectsWithTasks.filter(p => p.status === 'in_progress').length,
+        completedCount: projectsWithTasks.filter(p => p.status === 'completed').length
+      }
+    });
+  }, [projectsWithTasks, editingProject, updatePageContext]);
+
+  // Listen for context refresh events
+  useEffect(() => {
+    const handleRefresh = () => {
+      const contextSummary = formatProjectsContext(projectsWithTasks, {}, editingProject);
+
+      updatePageContext({
+        page: '/projects',
+        summary: contextSummary,
+        selection: editingProject ? { id: editingProject.id, type: 'project' } : null,
+        data: {
+          projectCount: projectsWithTasks.length,
+          activeCount: projectsWithTasks.filter(p => p.status === 'in_progress').length,
+          completedCount: projectsWithTasks.filter(p => p.status === 'completed').length
+        }
+      });
+    };
+
+    window.addEventListener('ai-context-refresh', handleRefresh);
+    return () => window.removeEventListener('ai-context-refresh', handleRefresh);
+  }, [projectsWithTasks, editingProject, updatePageContext]);
 
   return (
     <div className="p-6">

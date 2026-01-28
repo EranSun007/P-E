@@ -77,6 +77,21 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /api/jira-issues/filters
+ * Get unique filter options for UI dropdowns
+ * Returns: { statuses: [], assignees: [], sprints: [] }
+ */
+router.get('/filters', async (req, res) => {
+  try {
+    const filterOptions = await JiraService.getFilterOptions(req.user.id);
+    res.json(filterOptions);
+  } catch (error) {
+    console.error('GET /api/jira-issues/filters error:', error);
+    res.status(500).json({ error: 'Internal Server Error', message: error.message });
+  }
+});
+
+/**
  * GET /api/jira-issues/status
  * Get sync status (last sync time, issue count)
  */

@@ -315,3 +315,18 @@ function extractDescription() {
 
 // Export to window for content script access
 window.extractDetailIssue = extractDetailIssue;
+
+// CustomEvent communication for content script (isolated world)
+// Content script can't access window.extractDetailIssue directly
+window.addEventListener('PE_JIRA_EXTRACT_REQUEST', () => {
+  console.log('[PE-Jira] Extraction request received in page context (detail)');
+  const issues = extractDetailIssue();
+  window.dispatchEvent(new CustomEvent('PE_JIRA_EXTRACT_RESULT', {
+    detail: { issues: issues, pageType: 'detail' }
+  }));
+});
+
+// Signal that extractor is ready
+window.dispatchEvent(new CustomEvent('PE_JIRA_EXTRACTOR_READY', {
+  detail: { pageType: 'detail' }
+}));

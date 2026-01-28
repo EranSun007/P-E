@@ -381,3 +381,18 @@ function buildJiraUrl(issueKey) {
 
 // Export to window for content script access
 window.extractBoardIssues = extractBoardIssues;
+
+// CustomEvent communication for content script (isolated world)
+// Content script can't access window.extractBoardIssues directly
+window.addEventListener('PE_JIRA_EXTRACT_REQUEST', () => {
+  console.log('[PE-Jira] Extraction request received in page context (board)');
+  const issues = extractBoardIssues();
+  window.dispatchEvent(new CustomEvent('PE_JIRA_EXTRACT_RESULT', {
+    detail: { issues: issues, pageType: 'board' }
+  }));
+});
+
+// Signal that extractor is ready
+window.dispatchEvent(new CustomEvent('PE_JIRA_EXTRACTOR_READY', {
+  detail: { pageType: 'board' }
+}));

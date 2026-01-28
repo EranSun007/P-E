@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { format, parseISO } from "date-fns";
-import { TeamMember, OneOnOne } from "@/api/entities";
+import { format, parseISO, isFuture, isPast } from "date-fns";
+import { TeamMember, OneOnOne, TimeOff } from "@/api/entities";
 import { createPageUrl } from "@/utils";
 import { AppContext } from "@/contexts/AppContext.jsx";
 import { useDisplayMode } from "@/contexts/DisplayModeContext.jsx";
@@ -63,11 +63,14 @@ import {
   SmilePlus,
   Trash2,
   Pencil,
+  Palmtree,
 } from "lucide-react";
 import TagInput from "@/components/ui/tag-input";
 import CurrentWorkSection from "@/components/team/CurrentWorkSection";
 import DeveloperGoalsCard from "@/components/team/DeveloperGoalsCard";
 import PerformanceEvaluationCard from "@/components/team/PerformanceEvaluationCard";
+import TimeOffForm from "@/components/timeoff/TimeOffForm";
+import TimeOffCard from "@/components/timeoff/TimeOffCard";
 
 export default function TeamMemberProfile() {
   const [searchParams] = useSearchParams();
@@ -76,8 +79,14 @@ export default function TeamMemberProfile() {
 
   const [member, setMember] = useState(null);
   const [oneOnOnes, setOneOnOnes] = useState([]);
-  const { tasks, projects, teamMembers: allTeamMembers, stakeholders: allStakeholders, oneOnOnes: ctxOneOnOnes, refreshAll } = useContext(AppContext);
+  const [timeOffs, setTimeOffs] = useState([]);
+  const { tasks, projects, teamMembers: allTeamMembers, stakeholders: allStakeholders, refreshAll } = useContext(AppContext);
   const [loading, setLoading] = useState(true);
+
+  // Time Off state
+  const [showTimeOffForm, setShowTimeOffForm] = useState(false);
+  const [editingTimeOff, setEditingTimeOff] = useState(null);
+  const [timeOffLoading, setTimeOffLoading] = useState(false);
 
   // Get the index of current member for consistent anonymization
   const getMemberIndex = () => {
@@ -205,12 +214,26 @@ export default function TeamMemberProfile() {
       const memberData = await TeamMember.get(memberId);
       setMember(memberData);
       await refreshAll();
-      const memberOneOnOnes = (Array.isArray(ctxOneOnOnes) ? ctxOneOnOnes : []).filter(o => String(o.team_member_id) === String(memberId));
+      // Fetch fresh one-on-ones directly from API to avoid stale closure data
+      const allOneOnOnes = await OneOnOne.list();
+      const memberOneOnOnes = (Array.isArray(allOneOnOnes) ? allOneOnOnes : []).filter(o => String(o.team_member_id) === String(memberId));
       setOneOnOnes(memberOneOnOnes);
+      // Load time off for this team member
+      await loadTimeOffs();
     } catch (error) {
       logger.error("Error loading team member data", { error: String(error) });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTimeOffs = async () => {
+    try {
+      const entries = await TimeOff.listByTeamMember(memberId);
+      setTimeOffs(Array.isArray(entries) ? entries : []);
+    } catch (error) {
+      logger.error("Error loading time off", { error: String(error) });
+      setTimeOffs([]);
     }
   };
 
@@ -365,6 +388,35 @@ export default function TeamMemberProfile() {
       loadData();
     } catch (error) {
       logger.error("Error updating meeting", { error: String(error) });
+    }
+  };
+
+  // Handle time off form submission
+  const handleTimeOffSubmit = async (data) => {
+    setTimeOffLoading(true);
+    try {
+      if (editingTimeOff) {
+        await TimeOff.update(editingTimeOff.id, data);
+      } else {
+        await TimeOff.create(data);
+      }
+      await loadTimeOffs();
+      setShowTimeOffForm(false);
+      setEditingTimeOff(null);
+    } catch (error) {
+      logger.error("Error saving time off", { error: String(error) });
+    } finally {
+      setTimeOffLoading(false);
+    }
+  };
+
+  // Handle time off deletion
+  const handleDeleteTimeOff = async (id) => {
+    try {
+      await TimeOff.delete(id);
+      await loadTimeOffs();
+    } catch (error) {
+      logger.error("Error deleting time off", { error: String(error) });
     }
   };
 
@@ -770,6 +822,89 @@ export default function TeamMemberProfile() {
 
             {/* Performance Evaluation */}
             <PerformanceEvaluationCard teamMemberId={memberId} />
+
+            {/* Time Off */}
+            <Card>
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="flex items-center gap-2">
+                    <Palmtree className="h-5 w-5 text-blue-600" />
+                    Time Off
+                  </CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEditingTimeOff(null);
+                      setShowTimeOffForm(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {timeOffs.length === 0 ? (
+                  <div className="text-center py-4">
+                    <Palmtree className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">No time off recorded</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {/* Upcoming time off */}
+                    {timeOffs.filter(t => isFuture(parseISO(t.start_date)) || isFuture(parseISO(t.end_date))).length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-medium text-gray-500 uppercase mb-2">Upcoming</h4>
+                        <div className="space-y-2">
+                          {timeOffs
+                            .filter(t => isFuture(parseISO(t.start_date)) || isFuture(parseISO(t.end_date)))
+                            .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
+                            .map(timeOff => (
+                              <TimeOffCard
+                                key={timeOff.id}
+                                timeOff={timeOff}
+                                compact={true}
+                                showTeamMember={false}
+                                onEdit={(t) => {
+                                  setEditingTimeOff(t);
+                                  setShowTimeOffForm(true);
+                                }}
+                                onDelete={handleDeleteTimeOff}
+                              />
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Past time off */}
+                    {timeOffs.filter(t => isPast(parseISO(t.end_date))).length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-medium text-gray-500 uppercase mb-2">Past</h4>
+                        <div className="space-y-2">
+                          {timeOffs
+                            .filter(t => isPast(parseISO(t.end_date)))
+                            .sort((a, b) => new Date(b.start_date) - new Date(a.start_date))
+                            .slice(0, 3)
+                            .map(timeOff => (
+                              <TimeOffCard
+                                key={timeOff.id}
+                                timeOff={timeOff}
+                                compact={true}
+                                showTeamMember={false}
+                                onEdit={(t) => {
+                                  setEditingTimeOff(t);
+                                  setShowTimeOffForm(true);
+                                }}
+                                onDelete={handleDeleteTimeOff}
+                              />
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
@@ -1273,6 +1408,19 @@ export default function TeamMemberProfile() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Time Off Form Dialog */}
+      <TimeOffForm
+        open={showTimeOffForm}
+        onOpenChange={(open) => {
+          setShowTimeOffForm(open);
+          if (!open) setEditingTimeOff(null);
+        }}
+        onSubmit={handleTimeOffSubmit}
+        initialData={editingTimeOff}
+        preselectedTeamMemberId={memberId}
+        isLoading={timeOffLoading}
+      />
     </div>
   );
 }

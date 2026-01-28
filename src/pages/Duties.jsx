@@ -2,18 +2,21 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   format,
   parseISO,
-  startOfMonth,
-  endOfMonth,
-  addMonths,
-  subMonths,
   isWithinInterval,
   startOfDay,
-  endOfDay,
-  eachWeekOfInterval,
-  getWeek,
 } from 'date-fns';
 import { DutySchedule } from '@/api/entities';
+import { useAI } from '@/contexts/AIContext';
+import { formatDutiesContext } from '@/utils/contextFormatter';
 import { logger } from '@/utils/logger';
+import {
+  getCurrentCycle,
+  getCycleById,
+  listCycles,
+  getNextCycleId,
+  getPreviousCycleId,
+  formatDateRange,
+} from '@/utils/releaseCycles';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,33 +39,34 @@ import {
   Filter,
 } from 'lucide-react';
 import DutyScheduleForm from '@/components/duties/DutyScheduleForm';
-import DutyScheduleCard, { DUTY_TYPE_CONFIG } from '@/components/duties/DutyScheduleCard';
+import DutyScheduleCard from '@/components/duties/DutyScheduleCard';
 
 const TEAMS = ['All', 'Metering', 'Reporting'];
-const DUTY_TYPES = ['All', 'devops', 'dev_on_duty', 'replacement'];
 
 export default function DutiesPage() {
   const [duties, setDuties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentCycleId, setCurrentCycleId] = useState(() => getCurrentCycle().id);
   const [selectedTeam, setSelectedTeam] = useState('All');
   const [selectedDutyType, setSelectedDutyType] = useState('All');
   const [showForm, setShowForm] = useState(false);
   const [editingDuty, setEditingDuty] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
 
-  // Load duties for the visible date range (current month + 2 months)
+  // Load duties for the visible date range (3 cycles)
   useEffect(() => {
     loadDuties();
-  }, [currentMonth, selectedTeam, selectedDutyType]);
+  }, [currentCycleId, selectedTeam, selectedDutyType]);
 
   const loadDuties = async () => {
     setLoading(true);
     setError(null);
     try {
-      const start = startOfMonth(subMonths(currentMonth, 1));
-      const end = endOfMonth(addMonths(currentMonth, 2));
+      // Get date range for 3 cycles
+      const cycles = listCycles(currentCycleId, 3);
+      const start = cycles[0].startDate;
+      const end = cycles[cycles.length - 1].endDate;
 
       const filters = {};
       if (selectedTeam !== 'All') {
@@ -130,43 +134,51 @@ export default function DutiesPage() {
     setEditingDuty(duty);
   };
 
-  // Group duties by month
-  const dutiesByMonth = useMemo(() => {
-    const months = [];
-    for (let i = 0; i < 3; i++) {
-      const monthDate = addMonths(currentMonth, i);
-      const monthStart = startOfMonth(monthDate);
-      const monthEnd = endOfMonth(monthDate);
+  // Group duties by release cycle and sprint
+  const dutiesByCycle = useMemo(() => {
+    const cycles = listCycles(currentCycleId, 3);
 
-      const monthDuties = duties.filter(duty => {
-        if (!duty.start_date || !duty.end_date) return false;
+    return cycles.map(cycle => {
+      // Find duties that start within this cycle
+      const cycleDuties = duties.filter(duty => {
+        if (!duty.start_date) return false;
         const dutyStart = startOfDay(parseISO(duty.start_date));
-        const dutyEnd = endOfDay(parseISO(duty.end_date));
-
-        // Duty overlaps with this month
-        return (
-          isWithinInterval(monthStart, { start: dutyStart, end: dutyEnd }) ||
-          isWithinInterval(monthEnd, { start: dutyStart, end: dutyEnd }) ||
-          isWithinInterval(dutyStart, { start: monthStart, end: monthEnd })
-        );
+        return isWithinInterval(dutyStart, {
+          start: cycle.startDate,
+          end: cycle.endDate
+        });
       });
 
-      // Group by duty type within each month
-      const grouped = {
-        devops: monthDuties.filter(d => d.duty_type === 'devops'),
-        dev_on_duty: monthDuties.filter(d => d.duty_type === 'dev_on_duty'),
-        replacement: monthDuties.filter(d => d.duty_type === 'replacement'),
+      // Group by sprint within cycle
+      const sprintGroups = cycle.sprints.map(sprint => {
+        const sprintDuties = cycleDuties.filter(duty => {
+          const dutyStart = startOfDay(parseISO(duty.start_date));
+          return isWithinInterval(dutyStart, {
+            start: sprint.startDate,
+            end: sprint.endDate
+          });
+        });
+
+        return {
+          ...sprint,
+          duties: sprintDuties,
+          grouped: {
+            devops: sprintDuties.filter(d => d.duty_type === 'devops'),
+            dev_on_duty: sprintDuties.filter(d => d.duty_type === 'dev_on_duty'),
+            replacement: sprintDuties.filter(d => d.duty_type === 'replacement'),
+          }
+        };
+      });
+
+      return {
+        ...cycle,
+        duties: cycleDuties,
+        sprintGroups,
+        label: `Release Cycle ${cycle.id}`,
+        dateLabel: formatDateRange(cycle.startDate, cycle.endDate),
       };
-
-      months.push({
-        date: monthDate,
-        label: format(monthDate, 'MMMM yyyy'),
-        duties: monthDuties,
-        grouped,
-      });
-    }
-    return months;
-  }, [duties, currentMonth]);
+    });
+  }, [duties, currentCycleId]);
 
   // Summary counts
   const summary = useMemo(() => {
@@ -186,6 +198,62 @@ export default function DutiesPage() {
     };
   }, [duties]);
 
+  const handlePrevCycle = () => {
+    setCurrentCycleId(getPreviousCycleId(currentCycleId));
+  };
+
+  const handleNextCycle = () => {
+    setCurrentCycleId(getNextCycleId(currentCycleId));
+  };
+
+  const handleToday = () => {
+    setCurrentCycleId(getCurrentCycle().id);
+  };
+
+  // AI Context Registration
+  const { updatePageContext } = useAI();
+
+  // Register duties context for AI
+  useEffect(() => {
+    const contextSummary = formatDutiesContext([], duties, editingDuty);
+
+    updatePageContext({
+      page: '/duties',
+      summary: contextSummary,
+      selection: editingDuty ? { id: editingDuty.id, type: 'duty_schedule' } : null,
+      data: {
+        dutyCount: duties.length,
+        activeDuties: summary.active,
+        currentCycleId,
+        selectedTeam,
+        selectedDutyType
+      }
+    });
+  }, [duties, editingDuty, summary.active, currentCycleId, selectedTeam, selectedDutyType, updatePageContext]);
+
+  // Listen for context refresh events
+  useEffect(() => {
+    const handleRefresh = () => {
+      const contextSummary = formatDutiesContext([], duties, editingDuty);
+
+      updatePageContext({
+        page: '/duties',
+        summary: contextSummary,
+        selection: editingDuty ? { id: editingDuty.id, type: 'duty_schedule' } : null,
+        data: {
+          dutyCount: duties.length,
+          activeDuties: summary.active,
+          currentCycleId,
+          selectedTeam,
+          selectedDutyType
+        }
+      });
+    };
+
+    window.addEventListener('ai-context-refresh', handleRefresh);
+    return () => window.removeEventListener('ai-context-refresh', handleRefresh);
+  }, [duties, editingDuty, summary.active, currentCycleId, selectedTeam, selectedDutyType, updatePageContext]);
+
   return (
     <div className="p-6">
       <div className="max-w-7xl mx-auto">
@@ -197,7 +265,7 @@ export default function DutiesPage() {
               Duties Schedule
             </h1>
             <p className="text-gray-500 mt-1">
-              Manage duty rotation assignments for your teams
+              Manage duty rotation assignments by release cycle
             </p>
           </div>
           <Button onClick={() => setShowForm(true)}>
@@ -259,15 +327,15 @@ export default function DutiesPage() {
             </SelectContent>
           </Select>
 
-          {/* Month Navigation */}
+          {/* Cycle Navigation */}
           <div className="flex items-center gap-2 ml-auto">
-            <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+            <Button variant="outline" size="icon" onClick={handlePrevCycle}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" onClick={() => setCurrentMonth(new Date())}>
-              Today
+            <Button variant="outline" onClick={handleToday} className="min-w-[80px]">
+              {currentCycleId}
             </Button>
-            <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+            <Button variant="outline" size="icon" onClick={handleNextCycle}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -329,88 +397,114 @@ export default function DutiesPage() {
             </Button>
           </div>
         ) : (
-          /* Monthly Schedule View */
+          /* Release Cycle Schedule View */
           <div className="space-y-6">
-            {dutiesByMonth.map(month => (
-              <Card key={month.label}>
+            {dutiesByCycle.map(cycle => (
+              <Card key={cycle.id}>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-lg">{month.label}</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <span>{cycle.label}</span>
+                    <span className="text-sm font-normal text-gray-500">
+                      ({cycle.dateLabel})
+                    </span>
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {month.duties.length === 0 ? (
+                  {cycle.duties.length === 0 ? (
                     <p className="text-gray-500 text-sm py-4 text-center">
-                      No duties scheduled for this month
+                      No duties scheduled for this cycle
                     </p>
                   ) : (
-                    <div className="space-y-4">
-                      {/* DevOps Section */}
-                      {month.grouped.devops.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <Shield className="h-4 w-4 text-indigo-600" />
-                            <span className="text-sm font-medium text-indigo-800">DevOps (2 weeks)</span>
-                            <Badge variant="outline" className="bg-indigo-50 text-indigo-700">
-                              {month.grouped.devops.length}
-                            </Badge>
+                    <div className="space-y-6">
+                      {/* Sprint Sections */}
+                      {cycle.sprintGroups.map(sprint => (
+                        <div key={sprint.id} className="border-l-2 border-gray-200 pl-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="text-sm font-semibold text-gray-700">
+                              Sprint {sprint.id}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              ({formatDateRange(sprint.startDate, sprint.endDate)})
+                            </span>
+                            {sprint.duties.length > 0 && (
+                              <Badge variant="outline" className="ml-auto">
+                                {sprint.duties.length} {sprint.duties.length === 1 ? 'duty' : 'duties'}
+                              </Badge>
+                            )}
                           </div>
-                          <div className="space-y-2">
-                            {month.grouped.devops.map(duty => (
-                              <DutyScheduleCard
-                                key={duty.id}
-                                duty={duty}
-                                onEdit={handleEdit}
-                                onDelete={handleDeleteDuty}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
 
-                      {/* Dev On Duty Section */}
-                      {month.grouped.dev_on_duty.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <Wrench className="h-4 w-4 text-teal-600" />
-                            <span className="text-sm font-medium text-teal-800">Dev On Duty (1 week)</span>
-                            <Badge variant="outline" className="bg-teal-50 text-teal-700">
-                              {month.grouped.dev_on_duty.length}
-                            </Badge>
-                          </div>
-                          <div className="space-y-2">
-                            {month.grouped.dev_on_duty.map(duty => (
-                              <DutyScheduleCard
-                                key={duty.id}
-                                duty={duty}
-                                onEdit={handleEdit}
-                                onDelete={handleDeleteDuty}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                          {sprint.duties.length === 0 ? (
+                            <p className="text-gray-400 text-sm py-2">
+                              No duties in this sprint
+                            </p>
+                          ) : (
+                            <div className="space-y-3">
+                              {/* DevOps */}
+                              {sprint.grouped.devops.length > 0 && (
+                                <div>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Shield className="h-3 w-3 text-indigo-600" />
+                                    <span className="text-xs font-medium text-indigo-700">DevOps</span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    {sprint.grouped.devops.map(duty => (
+                                      <DutyScheduleCard
+                                        key={duty.id}
+                                        duty={duty}
+                                        onEdit={handleEdit}
+                                        onDelete={handleDeleteDuty}
+                                        compact
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
 
-                      {/* Replacement Section */}
-                      {month.grouped.replacement.length > 0 && (
-                        <div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <UserCog className="h-4 w-4 text-amber-600" />
-                            <span className="text-sm font-medium text-amber-800">Replacement (SM Cover)</span>
-                            <Badge variant="outline" className="bg-amber-50 text-amber-700">
-                              {month.grouped.replacement.length}
-                            </Badge>
-                          </div>
-                          <div className="space-y-2">
-                            {month.grouped.replacement.map(duty => (
-                              <DutyScheduleCard
-                                key={duty.id}
-                                duty={duty}
-                                onEdit={handleEdit}
-                                onDelete={handleDeleteDuty}
-                              />
-                            ))}
-                          </div>
+                              {/* Dev On Duty */}
+                              {sprint.grouped.dev_on_duty.length > 0 && (
+                                <div>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Wrench className="h-3 w-3 text-teal-600" />
+                                    <span className="text-xs font-medium text-teal-700">Dev On Duty</span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    {sprint.grouped.dev_on_duty.map(duty => (
+                                      <DutyScheduleCard
+                                        key={duty.id}
+                                        duty={duty}
+                                        onEdit={handleEdit}
+                                        onDelete={handleDeleteDuty}
+                                        compact
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Replacement */}
+                              {sprint.grouped.replacement.length > 0 && (
+                                <div>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <UserCog className="h-3 w-3 text-amber-600" />
+                                    <span className="text-xs font-medium text-amber-700">Replacement</span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    {sprint.grouped.replacement.map(duty => (
+                                      <DutyScheduleCard
+                                        key={duty.id}
+                                        duty={duty}
+                                        onEdit={handleEdit}
+                                        onDelete={handleDeleteDuty}
+                                        compact
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      ))}
                     </div>
                   )}
                 </CardContent>
@@ -425,6 +519,7 @@ export default function DutiesPage() {
           onOpenChange={setShowForm}
           onSubmit={handleCreateDuty}
           preselectedTeam={selectedTeam !== 'All' ? selectedTeam : null}
+          currentCycleId={currentCycleId}
           isLoading={formLoading}
         />
 
@@ -434,6 +529,7 @@ export default function DutiesPage() {
           onOpenChange={(open) => !open && setEditingDuty(null)}
           onSubmit={handleUpdateDuty}
           initialData={editingDuty}
+          currentCycleId={currentCycleId}
           isLoading={formLoading}
         />
       </div>

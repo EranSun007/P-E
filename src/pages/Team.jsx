@@ -19,6 +19,8 @@ import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { AppContext } from "@/contexts/AppContext.jsx";
 import { useDisplayMode } from "@/contexts/DisplayModeContext.jsx";
+import { useAI } from "@/contexts/AIContext";
+import { formatTeamContext } from "@/utils/contextFormatter";
 import { logger } from "@/utils/logger";
 import {
   anonymizeName,
@@ -370,6 +372,46 @@ export default function TeamPage() {
     const goToMemberProfile = (memberId) => {
     navigate(createPageUrl("TeamMemberProfile") + `?id=${memberId}`);
   };
+
+  // AI Context Registration
+  const { updatePageContext } = useAI();
+
+  // Register team context for AI
+  useEffect(() => {
+    const contextSummary = formatTeamContext(filteredMembers, { search: searchQuery }, editingMember);
+
+    updatePageContext({
+      page: '/team',
+      summary: contextSummary,
+      selection: editingMember ? { id: editingMember.id, type: 'team_member' } : null,
+      data: {
+        memberCount: filteredMembers.length,
+        totalMemberCount: teamMembers.length,
+        viewMode
+      }
+    });
+  }, [filteredMembers, searchQuery, editingMember, teamMembers.length, viewMode, updatePageContext]);
+
+  // Listen for context refresh events
+  useEffect(() => {
+    const handleRefresh = () => {
+      const contextSummary = formatTeamContext(filteredMembers, { search: searchQuery }, editingMember);
+
+      updatePageContext({
+        page: '/team',
+        summary: contextSummary,
+        selection: editingMember ? { id: editingMember.id, type: 'team_member' } : null,
+        data: {
+          memberCount: filteredMembers.length,
+          totalMemberCount: teamMembers.length,
+          viewMode
+        }
+      });
+    };
+
+    window.addEventListener('ai-context-refresh', handleRefresh);
+    return () => window.removeEventListener('ai-context-refresh', handleRefresh);
+  }, [filteredMembers, searchQuery, editingMember, teamMembers.length, viewMode, updatePageContext]);
 
   return (
     <div className="p-6">

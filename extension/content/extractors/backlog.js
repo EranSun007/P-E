@@ -8,39 +8,49 @@
  * SELECTORS NOTE: These selectors are educated guesses. Live inspection needed.
  */
 
-// Primary selectors - Modern Jira backlog
+// Primary selectors - SAP Jira (Classic GHX-based)
+// These selectors are based on live DOM inspection of jira.tools.sap
 const BACKLOG_SELECTORS = {
-  // Sprint container
-  sprintContainer: '[data-test-id*="sprint-container"], [data-testid*="sprint"], .js-sprint',
-  // Sprint header
-  sprintHeader: '[data-test-id*="sprint-header"], [data-testid*="sprint-name"], .ghx-sprint-header',
-  // Issue row in backlog
-  issueRow: '[data-test-id*="issue-row"], [data-testid*="backlog-issue"], [data-rbd-draggable-id]',
-  // Issue key
-  issueKey: '[data-test-id*="issue-key"], [data-testid*="key"], a[href*="/browse/"]',
+  // Sprint container - contains issues for a sprint (has data-sprint-id)
+  sprintContainer: '.js-sprint-container[data-sprint-id], .ghx-backlog-container[data-sprint-id]',
+  // Sprint header - contains sprint name
+  sprintHeader: '.js-sprint-header, .ghx-backlog-header',
+  // Issue row in backlog - each issue item is a .ghx-row
+  issueRow: '.ghx-row',
+  // Issue key - link to issue
+  issueKey: '.ghx-key a, a.js-key-link',
   // Issue summary
-  summary: '[data-test-id*="issue-summary"], [data-testid*="summary"]',
-  // Status badge
-  status: '[data-test-id*="status"], [data-testid*="status"]',
-  // Story points
-  storyPoints: '[data-test-id*="estimate"], [data-testid*="story-point"]',
-  // Assignee
-  assignee: '[data-test-id*="assignee"], [data-testid*="avatar"]',
+  summary: '.ghx-summary .ghx-inner, .ghx-summary',
+  // Status badge (may not be visible in backlog compact view)
+  status: '.ghx-status .aui-lozenge, .ghx-status',
+  // Story points - in the ghx-end section
+  storyPoints: '.ghx-end .ghx-statistic-badge, .ghx-estimate',
+  // Assignee avatar
+  assignee: '.ghx-avatar-img, .ghx-avatar img',
+  // Issue type
+  issueType: '.ghx-type[title], .ghx-type img[alt]',
+  // Priority
+  priority: '.ghx-priority[title], .ghx-priority img[alt]',
+  // Epic label
+  epicLabel: '.ghx-label[data-epickey]',
   // Backlog section (unassigned to sprint)
-  backlogSection: '[data-test-id*="backlog-content"], [data-testid*="backlog"], .ghx-backlog'
+  backlogSection: '.ghx-backlog, .ghx-backlog-container:not([data-sprint-id])'
 };
 
-// Fallback selectors - Classic Jira backlog
+// Fallback selectors - Additional patterns
 const FALLBACK_SELECTORS = {
-  sprintContainer: '.ghx-sprint-group, .js-sprint-container',
-  sprintHeader: '.ghx-sprint-header, .ghx-sprint-name',
-  issueRow: '.ghx-issue-content, .ghx-backlog-issue, .js-issue',
-  issueKey: '.ghx-key, .ghx-key a',
-  summary: '.ghx-summary',
-  status: '.ghx-status, .aui-lozenge',
-  storyPoints: '.ghx-estimate, .ghx-statistic-badge',
-  assignee: '.ghx-avatar',
-  backlogSection: '.ghx-backlog-container, #ghx-backlog'
+  sprintContainer: '.ghx-sprint-group > div[data-sprint-id]',
+  sprintHeader: '.ghx-sprint-info, .sprint-lozenge',
+  issueRow: '.ghx-issues .ghx-row, [class*="ghx-row"]',
+  issueKey: 'a[href*="/browse/"]',
+  summary: '[title]:not(.ghx-type):not(.ghx-priority)',
+  status: '.aui-lozenge',
+  storyPoints: '.ghx-stat-1, [class*="estimate"]',
+  assignee: 'img[class*="avatar"]',
+  issueType: 'img[alt*="Issue Type"]',
+  priority: 'img[alt*="Priority"]',
+  epicLabel: '[data-epickey]',
+  backlogSection: '#ghx-backlog, .ghx-backlog-group'
 };
 
 /**
@@ -83,22 +93,52 @@ function extractBacklogIssues() {
 
 /**
  * Extract sprint name from container header
+ * SAP Jira header contains sprint name in .ghx-sprint-info or sprint-lozenge
  */
 function extractSprintName(container) {
+  // Try sprint info element first
+  const infoEl = container.querySelector('.ghx-sprint-info');
+  if (infoEl) {
+    // Sprint info might have multiple children, get the name part
+    const nameEl = infoEl.querySelector('.ghx-name, .sprint-lozenge, span');
+    if (nameEl) {
+      let name = nameEl.textContent?.trim();
+      if (name) return cleanSprintName(name);
+    }
+  }
+
+  // Try header element
   const header = container.querySelector(BACKLOG_SELECTORS.sprintHeader) ||
                  container.querySelector(FALLBACK_SELECTORS.sprintHeader);
 
   if (!header) return null;
 
+  // Try to find sprint name within header
+  const lozenge = header.querySelector('.sprint-lozenge');
+  if (lozenge) {
+    return cleanSprintName(lozenge.textContent?.trim());
+  }
+
+  // Fallback to full header text
   let name = header.textContent?.trim();
   if (!name) return null;
 
-  // Clean up sprint name (remove issue counts, dates, etc.)
-  // "Sprint 42 (5 issues)" -> "Sprint 42"
-  // "Sprint 42 Jan 1 - Jan 14" -> "Sprint 42"
+  return cleanSprintName(name);
+}
+
+/**
+ * Clean sprint name by removing extra info
+ */
+function cleanSprintName(name) {
+  if (!name) return null;
+
+  // Remove issue counts: "Sprint 42 (5 issues)" -> "Sprint 42"
+  // Remove dates: "Sprint 42 Jan 1 - Jan 14" -> "Sprint 42"
+  // Remove status indicators
   name = name
-    .replace(/\s*\(\d+\s*(issues?|stories?|items?)?\)/gi, '')
-    .replace(/\s+\d{1,2}\s+\w+\s+-\s+\d{1,2}\s+\w+/g, '')
+    .replace(/\s*\(\d+\s*(issues?|stories?|items?|pts?)?\)/gi, '')
+    .replace(/\s+\d{1,2}\s+\w{3,9}\s*-\s*\d{1,2}\s+\w{3,9}/gi, '')
+    .replace(/\s*(active|closed|future|planned)\s*/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -147,7 +187,7 @@ function extractIssueFromRow(row, sprintName, rank) {
   // Summary
   const summary = extractSummary(row);
 
-  // Status
+  // Status (may not be visible in compact backlog view)
   const status = extractStatus(row);
 
   // Story points
@@ -156,24 +196,37 @@ function extractIssueFromRow(row, sprintName, rank) {
   // Assignee
   const assigneeName = extractAssignee(row);
 
-  // Issue type
+  // Issue type - from .ghx-type title or img alt
   const issueType = extractIssueType(row);
 
-  // Priority
+  // Priority - from .ghx-priority title or img alt
   const priority = extractPriority(row);
+
+  // Epic key - from data-epickey attribute
+  const epicKey = extractEpicKey(row);
 
   return {
     issue_key: issueKey,
     summary: summary,
-    status: status,
+    status: status || 'To Do', // Default if not visible
     assignee_name: assigneeName,
     story_points: storyPoints,
     issue_type: issueType,
     priority: priority,
+    epic_key: epicKey,
     sprint_name: sprintName,
     backlog_rank: rank,
     jira_url: buildJiraUrl(issueKey)
   };
+}
+
+/**
+ * Extract epic key from row
+ */
+function extractEpicKey(row) {
+  const epicEl = row.querySelector(BACKLOG_SELECTORS.epicLabel) ||
+                 row.querySelector(FALLBACK_SELECTORS.epicLabel);
+  return epicEl?.dataset?.epickey || null;
 }
 
 /**
@@ -297,15 +350,22 @@ function extractAssignee(row) {
 
 /**
  * Extract issue type from row
+ * SAP Jira: <span class="ghx-type" title="Activity"><img alt="Issue Type: Activity"...>
  */
 function extractIssueType(row) {
-  const typeEl = row.querySelector('[data-test-id*="issue-type"], [data-testid*="type"], .ghx-type');
-
+  // Try ghx-type element with title attribute
+  const typeEl = row.querySelector('.ghx-type[title]');
   if (typeEl) {
-    return typeEl.getAttribute('aria-label') ||
-           typeEl.getAttribute('title') ||
-           typeEl.textContent?.trim() ||
-           null;
+    return typeEl.getAttribute('title');
+  }
+
+  // Try img alt text inside ghx-type
+  const typeImg = row.querySelector('.ghx-type img[alt]');
+  if (typeImg) {
+    const alt = typeImg.getAttribute('alt');
+    // Extract type from "Issue Type: Activity" -> "Activity"
+    const match = alt?.match(/Issue Type:\s*(.+)/i);
+    return match ? match[1] : alt;
   }
 
   return null;
@@ -313,15 +373,22 @@ function extractIssueType(row) {
 
 /**
  * Extract priority from row
+ * SAP Jira: <span class="ghx-priority" title="Very High"><img alt="Priority: Very High"...>
  */
 function extractPriority(row) {
-  const priorityEl = row.querySelector('[data-test-id*="priority"], [data-testid*="priority"], .ghx-priority');
-
+  // Try ghx-priority element with title attribute
+  const priorityEl = row.querySelector('.ghx-priority[title]');
   if (priorityEl) {
-    return priorityEl.getAttribute('aria-label') ||
-           priorityEl.getAttribute('title') ||
-           priorityEl.textContent?.trim() ||
-           null;
+    return priorityEl.getAttribute('title');
+  }
+
+  // Try img alt text inside ghx-priority
+  const priorityImg = row.querySelector('.ghx-priority img[alt]');
+  if (priorityImg) {
+    const alt = priorityImg.getAttribute('alt');
+    // Extract priority from "Priority: Very High" -> "Very High"
+    const match = alt?.match(/Priority:\s*(.+)/i);
+    return match ? match[1] : alt;
   }
 
   return null;
@@ -377,5 +444,20 @@ function buildJiraUrl(issueKey) {
   return `${baseUrl}/browse/${issueKey}`;
 }
 
-// Export to window for content script access
+// Export to window for page context
 window.extractBacklogIssues = extractBacklogIssues;
+
+// Also dispatch result via CustomEvent for content script (isolated world)
+// Content script can't access window.extractBacklogIssues directly
+window.addEventListener('PE_JIRA_EXTRACT_REQUEST', () => {
+  console.log('[PE-Jira] Extraction request received in page context');
+  const issues = extractBacklogIssues();
+  window.dispatchEvent(new CustomEvent('PE_JIRA_EXTRACT_RESULT', {
+    detail: { issues: issues, pageType: 'backlog' }
+  }));
+});
+
+// Signal that extractor is ready
+window.dispatchEvent(new CustomEvent('PE_JIRA_EXTRACTOR_READY', {
+  detail: { pageType: 'backlog' }
+}));

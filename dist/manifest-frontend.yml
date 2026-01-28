@@ -1,0 +1,12 @@
+---
+applications:
+  - name: pe-manager-frontend
+    memory: 128M
+    instances: 1
+    buildpacks:
+      - staticfile_buildpack
+    env:
+      FORCE_HTTPS: true
+      VITE_AUTH_MODE: development
+    health-check-type: http
+    health-check-http-endpoint: /

@@ -11,6 +11,7 @@ const pendingSection = document.getElementById('pendingSection');
 const pendingCountEl = document.getElementById('pendingCount');
 const viewInboxLink = document.getElementById('viewInbox');
 const captureBtn = document.getElementById('captureBtn');
+const createRuleBtn = document.getElementById('createRuleBtn');
 const refreshRulesBtn = document.getElementById('refreshRulesBtn');
 
 // Load status on popup open
@@ -166,6 +167,43 @@ captureBtn.addEventListener('click', async () => {
     captureBtn.textContent = 'Capture This Page';
     captureBtn.disabled = false;
   }, 2000);
+});
+
+/**
+ * Create rule button - injects element picker into current page
+ */
+createRuleBtn.addEventListener('click', async () => {
+  createRuleBtn.disabled = true;
+  createRuleBtn.textContent = 'Starting...';
+
+  try {
+    // Get the current active tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (!tab || !tab.id) {
+      throw new Error('No active tab found');
+    }
+
+    // Inject the element picker script into the page
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content/element-picker.js']
+    });
+
+    // Close popup - picker takes over
+    window.close();
+
+  } catch (error) {
+    console.error('Failed to start picker:', error);
+    createRuleBtn.textContent = 'Failed';
+    infoEl.textContent = error.message;
+
+    // Reset button after 2 seconds
+    setTimeout(() => {
+      createRuleBtn.textContent = 'Create Rule for This Page';
+      createRuleBtn.disabled = false;
+    }, 2000);
+  }
 });
 
 /**

@@ -8,7 +8,6 @@ import {
   X,
   Clock,
   Loader2,
-  ExternalLink,
   AlertTriangle,
   Users,
   LayoutList,
@@ -17,6 +16,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import WorkloadView from "@/components/jira/WorkloadView";
 import AssigneeMappingDialog from "@/components/jira/AssigneeMappingDialog";
+import JiraIssueDetailDialog from "@/components/jira/JiraIssueDetailDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,10 @@ export default function JiraIssuesPage() {
   const [showMappingDialog, setShowMappingDialog] = useState(false);
   const [mappings, setMappings] = useState({});
   const [teamMembers, setTeamMembers] = useState([]);
+
+  // Issue detail dialog state
+  const [selectedIssue, setSelectedIssue] = useState(null);
+  const [showDetailDialog, setShowDetailDialog] = useState(false);
 
   // Load data on mount
   useEffect(() => {
@@ -449,17 +453,18 @@ export default function JiraIssuesPage() {
                     </TableHeader>
                     <TableBody>
                       {filteredIssues.map((issue) => (
-                        <TableRow key={issue.id}>
+                        <TableRow
+                          key={issue.id}
+                          className="cursor-pointer hover:bg-gray-50"
+                          onClick={() => {
+                            setSelectedIssue(issue);
+                            setShowDetailDialog(true);
+                          }}
+                        >
                           <TableCell>
-                            <a
-                              href={issue.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:underline flex items-center gap-1 font-medium"
-                            >
+                            <span className="text-blue-600 font-medium flex items-center gap-1">
                               {issue.issue_key}
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
+                            </span>
                           </TableCell>
                           <TableCell className="max-w-xs truncate">
                             {issue.summary}
@@ -471,7 +476,7 @@ export default function JiraIssuesPage() {
                           </TableCell>
                           <TableCell>{issue.assignee_name || "-"}</TableCell>
                           <TableCell>{issue.story_points || "-"}</TableCell>
-                          <TableCell>{issue.sprint || "-"}</TableCell>
+                          <TableCell>{issue.sprint || issue.sprint_name || "-"}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -497,6 +502,13 @@ export default function JiraIssuesPage() {
           onOpenChange={setShowMappingDialog}
           jiraAssignees={uniqueAssignees}
           onMappingsUpdated={handleMappingsUpdated}
+        />
+
+        {/* Issue Detail Dialog */}
+        <JiraIssueDetailDialog
+          issue={selectedIssue}
+          open={showDetailDialog}
+          onOpenChange={setShowDetailDialog}
         />
       </div>
     </div>

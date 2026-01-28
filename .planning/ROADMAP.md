@@ -5,7 +5,7 @@
 - **v1.0 Jira Integration MVP** - Phases 1-5 (shipped 2026-01-21) — [Archive](milestones/v1.0-ROADMAP.md)
 - **v1.1 Web Capture Framework** - Phases 6-9 (shipped 2026-01-22) — [Archive](milestones/v1.1-ROADMAP.md)
 - **v1.2 DevOps Bug Dashboard** - Phases 10-12 (shipped 2026-01-28) — [Archive](milestones/v1.2-ROADMAP.md)
-- **v1.3 KPI Insights & Alerts** - Phases 13-16 (in progress)
+- **v1.3 KPI Insights & Alerts** - Phases 13-16 (shipped 2026-01-28) — [Archive](milestones/v1.3-ROADMAP.md)
 
 ## Phases
 
@@ -232,7 +232,7 @@ Plans:
 
 </details>
 
-## v1.3 KPI Insights & Alerts (In Progress)
+## v1.3 KPI Insights & Alerts (SHIPPED 2026-01-28)
 
 **Milestone Goal:** Add historical KPI trend visualization and proactive notifications when performance degrades.
 
@@ -299,8 +299,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 16-01-PLAN.md — EmailService with nodemailer, SMTP config, retry logic, preferences API
-- [ ] 16-02-PLAN.md — Email preferences UI in Settings page
+- [x] 16-01-PLAN.md — EmailService with nodemailer, SMTP config, retry logic, preferences API
+- [x] 16-02-PLAN.md — Email preferences UI in Settings page
 
 ## Progress
 
@@ -327,4 +327,4 @@ v1.3: 13 -> 14 (depends on 13) -> 15 (depends on 13) -> 16 (depends on 15)
 | 13. Historical KPI Storage | v1.3 | 1/1 | Complete | 2026-01-28 |
 | 14. Trend Charts | v1.3 | 2/2 | Complete | 2026-01-28 |
 | 15. Threshold Detection & In-App Notifications | v1.3 | 2/2 | Complete | 2026-01-28 |
-| 16. Email Notifications & Preferences | v1.3 | 0/2 | Planned | - |
+| 16. Email Notifications & Preferences | v1.3 | 2/2 | Complete | 2026-01-28 |

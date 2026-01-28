@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { format, addDays, addWeeks } from 'date-fns';
+import { useState, useEffect, useMemo } from 'react';
+import { format } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -21,6 +20,13 @@ import {
 } from '@/components/ui/select';
 import { DutySchedule } from '@/api/entities';
 import { logger } from '@/utils/logger';
+import {
+  listSprints,
+  getSprintById,
+  formatDateRange,
+  findSprintForDate,
+  getCurrentCycle,
+} from '@/utils/releaseCycles';
 
 const DUTY_TYPES = [
   { value: 'devops', label: 'DevOps', duration: 14, color: 'indigo' },
@@ -36,13 +42,15 @@ const DutyScheduleForm = ({
   onSubmit,
   initialData = null,
   preselectedTeam = null,
-  preselectedDate = null,
+  currentCycleId = null,
   isLoading = false,
 }) => {
   const [formData, setFormData] = useState({
     team: '',
     team_member_id: '',
     duty_type: '',
+    sprint_id: '',
+    week: '', // For dev_on_duty (1 week duties): '1' or '2'
     start_date: '',
     end_date: '',
     notes: '',
@@ -51,35 +59,48 @@ const DutyScheduleForm = ({
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [errors, setErrors] = useState({});
 
+  // Get available sprints (6 sprints = 3 cycles)
+  const availableSprints = useMemo(() => {
+    const startCycle = currentCycleId || getCurrentCycle().id;
+    return listSprints(startCycle, 3);
+  }, [currentCycleId]);
+
   // Reset form when dialog opens/closes
   useEffect(() => {
     if (open) {
       if (initialData) {
+        // When editing, try to find the sprint from the start date
+        const startDate = initialData.start_date ? new Date(initialData.start_date) : null;
+        const sprintId = startDate ? findSprintForDate(startDate) : '';
+
         setFormData({
           team: initialData.team || '',
           team_member_id: initialData.team_member_id || '',
           duty_type: initialData.duty_type || '',
+          sprint_id: sprintId || '',
+          week: '', // Will be determined if editing a 1-week duty
           start_date: initialData.start_date ? initialData.start_date.split('T')[0] : '',
           end_date: initialData.end_date ? initialData.end_date.split('T')[0] : '',
           notes: initialData.notes || '',
         });
       } else {
-        const defaultDate = preselectedDate
-          ? format(preselectedDate, 'yyyy-MM-dd')
-          : format(new Date(), 'yyyy-MM-dd');
+        // Default to first available sprint
+        const defaultSprintId = availableSprints.length > 0 ? availableSprints[0].id : '';
 
         setFormData({
           team: preselectedTeam || '',
           team_member_id: '',
           duty_type: '',
-          start_date: defaultDate,
+          sprint_id: defaultSprintId,
+          week: '1',
+          start_date: '',
           end_date: '',
           notes: '',
         });
       }
       setErrors({});
     }
-  }, [open, initialData, preselectedTeam, preselectedDate]);
+  }, [open, initialData, preselectedTeam, availableSprints]);
 
   // Load team members when team changes
   useEffect(() => {
@@ -103,35 +124,73 @@ const DutyScheduleForm = ({
     }
   };
 
-  // Auto-calculate end date based on duty type
+  // Calculate dates based on sprint and duty type
+  const calculateDatesFromSprint = (sprintId, dutyType, week) => {
+    if (!sprintId) return { start_date: '', end_date: '' };
+
+    const sprint = getSprintById(sprintId);
+    if (!sprint) return { start_date: '', end_date: '' };
+
+    // DevOps (2 weeks) = full sprint
+    if (dutyType === 'devops') {
+      return {
+        start_date: format(sprint.startDate, 'yyyy-MM-dd'),
+        end_date: format(sprint.endDate, 'yyyy-MM-dd'),
+      };
+    }
+
+    // Dev On Duty (1 week) = specific week within sprint
+    if (dutyType === 'dev_on_duty' && week) {
+      const weekData = sprint.weeks.find(w => w.week === parseInt(week));
+      if (weekData) {
+        return {
+          start_date: format(weekData.startDate, 'yyyy-MM-dd'),
+          end_date: format(weekData.endDate, 'yyyy-MM-dd'),
+        };
+      }
+    }
+
+    // Replacement - use full sprint by default (can be customized)
+    return {
+      start_date: format(sprint.startDate, 'yyyy-MM-dd'),
+      end_date: format(sprint.endDate, 'yyyy-MM-dd'),
+    };
+  };
+
+  // Handle duty type change - recalculate dates
   const handleDutyTypeChange = (dutyType) => {
     setFormData(prev => {
-      const updated = { ...prev, duty_type: dutyType };
-
-      const dutyConfig = DUTY_TYPES.find(d => d.value === dutyType);
-      if (dutyConfig?.duration && prev.start_date) {
-        const startDate = new Date(prev.start_date);
-        const endDate = addDays(startDate, dutyConfig.duration - 1);
-        updated.end_date = format(endDate, 'yyyy-MM-dd');
-      }
-
-      return updated;
+      const dates = calculateDatesFromSprint(prev.sprint_id, dutyType, prev.week || '1');
+      return {
+        ...prev,
+        duty_type: dutyType,
+        week: dutyType === 'dev_on_duty' ? (prev.week || '1') : '',
+        ...dates,
+      };
     });
   };
 
-  const handleStartDateChange = (startDate) => {
+  // Handle sprint change - recalculate dates
+  const handleSprintChange = (sprintId) => {
     setFormData(prev => {
-      const updated = { ...prev, start_date: startDate };
+      const dates = calculateDatesFromSprint(sprintId, prev.duty_type, prev.week);
+      return {
+        ...prev,
+        sprint_id: sprintId,
+        ...dates,
+      };
+    });
+  };
 
-      // Auto-calculate end date if duty type has fixed duration
-      const dutyConfig = DUTY_TYPES.find(d => d.value === prev.duty_type);
-      if (dutyConfig?.duration && startDate) {
-        const start = new Date(startDate);
-        const endDate = addDays(start, dutyConfig.duration - 1);
-        updated.end_date = format(endDate, 'yyyy-MM-dd');
-      }
-
-      return updated;
+  // Handle week change (for dev_on_duty) - recalculate dates
+  const handleWeekChange = (week) => {
+    setFormData(prev => {
+      const dates = calculateDatesFromSprint(prev.sprint_id, prev.duty_type, week);
+      return {
+        ...prev,
+        week,
+        ...dates,
+      };
     });
   };
 
@@ -161,14 +220,14 @@ const DutyScheduleForm = ({
     if (!formData.duty_type) {
       newErrors.duty_type = 'Duty type is required';
     }
-    if (!formData.start_date) {
-      newErrors.start_date = 'Start date is required';
+    if (!formData.sprint_id) {
+      newErrors.sprint_id = 'Sprint is required';
     }
-    if (!formData.end_date) {
-      newErrors.end_date = 'End date is required';
+    if (formData.duty_type === 'dev_on_duty' && !formData.week) {
+      newErrors.week = 'Week is required for Dev On Duty';
     }
-    if (formData.start_date && formData.end_date && formData.start_date > formData.end_date) {
-      newErrors.end_date = 'End date must be after start date';
+    if (!formData.start_date || !formData.end_date) {
+      newErrors.sprint_id = 'Please select a valid sprint';
     }
 
     setErrors(newErrors);
@@ -298,42 +357,71 @@ const DutyScheduleForm = ({
             )}
           </div>
 
-          {/* Date Range */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="start_date">Start Date *</Label>
-              <Input
-                id="start_date"
-                type="date"
-                value={formData.start_date}
-                onChange={(e) => handleStartDateChange(e.target.value)}
-                disabled={isLoading}
-                className={errors.start_date ? 'border-destructive' : ''}
-              />
-              {errors.start_date && (
-                <p className="text-sm text-destructive">{errors.start_date}</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="end_date">End Date *</Label>
-              <Input
-                id="end_date"
-                type="date"
-                value={formData.end_date}
-                onChange={(e) => handleInputChange('end_date', e.target.value)}
-                disabled={isLoading}
-                className={errors.end_date ? 'border-destructive' : ''}
-              />
-              {errors.end_date && (
-                <p className="text-sm text-destructive">{errors.end_date}</p>
-              )}
-              {selectedDutyType?.duration && (
-                <p className="text-xs text-gray-500">
-                  Auto-calculated for {selectedDutyType.duration} days
-                </p>
-              )}
-            </div>
+          {/* Sprint Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="sprint">Sprint *</Label>
+            <Select
+              value={formData.sprint_id}
+              onValueChange={handleSprintChange}
+              disabled={isLoading}
+            >
+              <SelectTrigger className={errors.sprint_id ? 'border-destructive' : ''}>
+                <SelectValue placeholder="Select sprint" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableSprints.map(sprint => (
+                  <SelectItem key={sprint.id} value={sprint.id}>
+                    <span className="flex items-center gap-2">
+                      <span className="font-medium">{sprint.id}</span>
+                      <span className="text-xs text-gray-500">
+                        ({formatDateRange(sprint.startDate, sprint.endDate)})
+                      </span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.sprint_id && (
+              <p className="text-sm text-destructive">{errors.sprint_id}</p>
+            )}
           </div>
+
+          {/* Week Selection (only for Dev On Duty - 1 week duties) */}
+          {formData.duty_type === 'dev_on_duty' && (
+            <div className="space-y-2">
+              <Label htmlFor="week">Week *</Label>
+              <Select
+                value={formData.week}
+                onValueChange={handleWeekChange}
+                disabled={isLoading}
+              >
+                <SelectTrigger className={errors.week ? 'border-destructive' : ''}>
+                  <SelectValue placeholder="Select week" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Week 1 (First week of sprint)</SelectItem>
+                  <SelectItem value="2">Week 2 (Second week of sprint)</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.week && (
+                <p className="text-sm text-destructive">{errors.week}</p>
+              )}
+            </div>
+          )}
+
+          {/* Calculated Date Display */}
+          {formData.start_date && formData.end_date && (
+            <div className="p-3 bg-gray-50 rounded-md border">
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Scheduled:</span>{' '}
+                {format(new Date(formData.start_date), 'MMM d, yyyy')} -{' '}
+                {format(new Date(formData.end_date), 'MMM d, yyyy')}
+                <span className="text-xs text-gray-500 ml-2">
+                  ({selectedDutyType?.duration === 7 ? '1 week' : '2 weeks'})
+                </span>
+              </p>
+            </div>
+          )}
 
           {/* Notes */}
           <div className="space-y-2">

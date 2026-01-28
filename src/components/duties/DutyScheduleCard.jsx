@@ -31,6 +31,7 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
+import { findSprintForDate, getSprintById } from '@/utils/releaseCycles';
 
 const DUTY_TYPE_CONFIG = {
   devops: {
@@ -81,6 +82,32 @@ const DutyScheduleCard = ({
 
   const duration = getDuration();
 
+  // Get sprint label for the duty
+  const getSprintLabel = () => {
+    if (!duty.start_date) return null;
+    const startDate = parseISO(duty.start_date);
+    const sprintId = findSprintForDate(startDate);
+    if (!sprintId) return null;
+
+    // For 1-week duties (dev_on_duty), show which week
+    if (duration === 7 && sprintId) {
+      const sprint = getSprintById(sprintId);
+      if (sprint) {
+        const dutyStartTime = startDate.getTime();
+        const week1Start = sprint.weeks[0].startDate.getTime();
+        const week2Start = sprint.weeks[1].startDate.getTime();
+
+        // Determine which week
+        const weekNum = Math.abs(dutyStartTime - week1Start) < Math.abs(dutyStartTime - week2Start) ? 1 : 2;
+        return `${sprintId} W${weekNum}`;
+      }
+    }
+
+    return sprintId;
+  };
+
+  const sprintLabel = getSprintLabel();
+
   // Format date range
   const formatDateRange = () => {
     if (!duty.start_date) return 'No date';
@@ -114,7 +141,11 @@ const DutyScheduleCard = ({
           <div className={`text-sm font-medium ${config.textClass} truncate`}>
             {duty.team_member_name}
           </div>
-          <div className="text-xs text-gray-600">
+          <div className="text-xs text-gray-600 flex items-center gap-1">
+            {sprintLabel && (
+              <span className="font-semibold text-gray-700">{sprintLabel}</span>
+            )}
+            <span className="text-gray-400">·</span>
             {formatDateRange()}
           </div>
         </div>
@@ -150,11 +181,15 @@ const DutyScheduleCard = ({
               <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
+                  {sprintLabel && (
+                    <span className="font-semibold text-gray-700">{sprintLabel}</span>
+                  )}
+                  {sprintLabel && <span className="text-gray-400">·</span>}
                   {formatDateRange()}
                 </span>
                 {duration && (
                   <span className="text-xs">
-                    ({duration} day{duration !== 1 ? 's' : ''})
+                    ({duration === 7 ? '1 week' : duration === 14 ? '2 weeks' : `${duration} days`})
                   </span>
                 )}
               </div>

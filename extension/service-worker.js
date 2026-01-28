@@ -79,7 +79,8 @@ const MessageType = {
   CAPTURE_DATA: 'CAPTURE_DATA',           // Content script sends extracted data
   REFRESH_RULES: 'REFRESH_RULES',         // Popup requests rule refresh
   GET_PENDING_COUNT: 'GET_PENDING_COUNT', // Popup requests pending inbox count
-  MANUAL_CAPTURE: 'MANUAL_CAPTURE'        // Popup triggers manual capture
+  MANUAL_CAPTURE: 'MANUAL_CAPTURE',       // Popup triggers manual capture
+  CREATE_RULE: 'CREATE_RULE'              // Element picker creates new rule
 };
 
 // Capture rules refresh alarm
@@ -178,6 +179,9 @@ async function handleMessage(message, sender) {
 
     case MessageType.MANUAL_CAPTURE:
       return await handleManualCapture();
+
+    case MessageType.CREATE_RULE:
+      return await handleCreateRule(message.payload);
 
     default:
       return { success: false, error: `Unknown message type: ${message.type}` };
@@ -575,6 +579,46 @@ async function handleManualCapture() {
       success: false,
       error: 'No capture script on this page. Check if URL matches a capture rule.'
     };
+  }
+}
+
+// =============================================================================
+// RULE CREATION (from element picker)
+// =============================================================================
+
+/**
+ * Handle CREATE_RULE message from element picker
+ * Creates a new capture rule via backend API
+ * @param {Object} ruleData - { name, url_pattern, enabled, selectors }
+ * @returns {{ success: boolean, rule?: Object, error?: string }}
+ */
+async function handleCreateRule(ruleData) {
+  // Validate payload
+  if (!ruleData || !ruleData.name || !ruleData.url_pattern || !ruleData.selectors) {
+    return { success: false, error: 'Invalid rule data' };
+  }
+
+  // Check configuration
+  const isConfigured = await Storage.isConfigured();
+  if (!isConfigured) {
+    return { success: false, error: 'Extension not configured' };
+  }
+
+  try {
+    console.log('[PE-Capture] Creating rule:', ruleData.name);
+
+    // Create rule via API
+    const rule = await Api.createCaptureRule(ruleData);
+
+    // Refresh rules to register the new script
+    await refreshRulesFromBackend();
+
+    console.log('[PE-Capture] Rule created successfully:', rule.id);
+    return { success: true, rule };
+
+  } catch (error) {
+    console.error('[PE-Capture] Failed to create rule:', error);
+    return { success: false, error: error.message };
   }
 }
 

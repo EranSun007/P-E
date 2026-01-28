@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useCallback } from "react";
 import { Task } from "@/api/entities";
 import { Plus, CheckSquare, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,12 +23,16 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { logger } from "@/utils/logger";
 import { AppContext } from "@/contexts/AppContext.jsx";
+import { useAI } from "@/contexts/AIContext";
+import { formatTasksContext } from "@/utils/contextFormatter";
 
 export default function TasksPage() {
   const { tasks, loading, refreshAll } = useContext(AppContext);
+  const { updatePageContext } = useAI();
   const [localTasks, setLocalTasks] = useState([]);
   const [showCreationForm, setShowCreationForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [selectedTask, setSelectedTask] = useState(null);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
     status: [],
@@ -39,12 +43,13 @@ export default function TasksPage() {
     strategic: null,
     groupBy: "none"
   });
-  
+
   const [availableTags, setAvailableTags] = useState([]);
 
   useEffect(() => {
     setLocalTasks(Array.isArray(tasks) ? tasks : []);
   }, [tasks]);
+
 
   // Recompute available tags whenever local tasks change
   useEffect(() => {
@@ -181,6 +186,72 @@ export default function TasksPage() {
   const filteredTasks = filterTasks(localTasks);
   const activeTasks = filteredTasks.filter(task => task?.status !== "done");
   const completedTasks = filteredTasks.filter(task => task?.status === "done");
+
+  // Build filter description for AI context
+  const getFilterDescription = useCallback(() => {
+    const parts = [];
+    if (filters.status?.length > 0) parts.push(`status: ${filters.status.join(', ')}`);
+    if (filters.priority?.length > 0) parts.push(`priority: ${filters.priority.join(', ')}`);
+    if (filters.type?.length > 0) parts.push(`type: ${filters.type.join(', ')}`);
+    if (filters.tags?.length > 0) parts.push(`tags: ${filters.tags.join(', ')}`);
+    if (filters.search) parts.push(`search: "${filters.search}"`);
+    if (filters.strategic !== null) parts.push(filters.strategic ? 'strategic only' : 'tactical only');
+    return parts.length > 0 ? parts.join('; ') : null;
+  }, [filters]);
+
+  // Register page context for AI chat
+  useEffect(() => {
+    const contextSummary = formatTasksContext(
+      filteredTasks,
+      {
+        status: filters.status?.join(', '),
+        priority: filters.priority?.join(', '),
+        type: filters.type?.join(', '),
+        search: filters.search
+      },
+      selectedTask
+    );
+
+    updatePageContext({
+      page: '/tasks',
+      summary: contextSummary,
+      selection: selectedTask ? { id: selectedTask.id, type: 'task' } : null,
+      data: {
+        taskCount: filteredTasks.length,
+        totalTaskCount: localTasks.length,
+        filters: getFilterDescription()
+      }
+    });
+  }, [filteredTasks, filters, selectedTask, updatePageContext, getFilterDescription, localTasks.length]);
+
+  // Listen for context refresh events from the AI chat panel
+  useEffect(() => {
+    const handleRefresh = () => {
+      const contextSummary = formatTasksContext(
+        filteredTasks,
+        {
+          status: filters.status?.join(', '),
+          priority: filters.priority?.join(', '),
+          type: filters.type?.join(', '),
+          search: filters.search
+        },
+        selectedTask
+      );
+      updatePageContext({
+        page: '/tasks',
+        summary: contextSummary,
+        selection: selectedTask ? { id: selectedTask.id, type: 'task' } : null,
+        data: {
+          taskCount: filteredTasks.length,
+          totalTaskCount: localTasks.length,
+          filters: getFilterDescription()
+        }
+      });
+    };
+
+    window.addEventListener('ai-context-refresh', handleRefresh);
+    return () => window.removeEventListener('ai-context-refresh', handleRefresh);
+  }, [filteredTasks, filters, selectedTask, updatePageContext, getFilterDescription, localTasks.length]);
 
   return (
     <div className="p-6">

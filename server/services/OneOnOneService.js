@@ -44,15 +44,18 @@ class OneOnOneService {
         RETURNING *
       `;
 
+      // Convert empty strings to null for date fields (PostgreSQL can't parse "" as date)
+      const nextMeetingDateValue = next_meeting_date && next_meeting_date !== '' ? next_meeting_date : null;
+
       const values = [
         userId, team_member_id, date, notesJson, status, location,
-        mood, topicsArray, next_meeting_date, actionItemsJson
+        mood, topicsArray, nextMeetingDateValue, actionItemsJson
       ];
       const result = await query(sql, values);
       return result.rows[0];
     } catch (error) {
-      console.error('OneOnOneService.create error:', error);
-      throw new Error('Failed to create one-on-one');
+      console.error('OneOnOneService.create error:', error.message, error.stack);
+      throw new Error(`Failed to create one-on-one: ${error.message}`);
     }
   }
 
@@ -83,6 +86,9 @@ class OneOnOneService {
             values.push(Array.isArray(value) ? JSON.stringify(value) : JSON.stringify([]));
           } else if (key === 'topics_discussed') {
             values.push(Array.isArray(value) ? value : []);
+          } else if (key === 'next_meeting_date' || key === 'date') {
+            // Convert empty strings to null for date fields (PostgreSQL can't parse "" as date)
+            values.push(value && value !== '' ? value : null);
           } else {
             values.push(value);
           }

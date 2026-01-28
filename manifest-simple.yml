@@ -2,7 +2,7 @@
 applications:
   # Backend Application (Express.js API)
   - name: pe-manager-backend
-    memory: 256M
+    memory: 512M
     instances: 1
     buildpacks:
       - nodejs_buildpack
@@ -10,9 +10,14 @@ applications:
     path: .
     env:
       NODE_ENV: production
-      AUTH_MODE: production
+      AUTH_MODE: development
       JWT_SECRET: pe-manager-jwt-secret-key-2024-secure
       JWT_EXPIRES_IN: 7d
+      # SAP AI Core Configuration
+      AI_DEPLOYMENT_ID: d51b8803aa4b9a04
+      AI_RESOURCE_GROUP: default
+      AI_MODEL_NAME: anthropic--claude-3.5-sonnet
+      AICORE_SERVICE_KEY: '{"clientid":"sb-942e254b-c10c-4b09-95e6-18faa15edb4d!b1596775|xsuaa_std!b318061","clientsecret":"3f151960-a7ab-48a3-9c3a-ac0e39c7ab74$KkSMZbEKzK98FhW6siAVuP3ukbhFjqgz0JcifsbY8mw=","url":"https://5lk2zz2b0-92s7fg.authentication.eu12.hana.ondemand.com","identityzone":"5lk2zz2b0-92s7fg","identityzoneid":"5c24c99c-6aeb-4bd1-8b23-bf9a828e33c5","appname":"942e254b-c10c-4b09-95e6-18faa15edb4d!b1596775|xsuaa_std!b318061","credential-type":"binding-secret","serviceurls":{"AI_API_URL":"https://api.ai.intprod-eu12.eu-central-1.aws.ml.hana.ondemand.com"}}'
     services:
       - pe-manager-db3
 

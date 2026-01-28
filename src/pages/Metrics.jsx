@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useContext } from "react";
 import { Task } from "@/api/entities";
 import { AppContext } from "@/contexts/AppContext.jsx";
+import { useAI } from "@/contexts/AIContext";
+import { formatMetricsContext } from "@/utils/contextFormatter";
 import { logger } from "@/utils/logger";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +13,7 @@ import { format, parseISO } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import TaskCreationForm from "../components/task/TaskCreationForm";
 import { Badge } from "@/components/ui/badge";
+import OneOnOneComplianceCard from "@/components/metrics/OneOnOneComplianceCard";
 
 export default function MetricsPage() {
   const { tasks: ctxTasks, refreshAll } = useContext(AppContext);
@@ -51,15 +54,17 @@ export default function MetricsPage() {
     }
   };
 
-  // Group metrics by KPI name
-  const groupedMetrics = metricTasks.reduce((acc, task) => {
-    const kpiName = task.metadata?.metric?.kpi_name;
-    if (kpiName) {
-      if (!acc[kpiName]) acc[kpiName] = [];
-      acc[kpiName].push(task);
-    }
-    return acc;
-  }, {});
+  // Group metrics by KPI name (memoized to prevent infinite re-renders)
+  const groupedMetrics = React.useMemo(() => {
+    return metricTasks.reduce((acc, task) => {
+      const kpiName = task.metadata?.metric?.kpi_name;
+      if (kpiName) {
+        if (!acc[kpiName]) acc[kpiName] = [];
+        acc[kpiName].push(task);
+      }
+      return acc;
+    }, {});
+  }, [metricTasks]);
 
   // Calculate trend for a given KPI
   const calculateTrend = (metrics) => {
@@ -100,6 +105,59 @@ export default function MetricsPage() {
       .sort((a, b) => new Date(a.date) - new Date(b.date));
   };
 
+  // AI Context Registration
+  const { updatePageContext } = useAI();
+
+  // Compute metrics summary for AI context
+  const metricsData = React.useMemo(() => {
+    const kpiNames = Object.keys(groupedMetrics);
+    return {
+      kpiCount: kpiNames.length,
+      totalUpdates: metricTasks.length,
+      kpis: kpiNames.map(name => {
+        const metrics = groupedMetrics[name];
+        const latest = metrics.sort((a, b) =>
+          new Date(b.created_date) - new Date(a.created_date)
+        )[0];
+        return {
+          name,
+          currentValue: latest?.metadata?.metric?.current_value,
+          targetValue: latest?.metadata?.metric?.target_value,
+          updates: metrics.length
+        };
+      })
+    };
+  }, [groupedMetrics, metricTasks]);
+
+  // Register metrics context for AI
+  useEffect(() => {
+    const contextSummary = formatMetricsContext(metricsData);
+
+    updatePageContext({
+      page: '/metrics',
+      summary: contextSummary,
+      selection: null,
+      data: metricsData
+    });
+  }, [metricsData, updatePageContext]);
+
+  // Listen for context refresh events
+  useEffect(() => {
+    const handleRefresh = () => {
+      const contextSummary = formatMetricsContext(metricsData);
+
+      updatePageContext({
+        page: '/metrics',
+        summary: contextSummary,
+        selection: null,
+        data: metricsData
+      });
+    };
+
+    window.addEventListener('ai-context-refresh', handleRefresh);
+    return () => window.removeEventListener('ai-context-refresh', handleRefresh);
+  }, [metricsData, updatePageContext]);
+
   return (
     <div className="p-6">
       <div className="max-w-7xl mx-auto">
@@ -109,6 +167,11 @@ export default function MetricsPage() {
             <Plus className="h-4 w-4 mr-2" />
             Track New Metric
           </Button>
+        </div>
+
+        {/* 1:1 Compliance Card - Always shown at top */}
+        <div className="mb-6">
+          <OneOnOneComplianceCard />
         </div>
 
         {Object.keys(groupedMetrics).length === 0 ? (

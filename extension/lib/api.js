@@ -102,6 +102,18 @@ export const Api = {
   },
 
   /**
+   * Create a new capture rule
+   * @param {Object} ruleData - { name, url_pattern, enabled, selectors }
+   * @returns {Promise<Object>} Created rule object
+   */
+  async createCaptureRule(ruleData) {
+    return this.request('/api/capture-rules', {
+      method: 'POST',
+      body: JSON.stringify(ruleData)
+    });
+  },
+
+  /**
    * Send captured data to inbox for review
    * @param {Object} captureData - { rule_id, rule_name, source_url, source_identifier, captured_data }
    * @returns {Promise<Object>} Created inbox item

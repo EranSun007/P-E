@@ -61,7 +61,8 @@
     },
     {
       "resources": [
-        "content/generic-extractor.js"
+        "content/generic-extractor.js",
+        "content/element-picker.js"
       ],
       "matches": ["<all_urls>"]
     }

@@ -10,13 +10,13 @@ applications:
     path: .
     env:
       NODE_ENV: production
-      AUTH_MODE: xsuaa
-      PORT: 8080
+      AUTH_MODE: development
+      JWT_SECRET: pe-manager-jwt-secret-key-2024-secure
+      JWT_EXPIRES_IN: 7d
     services:
-      - pe-manager-db        # PostgreSQL service binding
-      - pe-manager-xsuaa     # XSUAA authentication service binding
+      - pe-manager-db3       # PostgreSQL service binding
     routes:
-      - route: pe-manager-backend.cfapps.sap.hana.ondemand.com
+      - route: pe-manager-backend.cfapps.eu01-canary.hana.ondemand.com
 
   # Frontend Application (React Static Files)
   - name: pe-manager-frontend
@@ -28,4 +28,4 @@ applications:
     env:
       FORCE_HTTPS: true
     routes:
-      - route: pe-manager.cfapps.sap.hana.ondemand.com
+      - route: pe-manager-frontend.cfapps.eu01-canary.hana.ondemand.com

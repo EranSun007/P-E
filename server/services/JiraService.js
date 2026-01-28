@@ -257,6 +257,29 @@ class JiraService {
   }
 
   /**
+   * Get unique filter options for UI dropdowns
+   * @param {string} userId - User ID for multi-tenancy
+   * @returns {Object} - { statuses, assignees, sprints }
+   */
+  async getFilterOptions(userId) {
+    const sql = `
+      SELECT
+        ARRAY_AGG(DISTINCT status ORDER BY status) FILTER (WHERE status IS NOT NULL) as statuses,
+        ARRAY_AGG(DISTINCT assignee_name ORDER BY assignee_name) FILTER (WHERE assignee_name IS NOT NULL) as assignees,
+        ARRAY_AGG(DISTINCT sprint_name ORDER BY sprint_name) FILTER (WHERE sprint_name IS NOT NULL) as sprints
+      FROM jira_issues
+      WHERE user_id = $1
+    `;
+    const result = await query(sql, [userId]);
+    const row = result.rows[0] || {};
+    return {
+      statuses: row.statuses || [],
+      assignees: row.assignees || [],
+      sprints: row.sprints || []
+    };
+  }
+
+  /**
    * Get sync status (last sync time, issue count)
    * @param {string} userId - User ID for multi-tenancy
    * @returns {Object} - { lastSync, issueCount }

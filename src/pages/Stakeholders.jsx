@@ -2,6 +2,8 @@ import React, { useState, useEffect, useContext } from "react";
 import { Stakeholder } from "@/api/entities";
 import { AppContext } from "@/contexts/AppContext.jsx";
 import { useDisplayMode } from "@/contexts/DisplayModeContext.jsx";
+import { useAI } from "@/contexts/AIContext";
+import { formatStakeholdersContext } from "@/utils/contextFormatter";
 import { logger } from "@/utils/logger";
 import {
   anonymizeName,
@@ -235,6 +237,46 @@ export default function StakeholdersPage() {
       </Card>
     );
   };
+
+  // AI Context Registration
+  const { updatePageContext } = useAI();
+
+  // Register stakeholders context for AI
+  useEffect(() => {
+    const contextSummary = formatStakeholdersContext(filteredStakeholders, { search: searchQuery }, editingStakeholder);
+
+    updatePageContext({
+      page: '/stakeholders',
+      summary: contextSummary,
+      selection: editingStakeholder ? { id: editingStakeholder.id, type: 'stakeholder' } : null,
+      data: {
+        stakeholderCount: filteredStakeholders.length,
+        totalCount: stakeholders.length,
+        viewMode
+      }
+    });
+  }, [filteredStakeholders, searchQuery, editingStakeholder, stakeholders.length, viewMode, updatePageContext]);
+
+  // Listen for context refresh events
+  useEffect(() => {
+    const handleRefresh = () => {
+      const contextSummary = formatStakeholdersContext(filteredStakeholders, { search: searchQuery }, editingStakeholder);
+
+      updatePageContext({
+        page: '/stakeholders',
+        summary: contextSummary,
+        selection: editingStakeholder ? { id: editingStakeholder.id, type: 'stakeholder' } : null,
+        data: {
+          stakeholderCount: filteredStakeholders.length,
+          totalCount: stakeholders.length,
+          viewMode
+        }
+      });
+    };
+
+    window.addEventListener('ai-context-refresh', handleRefresh);
+    return () => window.removeEventListener('ai-context-refresh', handleRefresh);
+  }, [filteredStakeholders, searchQuery, editingStakeholder, stakeholders.length, viewMode, updatePageContext]);
 
   return (
     <div className="p-6">
