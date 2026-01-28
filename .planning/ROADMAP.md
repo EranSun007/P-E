@@ -170,13 +170,13 @@ Plans:
 
 </details>
 
-## v1.2 DevOps Bug Dashboard (In Progress)
+## v1.2 DevOps Bug Dashboard (Complete)
 
 **Milestone Goal:** Add a bug KPI dashboard that analyzes weekly JIRA exports to track DevOps duty team performance with actionable metrics and alerts.
 
 - [x] **Phase 10: Backend Foundation** - Database schema, BugService, KPI calculations, REST API
 - [x] **Phase 11: CSV Upload** - Upload UI with validation, parsing, progress feedback
-- [ ] **Phase 12: Dashboard UI** - KPI cards, filters, alerts, charts, aging bugs table
+- [x] **Phase 12: Dashboard UI** - KPI cards, filters, alerts, charts, aging bugs table
 
 ### Phase 10: Backend Foundation
 **Goal**: Backend can store bug data, calculate KPIs, and serve analytics via REST API
@@ -225,8 +225,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 12-01-PLAN.md — KPI cards with status colors, filter dropdowns, critical alert banner
-- [ ] 12-02-PLAN.md — Aging bugs table with JIRA links, MTTR bar chart, category donut chart
+- [x] 12-01-PLAN.md — KPI cards with status colors, filter dropdowns, critical alert banner
+- [x] 12-02-PLAN.md — Aging bugs table with JIRA links, MTTR bar chart, category donut chart
 
 ## Progress
 
@@ -248,7 +248,7 @@ v1.2: 10 -> 11 (depends on 10) -> 12 (depends on 10+11)
 | 9. Rule Builder UI | v1.1 | 2/2 | Complete | 2026-01-22 |
 | 10. Backend Foundation | v1.2 | 2/2 | Complete | 2026-01-27 |
 | 11. CSV Upload | v1.2 | 1/1 | Complete | 2026-01-28 |
-| 12. Dashboard UI | v1.2 | 0/2 | Planned | — |
+| 12. Dashboard UI | v1.2 | 2/2 | Complete | 2026-01-28 |
 
 ## v1.2 Requirement Coverage
 

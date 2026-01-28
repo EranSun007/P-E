@@ -125,16 +125,16 @@
 | API-03 | Phase 10 | Complete |
 | API-04 | Phase 10 | Complete |
 | API-05 | Phase 10 | Complete |
-| DASH-01 | Phase 12 | Pending |
-| DASH-02 | Phase 12 | Pending |
-| DASH-03 | Phase 12 | Pending |
-| DASH-04 | Phase 12 | Pending |
-| DASH-05 | Phase 12 | Pending |
-| DASH-06 | Phase 12 | Pending |
-| DASH-07 | Phase 12 | Pending |
-| DASH-08 | Phase 12 | Pending |
+| DASH-01 | Phase 12 | Complete |
+| DASH-02 | Phase 12 | Complete |
+| DASH-03 | Phase 12 | Complete |
+| DASH-04 | Phase 12 | Complete |
+| DASH-05 | Phase 12 | Complete |
+| DASH-06 | Phase 12 | Complete |
+| DASH-07 | Phase 12 | Complete |
+| DASH-08 | Phase 12 | Complete |
 
-*Traceability table updated — 2026-01-28*
+*All v1.2 requirements complete — 2026-01-28*
 
 ---
 
