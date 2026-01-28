@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-01-28)
 
 ## Current Position
 
-Phase: 15 - Threshold Detection & In-App Notifications
-Plan: 2 of 2 (Phase complete)
-Status: Phase 15 complete
-Last activity: 2026-01-28 - Completed 15-02-PLAN.md (Notification UI)
+Phase: 16 - Email Notifications & Preferences
+Plan: 0 of 2
+Status: Phase 16 planned, ready for execution
+Last activity: 2026-01-28 — Phase 16 plans created and verified
 
 Progress: [██████░░░░] 58% (28/31 plans complete)
 
@@ -74,19 +74,21 @@ Decisions are logged in PROJECT.md Key Decisions table.
 
 ### Pending Todos
 
-None - Phase 15 complete.
+None — Phase 16 planned.
 
 ### Blockers/Concerns
 
-None - In-app notification system complete (ThresholdService + Notification UI).
+**SMTP configuration required** — Phase 16 requires environment variables for email delivery:
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
 
 ## Session Continuity
 
 Last session: 2026-01-28
-Stopped at: Completed 15-02-PLAN.md
+Stopped at: Phase 16 planned
 Resume file: None
 
 ## Next Steps
 
-1. Plan and execute Phase 16 (Email Notifications)
-2. Ship v1.3 milestone
+1. Execute Phase 16 plans via `/gsd:execute-phase 16`
+2. Verify Phase 16 completion
+3. Ship v1.3 milestone
