@@ -323,11 +323,11 @@ Plans:
   3. Selecting a component filter updates all 9 KPI cards, all charts, and the aging bugs table simultaneously
   4. Category distribution chart displays accurate breakdown across all bug categories
   5. Bug inflow rate calculation uses correct 4-week rolling window formula per specification
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [ ] 17-01-PLAN.md — Component extraction logic and filter dropdown population
-- [ ] 17-02-PLAN.md — Filter integration and KPI/chart/table updates
+- [ ] 17-02-PLAN.md — Rolling window calculation and filter verification
 
 ### Phase 18: Table Enhancements & UI Polish
 **Goal**: Aging bugs table is enhanced with visual indicators and sorting, UI has clear labels and feedback
@@ -340,7 +340,7 @@ Plans:
   4. Weekly inflow trend chart displays when user has uploaded multiple weeks of data
   5. Filter dropdowns have clear, descriptive labels (e.g., "Filter by Component", "Filter by Week")
   6. Component filter shows badge indicator when filtered (displays component name, hidden when "All")
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [ ] 18-01-PLAN.md — Table enhancements (age indicators, component column, sorting)
@@ -373,5 +373,5 @@ v1.4: 17 -> 18 (depends on 17)
 | 14. Trend Charts | v1.3 | 2/2 | Complete | 2026-01-28 |
 | 15. Threshold Detection & In-App Notifications | v1.3 | 2/2 | Complete | 2026-01-28 |
 | 16. Email Notifications & Preferences | v1.3 | 2/2 | Complete | 2026-01-28 |
-| 17. Core Bug Fixes | v1.4 | 0/2 | Not started | - |
+| 17. Core Bug Fixes | v1.4 | 0/2 | In progress | - |
 | 18. Table Enhancements & UI Polish | v1.4 | 0/2 | Not started | - |
