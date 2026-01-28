@@ -172,22 +172,13 @@ const BugDashboard = () => {
   }, [selectedUploadId, selectedSprint, selectedComponent, sprintOptions]);
 
   /**
-   * Allowed components for the dropdown filter
+   * Extract components list dynamically from KPIs data
+   * Components are derived from actual uploaded bug data
    */
-  const ALLOWED_COMPONENTS = [
-    'JPaaS Metering Reporting',
-    'JPaaS Metering Service',
-    'Metering-as-a-Service',
-    'Unified Metering',
-    'Usage Data Management',
-  ];
-
-  /**
-   * Extract components list from KPIs data, filtered to allowed components only
-   */
-  const components = kpis?.category_distribution
-    ? Object.keys(kpis.category_distribution).filter(comp => ALLOWED_COMPONENTS.includes(comp))
-    : [];
+  const components = useMemo(() => {
+    if (!kpis?.category_distribution) return [];
+    return Object.keys(kpis.category_distribution).sort();
+  }, [kpis]);
 
   /**
    * Handle successful upload
