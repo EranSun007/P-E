@@ -8,14 +8,16 @@ A unified people and engineering management system combining team management, we
 
 Single dashboard showing health and status across all team tools without switching contexts, with full control over what gets captured and how it connects to your data.
 
-## Current Milestone: v1.3 KPI Insights & Alerts
+## Current Milestone: v1.4 Bug Dashboard Fixes & Enhancements
 
-**Goal:** Add historical KPI trend visualization and proactive notifications when performance degrades.
+**Goal:** Fix component extraction/filtering bugs and add missing UI features to complete the bug dashboard vision.
 
 **Target features:**
-- KPI trend charts showing week-over-week performance
-- Email notifications when KPIs breach red zone thresholds
-- In-app notification center for threshold alerts
+- Fix component extraction logic (currently all bugs categorized as one component)
+- Working component filter dropdown that updates all KPIs, charts, and table
+- Table enhancements: search, age indicators, component column, sortable columns
+- Weekly inflow trend chart when multiple weeks uploaded
+- KPI status badges and UI polish
 
 ## Current State (v1.2 Shipped)
 
@@ -59,10 +61,17 @@ Single dashboard showing health and status across all team tools without switchi
 
 ### Active
 
-- [ ] KPI trend line charts showing historical values week-over-week
-- [ ] Email notifications when any KPI hits red zone
-- [ ] In-app notification center with alert history
-- [ ] Notification preferences configuration
+- [ ] Component extraction logic fix (currently categorizing all bugs as one component)
+- [ ] Component filter dropdown working properly (updates KPIs, charts, table)
+- [ ] Category distribution chart showing correct breakdown
+- [ ] Bug inflow rate calculation verification
+- [ ] Table search functionality
+- [ ] Visual age indicators in aging bugs table
+- [ ] Component column in aging bugs table
+- [ ] Weekly inflow trend chart (when multiple weeks uploaded)
+- [ ] KPI status badges on cards
+- [ ] Sortable table columns
+- [ ] UI/UX improvements (dropdown labels, filter badges)
 
 ### Out of Scope
 
@@ -112,4 +121,4 @@ Bugs categorized by labels/summary into: deploy-metering, service-broker, foss-v
 | XMLHttpRequest for uploads | fetch lacks progress events needed for upload UI | ✓ Good (v1.2) |
 
 ---
-*Last updated: 2026-01-28 after v1.3 milestone started*
+*Last updated: 2026-01-28 after v1.4 milestone started*

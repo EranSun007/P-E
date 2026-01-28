@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-28)
 
 **Core value:** Single dashboard showing health and status across all team tools without switching contexts
-**Current focus:** v1.3 KPI Insights & Alerts - SHIPPED
+**Current focus:** v1.4 Bug Dashboard Fixes & Enhancements
 
 ## Current Position
 
-Phase: 16 - Email Notifications & Preferences
-Plan: 2 of 2
-Status: ✅ COMPLETE - Milestone v1.3 shipped
-Last activity: 2026-01-28 - Completed 16-02-PLAN.md (human verified)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-01-28 — Milestone v1.4 started
 
-Progress: [██████████] 100% (31/31 plans complete)
+Progress: [██████████] 100% (31/31 plans complete - previous milestones)
 
 ## Performance Metrics
 
@@ -94,5 +94,6 @@ Resume file: None
 ## Next Steps
 
 1. ✅ v1.3 KPI Insights & Alerts milestone complete
-2. Plan v1.4 or next milestone when ready
-3. Consider SMTP configuration for production email delivery
+2. Define v1.4 requirements
+3. Create v1.4 roadmap
+4. Consider SMTP configuration for production email delivery
