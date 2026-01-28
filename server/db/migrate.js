@@ -101,6 +101,11 @@ const MIGRATIONS = [
     version: '019_bug_dashboard',
     name: 'Create tables for DevOps Bug Dashboard (bug uploads, bugs, weekly KPIs)',
     file: '019_bug_dashboard.sql'
+  },
+  {
+    version: '020_notification_types',
+    name: 'Add notification type and metadata for KPI alerts',
+    file: '020_notification_types.sql'
   }
 ];
 
