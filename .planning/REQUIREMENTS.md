@@ -68,29 +68,35 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | TBD | Pending |
-| INFRA-02 | TBD | Pending |
-| INFRA-03 | TBD | Pending |
-| TREND-01 | TBD | Pending |
-| TREND-02 | TBD | Pending |
-| TREND-03 | TBD | Pending |
-| TREND-04 | TBD | Pending |
-| TREND-05 | TBD | Pending |
-| TREND-06 | TBD | Pending |
-| TREND-07 | TBD | Pending |
-| NOTIF-01 | TBD | Pending |
-| NOTIF-02 | TBD | Pending |
-| NOTIF-03 | TBD | Pending |
-| NOTIF-04 | TBD | Pending |
-| NOTIF-05 | TBD | Pending |
-| NOTIF-06 | TBD | Pending |
-| NOTIF-07 | TBD | Pending |
+| INFRA-01 | Phase 13 | Pending |
+| TREND-01 | Phase 14 | Pending |
+| TREND-02 | Phase 14 | Pending |
+| TREND-03 | Phase 14 | Pending |
+| TREND-04 | Phase 14 | Pending |
+| TREND-05 | Phase 14 | Pending |
+| TREND-06 | Phase 14 | Pending |
+| TREND-07 | Phase 14 | Pending |
+| NOTIF-01 | Phase 15 | Pending |
+| NOTIF-02 | Phase 15 | Pending |
+| NOTIF-03 | Phase 15 | Pending |
+| NOTIF-04 | Phase 15 | Pending |
+| NOTIF-05 | Phase 15 | Pending |
+| INFRA-02 | Phase 15 | Pending |
+| NOTIF-06 | Phase 16 | Pending |
+| NOTIF-07 | Phase 16 | Pending |
+| INFRA-03 | Phase 16 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 17 total
-- Mapped to phases: 0
-- Unmapped: 17 ⚠️
+- Mapped to phases: 17 (100%)
+- Unmapped: 0 ✓
+
+**Phase distribution:**
+- Phase 13: 1 requirement (INFRA-01)
+- Phase 14: 7 requirements (TREND-01 through TREND-07)
+- Phase 15: 6 requirements (NOTIF-01 through NOTIF-05, INFRA-02)
+- Phase 16: 3 requirements (NOTIF-06, NOTIF-07, INFRA-03)
 
 ---
 *Requirements defined: 2026-01-28*
-*Last updated: 2026-01-28 after initial definition*
+*Last updated: 2026-01-28 after roadmap creation*

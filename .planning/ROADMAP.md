@@ -5,6 +5,7 @@
 - **v1.0 Jira Integration MVP** - Phases 1-5 (shipped 2026-01-21) — [Archive](milestones/v1.0-ROADMAP.md)
 - **v1.1 Web Capture Framework** - Phases 6-9 (shipped 2026-01-22) — [Archive](milestones/v1.1-ROADMAP.md)
 - **v1.2 DevOps Bug Dashboard** - Phases 10-12 (shipped 2026-01-28) — [Archive](milestones/v1.2-ROADMAP.md)
+- **v1.3 KPI Insights & Alerts** - Phases 13-16 (in progress)
 
 ## Phases
 
@@ -231,12 +232,83 @@ Plans:
 
 </details>
 
+## v1.3 KPI Insights & Alerts (In Progress)
+
+**Milestone Goal:** Add historical KPI trend visualization and proactive notifications when performance degrades.
+
+### Phase 13: Historical KPI Storage
+**Goal**: Backend can query and return multi-week KPI trends for visualization
+**Depends on**: Phase 12 (v1.2 complete)
+**Requirements**: INFRA-01
+**Success Criteria** (what must be TRUE):
+  1. GET /api/bugs/kpis/history returns KPI data for last 12 weeks
+  2. Query accepts week count parameter (4, 8, or 12 weeks)
+  3. Query accepts component filter matching dashboard
+  4. Response includes week_ending dates for X-axis rendering
+  5. Query performance under 500ms for 12-week dataset
+**Plans**: TBD
+
+Plans:
+- [ ] 13-01: Historical query implementation with JOIN optimization
+
+### Phase 14: Trend Charts
+**Goal**: User can view KPI trends over time with visual threshold zones
+**Depends on**: Phase 13 (historical API must exist)
+**Requirements**: TREND-01, TREND-02, TREND-03, TREND-04, TREND-05, TREND-06, TREND-07
+**Success Criteria** (what must be TRUE):
+  1. User can view line chart showing any KPI across multiple weeks
+  2. User can switch between KPIs using dropdown selector
+  3. User can select time range (4, 8, or 12 weeks)
+  4. Chart displays colored threshold bands (green/yellow/red zones)
+  5. Hovering over data point shows exact KPI value and date
+  6. KPI cards show mini sparkline visualizations
+  7. KPI cards display trend arrows indicating direction (up/down/flat)
+**Plans**: TBD
+
+Plans:
+- [ ] 14-01: KPITrendChart component with Recharts LineChart
+- [ ] 14-02: Sparklines and trend indicators on KPI cards
+
+### Phase 15: Threshold Detection & In-App Notifications
+**Goal**: System detects threshold breaches and alerts users within the app
+**Depends on**: Phase 13 (historical data for trend calculation)
+**Requirements**: NOTIF-01, NOTIF-02, NOTIF-03, NOTIF-04, NOTIF-05, INFRA-02
+**Success Criteria** (what must be TRUE):
+  1. System detects when KPI crosses into red zone during CSV upload
+  2. System creates notification record when threshold breached
+  3. Notification bell icon in header shows unread count badge
+  4. User can click bell to view notification panel with alert list
+  5. User can mark individual notifications as read
+  6. System deduplicates notifications within 24-hour window
+**Plans**: TBD
+
+Plans:
+- [ ] 15-01: ThresholdService with breach detection logic
+- [ ] 15-02: NotificationBell component and notification panel UI
+
+### Phase 16: Email Notifications & Preferences
+**Goal**: Users receive email alerts when critical thresholds breached
+**Depends on**: Phase 15 (threshold detection must exist)
+**Requirements**: NOTIF-06, NOTIF-07, INFRA-03
+**Success Criteria** (what must be TRUE):
+  1. User receives email when any KPI hits red zone
+  2. Email includes KPI name, value, threshold, and dashboard link
+  3. User can enable/disable email notifications per KPI via settings
+  4. Email delivery retries up to 3 times on failure
+  5. Failed email deliveries logged for monitoring
+**Plans**: TBD
+
+Plans:
+- [ ] 16-01: EmailService with nodemailer and SMTP configuration
+- [ ] 16-02: Notification preferences UI and retry queue
+
 ## Progress
 
 **Execution Order:**
 v1.0: 1 -> 2 -> 3 -> 4/5 parallel
 v1.1: 6 -> 7 (depends on 6), 8 (depends on 6), 9 (depends on 6+7)
 v1.2: 10 -> 11 (depends on 10) -> 12 (depends on 10+11)
+v1.3: 13 -> 14 (depends on 13) -> 15 (depends on 13) -> 16 (depends on 15)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -252,3 +324,7 @@ v1.2: 10 -> 11 (depends on 10) -> 12 (depends on 10+11)
 | 10. Backend Foundation | v1.2 | 2/2 | Complete | 2026-01-27 |
 | 11. CSV Upload | v1.2 | 1/1 | Complete | 2026-01-28 |
 | 12. Dashboard UI | v1.2 | 2/2 | Complete | 2026-01-28 |
+| 13. Historical KPI Storage | v1.3 | 0/1 | Not started | - |
+| 14. Trend Charts | v1.3 | 0/2 | Not started | - |
+| 15. Threshold Detection & In-App Notifications | v1.3 | 0/2 | Not started | - |
+| 16. Email Notifications & Preferences | v1.3 | 0/2 | Not started | - |

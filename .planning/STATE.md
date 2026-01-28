@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-28)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 13 - Historical KPI Storage
 Plan: —
-Status: Defining requirements
-Last activity: 2026-01-28 — Milestone v1.3 started
+Status: Roadmap complete, ready for planning
+Last activity: 2026-01-28 — Roadmap created for v1.3
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [░░░░░░░░░░] 0% (Phase 13/16)
 
 ## Performance Metrics
 
@@ -33,10 +33,15 @@ Progress: [░░░░░░░░░░] 0%
 - Phases: 10-12 (3 phases)
 - Shipped: 2026-01-28
 
+**v1.3 KPI Insights & Alerts (current):**
+- Total plans: 7 (Phase 13: 1, Phase 14: 2, Phase 15: 2, Phase 16: 2)
+- Phases: 13-16 (4 phases)
+- Completed: 0 plans
+
 **Cumulative:**
-- Total milestones: 3
-- Total phases: 12
-- Total plans: 24
+- Total milestones: 4 (3 shipped, 1 in progress)
+- Total phases: 16
+- Total plans: 31
 
 ## Accumulated Context
 
@@ -51,23 +56,32 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - Data staging workflow (proven v1.1)
 - CSV upload for external data (proven v1.2)
 - Pre-calculated analytics (proven v1.2)
+- Recharts for data visualization (proven v1.2)
+
+**v1.3 architectural decisions:**
+- Historical KPI queries via JOIN (weekly_kpis + bug_uploads for week_ending)
+- Threshold evaluation fire-and-forget pattern (async after upload)
+- Reuse existing NotificationService for in-app alerts
+- Email delivery with nodemailer (SAP BTP Mail service)
+- Default thresholds in code (defer configuration UI to v2)
 
 ### Pending Todos
 
-None — starting new milestone.
+None — starting new phase.
 
 ### Blockers/Concerns
 
-None — ready for planning.
+None — ready for planning Phase 13.
 
 ## Session Continuity
 
 Last session: 2026-01-28
-Stopped at: Starting v1.3 milestone
+Stopped at: Roadmap created for v1.3 milestone
 Resume file: None
 
 ## Next Steps
 
-1. Complete research (if selected)
-2. Define REQUIREMENTS.md
-3. Create ROADMAP.md with phase 13+
+1. Plan Phase 13 (Historical KPI Storage) via `/gsd:plan-phase 13`
+2. Execute Phase 13 plans
+3. Plan Phase 14 (Trend Charts)
+4. Continue sequential execution through Phase 16
