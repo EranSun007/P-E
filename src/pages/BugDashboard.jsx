@@ -21,6 +21,8 @@ import { AgingBugsTable } from '@/components/bugs/AgingBugsTable';
 import { MTTRBarChart } from '@/components/bugs/MTTRBarChart';
 import { BugCategoryChart } from '@/components/bugs/BugCategoryChart';
 import { KPITrendChart } from '@/components/bugs/KPITrendChart';
+import { WeeklyInflowChart } from '@/components/bugs/WeeklyInflowChart';
+import { Badge } from '@/components/ui/badge';
 import {
   getCurrentCycle,
   getPreviousCycleId,
@@ -319,24 +321,34 @@ const BugDashboard = () => {
           </Select>
         )}
 
-        {/* Component Filter */}
-        <Select
-          value={selectedComponent}
-          onValueChange={setSelectedComponent}
-          disabled={components.length === 0}
-        >
-          <SelectTrigger className="w-[220px]">
-            <SelectValue placeholder="All components" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Components</SelectItem>
-            {components.map((comp) => (
-              <SelectItem key={comp} value={comp}>
-                {comp}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Component Filter with Badge */}
+        <div className="flex items-center gap-2">
+          <Select
+            value={selectedComponent}
+            onValueChange={setSelectedComponent}
+            disabled={components.length === 0}
+          >
+            <SelectTrigger className="w-[220px]">
+              <span className="text-xs text-muted-foreground mr-1">Component:</span>
+              <SelectValue placeholder="All" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Components</SelectItem>
+              {components.map((comp) => (
+                <SelectItem key={comp} value={comp}>
+                  {comp}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Active filter badge */}
+          {selectedComponent !== 'all' && (
+            <Badge variant="secondary" className="text-xs">
+              {selectedComponent}
+            </Badge>
+          )}
+        </div>
 
         {/* Loading indicator for KPIs */}
         {kpisLoading && (
@@ -364,9 +376,12 @@ const BugDashboard = () => {
           />
 
           {/* Charts Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <MTTRBarChart mttrByPriority={kpis?.mttr_by_priority} />
             <BugCategoryChart categoryDistribution={kpis?.category_distribution} />
+            <WeeklyInflowChart
+              component={selectedComponent === 'all' ? null : selectedComponent}
+            />
           </div>
 
           {/* Aging Bugs Table */}
