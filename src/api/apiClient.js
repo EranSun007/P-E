@@ -526,4 +526,52 @@ export const apiClient = {
       return fetchWithAuth(`${API_BASE_URL}/github/repos/${repoId}/commits?limit=${limit}`);
     },
   },
+
+  // Bug Dashboard API (v1.2)
+  bugs: {
+    // Check for duplicate upload before submitting
+    async checkDuplicate(weekEnding) {
+      return fetchWithAuth(`${API_BASE_URL}/bugs/uploads/check?weekEnding=${weekEnding}`);
+    },
+
+    // List all uploads for current user
+    async listUploads() {
+      return fetchWithAuth(`${API_BASE_URL}/bugs/uploads`);
+    },
+
+    // Get a single upload by ID
+    async getUpload(id) {
+      return fetchWithAuth(`${API_BASE_URL}/bugs/uploads/${id}`);
+    },
+
+    // Delete an upload (cascades to bugs and KPIs)
+    async deleteUpload(id) {
+      await fetchWithAuth(`${API_BASE_URL}/bugs/uploads/${id}`, {
+        method: 'DELETE',
+      });
+      return true;
+    },
+
+    // Get KPIs for an upload
+    async getKPIs(uploadId, component = null) {
+      let url = `${API_BASE_URL}/bugs/kpis?uploadId=${uploadId}`;
+      if (component) url += `&component=${encodeURIComponent(component)}`;
+      return fetchWithAuth(url);
+    },
+
+    // List bugs with filtering and pagination
+    async listBugs(uploadId, filters = {}) {
+      const params = new URLSearchParams();
+      params.append('uploadId', uploadId);
+      if (filters.component) params.append('component', filters.component);
+      if (filters.status) params.append('status', filters.status);
+      if (filters.priority) params.append('priority', filters.priority);
+      if (filters.limit) params.append('limit', filters.limit);
+      if (filters.offset) params.append('offset', filters.offset);
+      return fetchWithAuth(`${API_BASE_URL}/bugs/list?${params.toString()}`);
+    },
+
+    // Note: Upload uses XMLHttpRequest for progress tracking, not fetchWithAuth
+    // See CSVUploadDialog for upload implementation
+  },
 };
