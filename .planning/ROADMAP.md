@@ -2,9 +2,9 @@
 
 ## Milestones
 
-- **v1.0 Jira Integration MVP** - Phases 1-5 (shipped 2026-01-21)
-- **v1.1 Web Capture Framework** - Phases 6-9 (shipped 2026-01-22)
-- **v1.2 DevOps Bug Dashboard** - Phases 10-12 (in progress)
+- **v1.0 Jira Integration MVP** - Phases 1-5 (shipped 2026-01-21) — [Archive](milestones/v1.0-ROADMAP.md)
+- **v1.1 Web Capture Framework** - Phases 6-9 (shipped 2026-01-22) — [Archive](milestones/v1.1-ROADMAP.md)
+- **v1.2 DevOps Bug Dashboard** - Phases 10-12 (shipped 2026-01-28) — [Archive](milestones/v1.2-ROADMAP.md)
 
 ## Phases
 
@@ -170,7 +170,8 @@ Plans:
 
 </details>
 
-## v1.2 DevOps Bug Dashboard (Complete)
+<details>
+<summary>v1.2 DevOps Bug Dashboard (Phases 10-12) - SHIPPED 2026-01-28</summary>
 
 **Milestone Goal:** Add a bug KPI dashboard that analyzes weekly JIRA exports to track DevOps duty team performance with actionable metrics and alerts.
 
@@ -185,15 +186,15 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Database tables (bug_uploads, bugs, weekly_kpis) exist with proper indexes
   2. BugService can parse CSV and validate required columns
-  3. BugService calculates all 10 KPIs matching specification formulas
+  3. BugService calculates all 9 KPIs matching specification formulas
   4. GET /api/bugs/kpis returns pre-calculated KPIs for week + component
   5. GET /api/bugs/list returns bugs with filtering and pagination
   6. DELETE /api/bugs/uploads/:id cascades to bugs and KPIs
-**Plans**: 2 plans (Wave 1: 10-01, Wave 2: 10-02)
+**Plans**: 2/2 complete
 
 Plans:
-- [x] 10-01-PLAN.md — Database schema, migration, and BugService foundation (Wave 1)
-- [x] 10-02-PLAN.md — KPI calculations and REST API routes (Wave 2)
+- [x] 10-01-PLAN.md — Database schema, migration, and BugService foundation
+- [x] 10-02-PLAN.md — KPI calculations and REST API routes
 
 ### Phase 11: CSV Upload
 **Goal**: User can upload JIRA CSV exports with validation and progress feedback
@@ -205,7 +206,7 @@ Plans:
   3. System shows clear error messages for invalid CSV format
   4. Duplicate upload detection prompts for replace/cancel
   5. Upload progress and summary displayed (total bugs, components)
-**Plans**: 1 plan
+**Plans**: 1/1 complete
 
 Plans:
 - [x] 11-01-PLAN.md — Upload page with validation, progress, and duplicate detection
@@ -222,11 +223,13 @@ Plans:
   5. Aging bugs table shows open VH/High bugs with clickable JIRA links
   6. MTTR by priority bar chart renders correctly
   7. Bug category pie/donut chart renders correctly
-**Plans**: 2 plans
+**Plans**: 2/2 complete
 
 Plans:
 - [x] 12-01-PLAN.md — KPI cards with status colors, filter dropdowns, critical alert banner
 - [x] 12-02-PLAN.md — Aging bugs table with JIRA links, MTTR bar chart, category donut chart
+
+</details>
 
 ## Progress
 
@@ -249,84 +252,3 @@ v1.2: 10 -> 11 (depends on 10) -> 12 (depends on 10+11)
 | 10. Backend Foundation | v1.2 | 2/2 | Complete | 2026-01-27 |
 | 11. CSV Upload | v1.2 | 1/1 | Complete | 2026-01-28 |
 | 12. Dashboard UI | v1.2 | 2/2 | Complete | 2026-01-28 |
-
-## v1.2 Requirement Coverage
-
-| REQ-ID | Phase | Description |
-|--------|-------|-------------|
-| DB-01 | 10 | bug_uploads table with metadata |
-| DB-02 | 10 | bugs table with parsed data |
-| DB-03 | 10 | weekly_kpis table for pre-calculated metrics |
-| DB-04 | 10 | Indexes on user_id, status, priority, component |
-| DB-05 | 10 | CASCADE DELETE from bug_uploads |
-| UPLOAD-03 | 10 | CSV column validation |
-| KPI-01 | 10 | Bug Inflow Rate calculation |
-| KPI-02 | 10 | Time to First Response calculation |
-| KPI-03 | 10 | MTTR by Priority calculation |
-| KPI-04 | 10 | SLA Compliance calculation |
-| KPI-05 | 10 | Open Bug Age Distribution calculation |
-| KPI-06 | 10 | Automated vs Actionable Ratio calculation |
-| KPI-07 | 10 | Bug Category Distribution calculation |
-| KPI-08 | 10 | Duty Rotation Workload calculation |
-| KPI-09 | 10 | Backlog Health Score calculation |
-| API-02 | 10 | GET /api/bugs/uploads endpoint |
-| API-03 | 10 | GET /api/bugs/kpis endpoint |
-| API-04 | 10 | GET /api/bugs/list endpoint |
-| API-05 | 10 | DELETE /api/bugs/uploads/:id endpoint |
-| UPLOAD-01 | 11 | Drag-and-drop or file picker upload |
-| UPLOAD-02 | 11 | Week-ending date picker (Saturday) |
-| UPLOAD-04 | 11 | Duplicate upload detection |
-| UPLOAD-05 | 11 | Upload progress and summary |
-| UPLOAD-06 | 11 | Clear error messages |
-| API-01 | 11 | POST /api/bugs/upload endpoint |
-| DASH-01 | 12 | KPI card layout |
-| DASH-02 | 12 | Green/yellow/red status indicators |
-| DASH-03 | 12 | Component filter dropdown |
-| DASH-04 | 12 | Week filter dropdown |
-| DASH-05 | 12 | Critical alert banner |
-| DASH-06 | 12 | Aging bugs table with JIRA links |
-| DASH-07 | 12 | MTTR by priority bar chart |
-| DASH-08 | 12 | Bug category pie/donut chart |
-
-**Coverage:** 33/33 v1.2 requirements mapped
-
-<details>
-<summary>v1.1 Requirement Coverage (Archived)</summary>
-
-| REQ-ID | Phase | Description |
-|--------|-------|-------------|
-| DB-01 | 6 | capture_rules table with URL patterns and selectors |
-| DB-02 | 6 | capture_inbox table for staged items |
-| DB-03 | 6 | entity_mappings table for source-to-target mappings |
-| DB-04 | 6 | Migration file following conventions |
-| API-01 | 6 | GET /api/capture-rules for extension fetch |
-| API-02 | 6 | CRUD for /api/capture-rules |
-| API-03 | 6 | POST /api/capture-inbox for captured items |
-| API-04 | 6 | GET /api/capture-inbox for inbox UI |
-| API-05 | 6 | POST /api/capture-inbox/:id/accept |
-| API-06 | 6 | POST /api/capture-inbox/:id/reject |
-| API-07 | 6 | CRUD for /api/entity-mappings |
-| EXT-01 | 7 | Extension fetches rules on startup/refresh |
-| EXT-02 | 7 | Extension activates on matching URL patterns |
-| EXT-03 | 7 | Extension sends to staging table |
-| EXT-04 | 7 | Badge shows capture count |
-| EXT-05 | 7 | Manual capture trigger |
-| STAGE-01 | 8 | View captured items in inbox |
-| STAGE-02 | 8 | Preview raw captured data |
-| STAGE-03 | 8 | Accept or reject items |
-| STAGE-04 | 8 | Select target entity type |
-| STAGE-05 | 8 | Bulk accept/reject |
-| MAP-01 | 8 | Map source identifier to target entity |
-| MAP-02 | 8 | Select target entity type |
-| MAP-03 | 8 | Auto-suggest mappings by name similarity |
-| MAP-04 | 8 | Reusable mapping rules |
-| RULE-01 | 9 | Create rule with URL pattern |
-| RULE-02 | 9 | Define CSS selectors in rule |
-| RULE-03 | 9 | Name extracted fields |
-| RULE-04 | 9 | Enable/disable rules |
-| RULE-05 | 9 | Test selectors against live page |
-| RULE-06 | 9 | Preset templates for common sites |
-
-**Coverage:** 31/31 v1.1 requirements mapped
-
-</details>

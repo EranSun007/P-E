@@ -191,7 +191,7 @@ function PagesContent() {
                         <Route path="/capturerules" element={<CaptureRules />} />
 
                         {/* Bug Dashboard */}
-                        <Route path="/bugs" element={<BugDashboard />} />
+                        <Route path="/bugdashboard" element={<BugDashboard />} />
 
                     </Routes>
                 </Suspense>

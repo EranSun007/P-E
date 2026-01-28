@@ -1,12 +1,23 @@
-# P&E Manager - DevOps Bug Dashboard
+# P&E Manager
 
 ## What This Is
 
-A unified people and engineering management system combining team management, web capture framework, and DevOps metrics. The current milestone adds a bug KPI dashboard that analyzes JIRA bug exports to track team DevOps duty performance with SLA compliance, resolution times, and backlog health.
+A unified people and engineering management system combining team management, web capture framework, and DevOps metrics. Features include a bug KPI dashboard that analyzes JIRA bug exports to track team DevOps duty performance with SLA compliance, resolution times, and backlog health.
 
 ## Core Value
 
 Single dashboard showing health and status across all team tools without switching contexts, with full control over what gets captured and how it connects to your data.
+
+## Current State (v1.2 Shipped)
+
+**Shipped:** 2026-01-28
+**Milestones:** v1.0 (Jira Integration), v1.1 (Web Capture Framework), v1.2 (DevOps Bug Dashboard)
+
+**Tech Stack:**
+- Frontend: React 18 + Vite + Tailwind CSS + Radix UI + Recharts
+- Backend: Express.js + PostgreSQL
+- Browser Extension: Manifest V3 + chrome.storage
+- Deployment: SAP BTP Cloud Foundry
 
 ## Requirements
 
@@ -28,38 +39,26 @@ Single dashboard showing health and status across all team tools without switchi
 - ✓ Data staging/inbox with review workflow — v1.1
 - ✓ Flexible entity mapping system — v1.1
 - ✓ Rule builder UI with preset templates — v1.1
+- ✓ CSV upload for JIRA bug exports — v1.2
+- ✓ Bug database schema (bug_uploads, bugs, weekly_kpis tables) — v1.2
+- ✓ 9 KPI calculations (inflow, TTFR, MTTR, SLA, backlog health, etc.) — v1.2
+- ✓ Bug dashboard page with KPI cards and status indicators — v1.2
+- ✓ Filtering by component and week — v1.2
+- ✓ Critical alerts when KPIs breach thresholds — v1.2
+- ✓ Aging bugs table with JIRA links — v1.2
+- ✓ Charts for MTTR by priority and category distribution — v1.2
 
 ### Active
 
-- [ ] CSV upload for JIRA bug exports
-- [ ] Bug database schema (bug_uploads, bugs, weekly_kpis tables)
-- [ ] 10 KPI calculations (inflow, TTFR, MTTR, SLA, backlog health, etc.)
-- [ ] Bug dashboard page with KPI cards and status indicators
-- [ ] Filtering by component and week
-- [ ] Critical alerts when KPIs breach thresholds
-- [ ] Aging bugs table with JIRA links
-- [ ] Charts for MTTR by priority and category distribution
+(No active requirements — ready for next milestone planning)
 
 ### Out of Scope
 
 - Direct JIRA API integration — CSV export is the data source
 - Real-time bug updates — weekly CSV upload workflow
 - Bug modification/write-back — read-only analytics
-- Custom KPI definitions — fixed set of 10 KPIs
+- Custom KPI definitions — fixed set of 9 KPIs
 - Historical data import — starts fresh with new uploads
-
-## Current Milestone: v1.2 DevOps Bug Dashboard
-
-**Goal:** Add a bug KPI dashboard that analyzes weekly JIRA exports to track DevOps duty team performance with actionable metrics and alerts.
-
-**Target features:**
-- CSV upload with validation and duplicate detection
-- 10 KPIs calculated per upload (bug inflow, TTFR, MTTR, SLA compliance, backlog health)
-- Dashboard with KPI cards showing status (green/yellow/red)
-- Filtering by component and week
-- Critical alerts when thresholds breached
-- Aging bugs table with direct JIRA links
-- Charts: MTTR by priority, bug category distribution
 
 ## Context
 
@@ -72,14 +71,6 @@ Team rotates weekly DevOps duty. Each week the duty person exports bugs from JIR
 - MTTR: Very High <72h, High <168h, Medium <336h
 - SLA Compliance: 80% VH resolved <24h, 70% High <48h
 - Backlog Health Score: 100 - (VH×10) - (High×5)
-
-**Data Flow:**
-1. User exports bugs from JIRA as CSV
-2. Uploads CSV via P&E Manager with week-ending date
-3. Backend parses CSV, validates columns, calculates resolution times
-4. All 10 KPIs calculated and stored in weekly_kpis table
-5. Dashboard displays KPIs with status indicators
-6. Alerts shown when thresholds breached
 
 **Component Extraction:**
 Bugs categorized by labels/summary into: deploy-metering, service-broker, foss-vulnerabilities, cm-metering, sdm-metering, other
@@ -102,9 +93,11 @@ Bugs categorized by labels/summary into: deploy-metering, service-broker, foss-v
 | Data staging workflow | Quality control before data enters main system | ✓ Good (v1.1) |
 | Generic entity mapping | Flexible connections, not hardcoded per source | ✓ Good (v1.1) |
 | Rule-based extraction | Selectors defined in config, not code | ✓ Good (v1.1) |
-| CSV upload for bugs | JIRA API not available, CSV export is standard workflow | — Pending |
-| Pre-calculated KPIs | Performance optimization, avoid recalculating on page load | — Pending |
-| 3-table schema | bug_uploads (meta), bugs (data), weekly_kpis (calculated) | — Pending |
+| CSV upload for bugs | JIRA API not available, CSV export is standard workflow | ✓ Good (v1.2) |
+| Pre-calculated KPIs | Performance optimization, avoid recalculating on page load | ✓ Good (v1.2) |
+| 3-table schema | bug_uploads (meta), bugs (data), weekly_kpis (calculated) | ✓ Good (v1.2) |
+| fast-csv for parsing | Streaming CSV parsing efficient for large files | ✓ Good (v1.2) |
+| XMLHttpRequest for uploads | fetch lacks progress events needed for upload UI | ✓ Good (v1.2) |
 
 ---
-*Last updated: 2026-01-27 after v1.2 milestone start*
+*Last updated: 2026-01-28 after v1.2 milestone shipped*
