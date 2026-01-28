@@ -35,6 +35,7 @@ import { useAuth } from "@/contexts/AuthContext.jsx";
 import { useDisplayMode } from "@/contexts/DisplayModeContext.jsx";
 import { useAppMode } from "@/contexts/AppModeContext.jsx";
 import { AIChatPanel, AIAssistantButton } from "@/components/ai";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -451,6 +452,11 @@ export default function Layout({ children, currentPageName }) {
 
             {/* Mode indicator and Presentation Mode Toggle */}
             <div className="flex items-center gap-2">
+              {/* Notification Bell */}
+              <NotificationBell
+                className={isProductMode ? 'hover:bg-gray-700' : ''}
+              />
+
               {/* Mode indicator badge */}
               <span className={cn(
                 "hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors",

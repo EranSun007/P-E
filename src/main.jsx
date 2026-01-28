@@ -5,13 +5,22 @@ import '@/index.css'
 import { AppProvider } from '@/contexts/AppContext.jsx'
 import { AuthProvider } from '@/contexts/AuthContext.jsx'
 import { DisplayModeProvider } from '@/contexts/DisplayModeContext.jsx'
+import { AppModeProvider } from '@/contexts/AppModeContext.jsx'
+import { AIProvider } from '@/contexts/AIContext.jsx'
+import { NotificationProvider } from '@/contexts/NotificationContext.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
     <AuthProvider>
-      <DisplayModeProvider>
-        <AppProvider>
-          <App />
-        </AppProvider>
-      </DisplayModeProvider>
+      <NotificationProvider>
+        <AppModeProvider>
+          <DisplayModeProvider>
+            <AppProvider>
+              <AIProvider>
+                <App />
+              </AIProvider>
+            </AppProvider>
+          </DisplayModeProvider>
+        </AppModeProvider>
+      </NotificationProvider>
     </AuthProvider>
 ) 
