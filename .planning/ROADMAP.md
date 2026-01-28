@@ -280,11 +280,11 @@ Plans:
   4. User can click bell to view notification panel with alert list
   5. User can mark individual notifications as read
   6. System deduplicates notifications within 24-hour window
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 15-01: ThresholdService with breach detection logic
-- [ ] 15-02: NotificationBell component and notification panel UI
+- [ ] 15-01-PLAN.md — ThresholdService with breach detection, deduplication, unread count endpoint
+- [ ] 15-02-PLAN.md — NotificationBell component and notification panel UI
 
 ### Phase 16: Email Notifications & Preferences
 **Goal**: Users receive email alerts when critical thresholds breached
