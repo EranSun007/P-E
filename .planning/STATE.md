@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-28)
 ## Current Position
 
 Phase: 15 - Threshold Detection & In-App Notifications
-Plan: 1 of 2
-Status: In progress
-Last activity: 2026-01-28 — Completed 15-01-PLAN.md (ThresholdService)
+Plan: 2 of 2 (Phase complete)
+Status: Phase 15 complete
+Last activity: 2026-01-28 - Completed 15-02-PLAN.md (Notification UI)
 
-Progress: [█████░░░░░] 52% (27/31 plans complete)
+Progress: [██████░░░░] 58% (28/31 plans complete)
 
 ## Performance Metrics
 
@@ -36,7 +36,7 @@ Progress: [█████░░░░░] 52% (27/31 plans complete)
 **v1.3 KPI Insights & Alerts (current):**
 - Total plans: 7 (Phase 13: 1, Phase 14: 2, Phase 15: 2, Phase 16: 2)
 - Phases: 13-16 (4 phases)
-- Completed: 4 plans (Phase 13: 1, Phase 14: 2, Phase 15: 1)
+- Completed: 5 plans (Phase 13: 1, Phase 14: 2, Phase 15: 2)
 
 **Cumulative:**
 - Total milestones: 4 (3 shipped, 1 in progress)
@@ -59,34 +59,34 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - Recharts for data visualization (proven v1.2)
 
 **v1.3 architectural decisions:**
-- Historical KPI queries via JOIN (weekly_kpis + bug_uploads for week_ending) — implemented in 13-01
-- Week count validation: only 4, 8, or 12 weeks (default 12) — implemented in 13-01
-- Component filter using IS NOT DISTINCT FROM for NULL handling — implemented in 13-01
-- Threshold evaluation fire-and-forget pattern (async after upload) — implemented in 15-01
-- Reuse existing NotificationService for in-app alerts — implemented in 15-01
-- 24-hour deduplication window prevents alert spam — implemented in 15-01
+- Historical KPI queries via JOIN (weekly_kpis + bug_uploads for week_ending) - implemented in 13-01
+- Week count validation: only 4, 8, or 12 weeks (default 12) - implemented in 13-01
+- Component filter using IS NOT DISTINCT FROM for NULL handling - implemented in 13-01
+- Threshold evaluation fire-and-forget pattern (async after upload) - implemented in 15-01
+- Reuse existing NotificationService for in-app alerts - implemented in 15-01
+- 24-hour deduplication window prevents alert spam - implemented in 15-01
 - Email delivery with nodemailer (SAP BTP Mail service)
 - Default thresholds in code (defer configuration UI to v2)
-- Sparkline size fixed at 60x24px for consistent card layout — implemented in 14-02
-- 5% threshold for flat vs up/down trend detection — implemented in 14-02
+- Sparkline size fixed at 60x24px for consistent card layout - implemented in 14-02
+- 5% threshold for flat vs up/down trend detection - implemented in 14-02
+- Optimistic updates for notification mark-as-read with rollback - implemented in 15-02
+- NotificationProvider inside AuthProvider for auth access - implemented in 15-02
 
 ### Pending Todos
 
-None — Phase 15-01 complete.
+None - Phase 15 complete.
 
 ### Blockers/Concerns
 
-None — ThresholdService ready, unread-count endpoint available.
+None - In-app notification system complete (ThresholdService + Notification UI).
 
 ## Session Continuity
 
 Last session: 2026-01-28
-Stopped at: Completed 15-01-PLAN.md
+Stopped at: Completed 15-02-PLAN.md
 Resume file: None
 
 ## Next Steps
 
-1. Execute Phase 15-02 plan (Frontend notification badge and list)
-2. Verify Phase 15 completion
-3. Plan and execute Phase 16 (Email Notifications)
-4. Ship v1.3 milestone
+1. Plan and execute Phase 16 (Email Notifications)
+2. Ship v1.3 milestone
