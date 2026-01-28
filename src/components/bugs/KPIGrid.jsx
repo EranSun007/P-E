@@ -11,7 +11,6 @@ import {
   Activity,
   PieChart,
   Users,
-  Timer,
 } from 'lucide-react';
 
 /**
