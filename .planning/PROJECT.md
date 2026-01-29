@@ -8,18 +8,31 @@ A unified people and engineering management system combining team management, we
 
 Single dashboard showing health and status across all team tools without switching contexts, with full control over what gets captured and how it connects to your data.
 
-## Current Milestone: v1.5 Knowledge Base Integration & Team Status
+## Current Milestone: v1.6 TeamSync Integration
 
-**Goal:** Integrate with the deployed MCP Knowledge Base server and build a Team Status page visualizing daily summaries with interactive controls.
+**Goal:** Integrate TeamSync functionality into existing P-E entities, providing a team sync dashboard with Kanban/Gantt views for tracking goals, blockers, dependencies, and emphasis items across teams.
 
 **Target features:**
-- MCP client integration (session management, JSON-RPC 2.0, all 4 tools)
-- Knowledge search UI (code and documentation search)
-- Team Status page with two teams (Metering & Reporting)
-- Dashboard cards showing progress metrics, blockers, velocity
-- Timeline view of daily summary history
-- Health indicators per team member/workstream
-- Extensibility foundation for future datasets
+- Extend projects table for sync items (category, sync_status, status_history audit trail)
+- Extend tasks table for subtasks linked to sync items
+- Team filtering by department (Metering, Reporting, Both)
+- Kanban view grouped by category (goals, blockers, dependencies, emphasis)
+- Gantt view using existing release cycle/sprint system
+- Archive/restore workflow with full change tracking
+- Subtask management per sync item
+- Integration with existing team_members for assignment
+- Sync settings for sprint configuration
+
+**Architecture approach:** Extend existing entities rather than parallel tables:
+- TeamSync Items → `projects` with `is_sync_item=true`
+- TeamSync Subtasks → `tasks` with `is_subtask=true` and `project_id` FK
+- TeamSync Teams → `team_members.department` filtering
+- TeamSync Sprints → existing `releaseCycles.js` utilities
+
+## Parallel Milestone: v1.5 Knowledge Base Integration (separate branch)
+
+**Goal:** Integrate with the deployed MCP Knowledge Base server and build a Team Status page.
+**Status:** In progress on `main` branch (Phases 19-22)
 
 ## Current State (v1.4 Shipped)
 
@@ -66,17 +79,31 @@ Single dashboard showing health and status across all team tools without switchi
 - ✓ Historical KPI trends and threshold notifications — v1.3
 - ✓ Email notifications for KPI breaches — v1.3
 
-### Active
+### Active (v1.6 TeamSync Integration)
+
+- [ ] Database schema extensions for sync items and subtasks
+- [ ] Backend sync items service (CRUD, archive, restore, status tracking)
+- [ ] Backend subtask service (CRUD, reorder, completion tracking)
+- [ ] Sync settings service for user preferences
+- [ ] REST API routes for sync operations
+- [ ] Frontend API client for sync items
+- [ ] SyncContext for state management
+- [ ] TeamSync page with team department tabs
+- [ ] Kanban view grouped by category
+- [ ] Gantt view with sprint timeline
+- [ ] Sync item card with status, assignee, subtask count
+- [ ] Sync item modal for create/edit with team member assignment
+- [ ] Status history timeline display
+- [ ] Archive modal with date filtering
+- [ ] Subtask list component with drag reorder
+- [ ] Sync settings UI for sprint configuration
+
+### Active (v1.5 - parallel on main branch)
 
 - [ ] MCP client service with session management and JSON-RPC 2.0 protocol
-- [ ] Integration with Knowledge Base MCP server (4 tools: consult_code_base, consult_documentation, store_insight, get_repository_stats)
+- [ ] Integration with Knowledge Base MCP server
 - [ ] Knowledge search UI with code highlighting and filters
-- [ ] Team Status page with Metering and Reporting team views
-- [ ] Daily summaries visualization from reporting-hub data
-- [ ] Dashboard cards (progress metrics, blockers, velocity)
-- [ ] Interactive timeline of daily summaries
-- [ ] Health indicators (red/yellow/green) per team member/workstream
-- [ ] Repository statistics dashboard
+- [ ] Team Status page with daily summaries
 
 ### Out of Scope
 
@@ -87,6 +114,9 @@ Single dashboard showing health and status across all team tools without switchi
 - Historical data import — starts fresh with new uploads
 - Custom MCP server deployment — using existing deployed server
 - Direct database access to knowledge base — MCP protocol only
+- Data migration from standalone TeamSync — fresh start, no legacy data
+- Separate sync_items/subtasks tables — reuse projects/tasks with flags
+- Real-time collaborative editing — single-user updates
 
 ## Context
 
@@ -135,5 +165,13 @@ Deployed MCP server at `https://knowledge-base-mcp-server.cfapps.eu01-canary.han
 | fast-csv for parsing | Streaming CSV parsing efficient for large files | ✓ Good (v1.2) |
 | XMLHttpRequest for uploads | fetch lacks progress events needed for upload UI | ✓ Good (v1.2) |
 
+**TeamSync Integration Context:**
+- Categories: goals, blockers, dependencies, emphasis (4 fixed categories)
+- Sync statuses: new, in_progress, resolved, blocked (maps to standard project statuses)
+- Team departments: Metering, Reporting, Both (filter via team_members.department)
+- Sprints: Use existing releaseCycles.js utilities, not new tables
+- Status history: JSONB audit trail tracking all field changes
+- Auto-archive: Items automatically archive when status changes to "resolved"
+
 ---
-*Last updated: 2026-01-29 after v1.5 milestone started*
+*Last updated: 2026-01-29 after v1.6 milestone started (feature/v1.6 branch)*
