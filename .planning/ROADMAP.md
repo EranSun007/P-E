@@ -7,8 +7,8 @@
 - **v1.2 DevOps Bug Dashboard** - Phases 10-12 (shipped 2026-01-28) — [Archive](milestones/v1.2-ROADMAP.md)
 - **v1.3 KPI Insights & Alerts** - Phases 13-16 (shipped 2026-01-28) — [Archive](milestones/v1.3-ROADMAP.md)
 - **v1.4 Bug Dashboard Fixes & Enhancements** - Phases 17-18 (shipped 2026-01-28) — [Archive](milestones/v1.4-ROADMAP.md)
-- **v1.5 Knowledge Base Integration & Team Status** - Phases 19-22 (in progress)
-- **v1.6 TeamSync Integration** - Phases 23-27 (in progress)
+- **v1.5 Knowledge Base Integration & Team Status** - Phases 19-22 (shipped 2026-01-29) — [Archive](milestones/v1.5-ROADMAP.md)
+- **v1.6 TeamSync Integration** - Phases 23-27 (shipped 2026-01-29) — [Archive](milestones/v1.6-ROADMAP.md)
 
 ## Phases
 
@@ -428,7 +428,7 @@ Plans:
 - [x] 22-02-PLAN.md — Dashboard components (MetricsBanner, MemberCard, TimelineNav, health indicators)
 - [x] 22-03-PLAN.md — Gap closure: PostgreSQL team_summaries table to fix data structure mismatch
 
-## v1.6 TeamSync Integration (IN PROGRESS)
+## v1.6 TeamSync Integration (SHIPPED 2026-01-29)
 
 **Milestone Goal:** Build a team synchronization feature for tracking goals, blockers, dependencies, and emphasis items with Kanban board interface, item management, and archive functionality.
 
@@ -436,7 +436,7 @@ Plans:
 - [x] **Phase 24: API Routes** - Subtask operations, sync settings, archive endpoints
 - [x] **Phase 25: Frontend Context** - SyncContext for state management, Kanban board components
 - [x] **Phase 26: Item Modal & Subtasks** - SyncItemModal with view/edit modes, subtask drag-and-drop
-- [ ] **Phase 27: Archive Flow** - Archive modal, restore functionality, auto-archive on resolve
+- [x] **Phase 27: Archive Flow** - Archive modal, restore functionality, auto-archive on resolve
 
 ### Phase 27: Archive Flow
 **Goal**: User can archive resolved items and restore them from archive modal
@@ -452,7 +452,7 @@ Plans:
 Plans:
 - [x] 27-01-PLAN.md — Archive modal and restore flow
 - [x] 27-02-PLAN.md — Auto-archive on resolve
-- [ ] 27-03-PLAN.md — Gap closure: Fix auto-archive and archived_at timestamp
+- [x] 27-03-PLAN.md — Gap closure: Fix auto-archive and archived_at timestamp
 
 ## Progress
 
@@ -493,4 +493,4 @@ v1.6: 23 -> 24 (depends on 23) -> 25 (depends on 24) -> 26 (depends on 25) -> 27
 | 24. API Routes | v1.6 | 2/2 | Complete | 2026-01-29 |
 | 25. Frontend Context | v1.6 | 2/2 | Complete | 2026-01-29 |
 | 26. Item Modal & Subtasks | v1.6 | 2/2 | Complete | 2026-01-29 |
-| 27. Archive Flow | v1.6 | 2/3 | Gap Closure | - |
+| 27. Archive Flow | v1.6 | 3/3 | Complete | 2026-01-29 |
