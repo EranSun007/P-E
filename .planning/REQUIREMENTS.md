@@ -1,54 +1,69 @@
-# Requirements: P&E Manager v1.4
+# Requirements: P&E Manager v1.5
 
-**Defined:** 2026-01-28
+**Defined:** 2026-01-29
 **Core Value:** Single dashboard showing health and status across all team tools without switching contexts
 
-## v1.4 Requirements
+## v1.5 Requirements
 
-Requirements for Bug Dashboard Fixes & Enhancements milestone. Each maps to roadmap phases.
+Requirements for Knowledge Base Integration & Team Status milestone. Each maps to roadmap phases.
 
-### Bug Fixes
+### MCP Client Integration
 
-- [x] **FIX-01**: Component extraction logic correctly categorizes bugs from labels/summary
-- [x] **FIX-02**: Component filter dropdown populated from uploaded data with "All Components" default
-- [x] **FIX-03**: Component filter updates all KPIs, charts, and table when changed
-- [x] **FIX-04**: Category distribution chart shows correct multi-category breakdown
-- [x] **FIX-05**: Bug inflow rate uses correct 4-week rolling window formula
+- [ ] **MCP-01**: Backend MCP client service with session management (Mcp-Session-Id header handling)
+- [ ] **MCP-02**: JSON-RPC 2.0 protocol implementation for tool calls
+- [ ] **MCP-03**: Support for consult_code_base tool (semantic code search)
+- [ ] **MCP-04**: Support for consult_documentation tool (semantic doc search)
+- [ ] **MCP-05**: Support for store_insight tool (persist learnings)
+- [ ] **MCP-06**: Support for get_repository_stats tool (knowledge base analytics)
+- [ ] **MCP-07**: Error handling and session recovery (timeout, reconnect)
+- [ ] **MCP-08**: REST API endpoints exposing MCP tools to frontend
 
-### Table Enhancements
+### Knowledge Search UI
 
-- [x] **TABLE-01**: Aging bugs table shows visual age indicators (🔴🟡🟢)
-- [x] **TABLE-02**: Aging bugs table includes component column with badge display
-- [x] **TABLE-03**: All table columns are sortable with sort indicators
+- [ ] **SEARCH-01**: Search page with query input and results display
+- [ ] **SEARCH-02**: Dual-pane view showing code results and documentation side by side
+- [ ] **SEARCH-03**: Syntax highlighting for code results
+- [ ] **SEARCH-04**: Filter by repository, language, and artifact type
+- [ ] **SEARCH-05**: Similarity score display on results
+- [ ] **SEARCH-06**: Repository statistics dashboard showing indexed content breakdown
 
-### Visualization
+### AI Chat Integration
 
-- [x] **VIS-01**: Weekly inflow trend chart displays when multiple weeks uploaded
+- [ ] **CHAT-01**: AI chat automatically queries relevant code/docs based on conversation context
+- [ ] **CHAT-02**: Explicit /search command in chat to query knowledge base
+- [ ] **CHAT-03**: Search results displayed inline in chat with expandable code snippets
+- [ ] **CHAT-04**: AI responses enriched with knowledge base context when relevant
 
-### UI Polish
+### Team Status Page
 
-- [x] **UI-01**: Filter dropdowns have clear, descriptive labels
-- [x] **UI-02**: Component filter badge shows when filtered (not "All")
+- [ ] **TEAM-01**: Team Status page accessible from navigation
+- [ ] **TEAM-02**: Reporting team view (Metering team scaffold for future)
+- [ ] **TEAM-03**: Daily summaries retrieved from MCP store_insight data
+- [ ] **TEAM-04**: Dashboard cards showing progress metrics (completed items, blockers, velocity)
+- [ ] **TEAM-05**: Interactive timeline view of daily summary history
+- [ ] **TEAM-06**: Health indicators (red/yellow/green) per team member or workstream
+- [ ] **TEAM-07**: Filtering by date range
 
 ## Future Requirements
 
-Deferred to v1.5 or later. Tracked but not in current roadmap.
+Deferred to v1.6 or later. Tracked but not in current roadmap.
 
-### Table Features
+### Multi-Team Support
 
-- **TABLE-F01**: Search functionality for bugs (filter by key, summary, assignee)
-- **TABLE-F02**: Bulk actions on selected bugs
+- **TEAM-F01**: Metering team status view (when dailies data available)
+- **TEAM-F02**: Cross-team comparison dashboard
+- **TEAM-F03**: Team member expertise mapping from knowledge base
 
-### Visualization Features
+### Advanced Search
 
-- **VIS-F01**: KPI status badges on cards (✅ On Target / 🟡 Warning / 🔴 Critical)
-- **VIS-F02**: Multi-KPI comparison view on trend charts
-- **VIS-F03**: Export trend data to CSV
+- **SEARCH-F01**: Search history and saved queries
+- **SEARCH-F02**: Code snippet bookmarking
+- **SEARCH-F03**: Share search results via URL
 
-### Advanced Features
+### AI Enhancements
 
-- **ADV-F01**: Custom threshold configuration UI
-- **ADV-F02**: Per-component threshold overrides
+- **CHAT-F01**: Proactive suggestions based on knowledge base patterns
+- **CHAT-F02**: Code generation using knowledge base examples
 
 ## Out of Scope
 
@@ -56,10 +71,11 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Direct JIRA API integration | CSV export is the data source per design |
-| Real-time bug updates | Weekly CSV upload workflow |
-| Bug modification/write-back | Read-only analytics |
-| Custom KPI definitions | Fixed set of 9 KPIs |
+| Custom MCP server deployment | Using existing deployed server |
+| Direct database access to knowledge base | MCP protocol only |
+| Real-time SSE streaming | HTTP POST sufficient for MVP |
+| Write-back to repositories | Read-only analytics |
+| Custom embedding model | Using deployed server's embeddings |
 
 ## Traceability
 
@@ -67,27 +83,37 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-01 | Phase 17 | Complete |
-| FIX-02 | Phase 17 | Complete |
-| FIX-03 | Phase 17 | Complete |
-| FIX-04 | Phase 17 | Complete |
-| FIX-05 | Phase 17 | Complete |
-| TABLE-01 | Phase 18 | Complete |
-| TABLE-02 | Phase 18 | Complete |
-| TABLE-03 | Phase 18 | Complete |
-| VIS-01 | Phase 18 | Complete |
-| UI-01 | Phase 18 | Complete |
-| UI-02 | Phase 18 | Complete |
+| MCP-01 | Pending | Pending |
+| MCP-02 | Pending | Pending |
+| MCP-03 | Pending | Pending |
+| MCP-04 | Pending | Pending |
+| MCP-05 | Pending | Pending |
+| MCP-06 | Pending | Pending |
+| MCP-07 | Pending | Pending |
+| MCP-08 | Pending | Pending |
+| SEARCH-01 | Pending | Pending |
+| SEARCH-02 | Pending | Pending |
+| SEARCH-03 | Pending | Pending |
+| SEARCH-04 | Pending | Pending |
+| SEARCH-05 | Pending | Pending |
+| SEARCH-06 | Pending | Pending |
+| CHAT-01 | Pending | Pending |
+| CHAT-02 | Pending | Pending |
+| CHAT-03 | Pending | Pending |
+| CHAT-04 | Pending | Pending |
+| TEAM-01 | Pending | Pending |
+| TEAM-02 | Pending | Pending |
+| TEAM-03 | Pending | Pending |
+| TEAM-04 | Pending | Pending |
+| TEAM-05 | Pending | Pending |
+| TEAM-06 | Pending | Pending |
+| TEAM-07 | Pending | Pending |
 
 **Coverage:**
-- v1.4 requirements: 11 total
-- Mapped to phases: 11 (100%)
-- Unmapped: 0 ✓
-
-**Phase distribution:**
-- Phase 17: 5 requirements (FIX-01 through FIX-05)
-- Phase 18: 6 requirements (TABLE-01 through TABLE-03, VIS-01, UI-01, UI-02)
+- v1.5 requirements: 25 total
+- Mapped to phases: 0 (pending roadmap creation)
+- Unmapped: 25
 
 ---
-*Requirements defined: 2026-01-28*
-*Last updated: 2026-01-28 after Phase 18 completion*
+*Requirements defined: 2026-01-29*
+*Last updated: 2026-01-29 after initial definition*
