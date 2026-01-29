@@ -1,4 +1,4 @@
-import { query, getClient } from '../db/connection.js';
+import { query } from '../db/connection.js';
 
 class SyncItemService {
   /**
@@ -172,7 +172,7 @@ class SyncItemService {
       const allowedFields = [
         'name', 'description', 'category', 'sync_status',
         'team_department', 'assigned_to_id', 'sprint_id',
-        'week_start_date', 'display_order'
+        'week_start_date', 'display_order', 'archived'
       ];
 
       const updateFields = [];
@@ -185,6 +185,18 @@ class SyncItemService {
           values.push(value);
           paramIndex++;
         }
+      }
+
+      // If archived is being set to true, also set archived_at timestamp
+      if (updates.archived === true) {
+        updateFields.push(`archived_at = $${paramIndex}`);
+        values.push(new Date().toISOString());
+        paramIndex++;
+      } else if (updates.archived === false) {
+        // Clear archived_at when un-archiving via update
+        updateFields.push(`archived_at = $${paramIndex}`);
+        values.push(null);
+        paramIndex++;
       }
 
       if (updateFields.length === 0 && status_history.length === 0) {
@@ -263,8 +275,9 @@ class SyncItemService {
       }
 
       // Add archive entry
+      const archiveTimestamp = new Date().toISOString();
       status_history.push({
-        timestamp: new Date().toISOString(),
+        timestamp: archiveTimestamp,
         action: 'archived',
         reason: reason,
         changedBy: userId
@@ -272,12 +285,12 @@ class SyncItemService {
 
       const sql = `
         UPDATE projects
-        SET archived = true, status_history = $1
-        WHERE id = $2 AND user_id = $3 AND is_sync_item = true
+        SET archived = true, archived_at = $1, status_history = $2
+        WHERE id = $3 AND user_id = $4 AND is_sync_item = true
         RETURNING *
       `;
 
-      const result = await query(sql, [JSON.stringify(status_history), syncItemId, userId]);
+      const result = await query(sql, [archiveTimestamp, JSON.stringify(status_history), syncItemId, userId]);
       return result.rows[0];
     } catch (error) {
       console.error('SyncItemService.archive error:', error);
@@ -315,7 +328,7 @@ class SyncItemService {
 
       const sql = `
         UPDATE projects
-        SET archived = false, status_history = $1
+        SET archived = false, archived_at = NULL, status_history = $1
         WHERE id = $2 AND user_id = $3 AND is_sync_item = true
         RETURNING *
       `;
@@ -343,13 +356,13 @@ class SyncItemService {
       let paramIndex = 2;
 
       if (from_date) {
-        conditions.push(`created_date >= $${paramIndex}`);
+        conditions.push(`archived_at >= $${paramIndex}`);
         params.push(from_date);
         paramIndex++;
       }
 
       if (to_date) {
-        conditions.push(`created_date <= $${paramIndex}`);
+        conditions.push(`archived_at <= $${paramIndex}`);
         params.push(to_date);
         paramIndex++;
       }
@@ -357,7 +370,7 @@ class SyncItemService {
       const sql = `
         SELECT * FROM projects
         WHERE ${conditions.join(' AND ')}
-        ORDER BY created_date DESC
+        ORDER BY archived_at DESC
       `;
 
       const result = await query(sql, params);
