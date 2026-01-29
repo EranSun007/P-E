@@ -12,6 +12,7 @@ import { Search, Code, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { apiClient } from '@/api/apiClient';
 import { CodeResultCard } from '@/components/knowledge/CodeResultCard';
 import { DocsResultCard } from '@/components/knowledge/DocsResultCard';
+import { SearchFilters } from '@/components/knowledge/SearchFilters';
 
 const KnowledgeSearch = () => {
   // Search state
@@ -24,6 +25,14 @@ const KnowledgeSearch = () => {
   const [error, setError] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Filter state
+  const [filters, setFilters] = useState({
+    repoName: '',
+    language: '',
+    artifactType: '',
+  });
+  const [repositories, setRepositories] = useState([]);
+
   const handleSearch = useCallback(async () => {
     if (!query.trim()) return;
 
@@ -32,21 +41,40 @@ const KnowledgeSearch = () => {
     setHasSearched(true);
 
     try {
-      // Search code and docs in parallel
+      // Search code and docs in parallel with filters
       const [codeResponse, docsResponse] = await Promise.all([
-        apiClient.knowledge.searchCode({ query: query.trim(), limit: 20 }),
-        apiClient.knowledge.searchDocs({ query: query.trim(), limit: 20 }),
+        apiClient.knowledge.searchCode({
+          query: query.trim(),
+          limit: 20,
+          repoName: filters.repoName || undefined,
+          language: filters.language || undefined,
+          artifactType: filters.artifactType || undefined,
+        }),
+        apiClient.knowledge.searchDocs({
+          query: query.trim(),
+          limit: 20,
+        }),
       ]);
 
       setCodeResults(codeResponse.results || codeResponse || []);
       setDocsResults(docsResponse.results || docsResponse || []);
+
+      // Extract unique repo names from results for filter dropdown
+      const repos = [...new Set(
+        (codeResponse.results || codeResponse || [])
+          .map(r => r.repoName || r.repo_name)
+          .filter(Boolean)
+      )];
+      if (repos.length > 0) {
+        setRepositories(prev => [...new Set([...prev, ...repos])]);
+      }
     } catch (err) {
       console.error('Search failed:', err);
       setError(err.message || 'Search failed. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, [query, filters]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
@@ -81,6 +109,17 @@ const KnowledgeSearch = () => {
             )}
           </Button>
         </div>
+
+        {/* Filter controls - show after first search */}
+        {hasSearched && (
+          <div className="mt-4 max-w-4xl mx-auto">
+            <SearchFilters
+              filters={filters}
+              setFilters={setFilters}
+              repositories={repositories}
+            />
+          </div>
+        )}
       </div>
 
       {/* Error display */}
