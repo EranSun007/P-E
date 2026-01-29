@@ -9,7 +9,7 @@
 - **v1.4 Bug Dashboard Fixes & Enhancements** - Phases 17-18 (shipped 2026-01-28) — [Archive](milestones/v1.4-ROADMAP.md)
 - **v1.5 Knowledge Base Integration & Team Status** - Phases 19-22 (shipped 2026-01-29) — [Archive](milestones/v1.5-ROADMAP.md)
 - **v1.6 TeamSync Integration** - Phases 23-27 (shipped 2026-01-29) — [Archive](milestones/v1.6-ROADMAP.md)
-- **v1.7 Menu Clustering** - Phases 28-31 (in progress)
+- **v1.7 Menu Clustering** - Phases 28-31 (shipped 2026-01-29) — [Archive](milestones/v1.7-ROADMAP.md)
 
 ## v1.7 Menu Clustering
 
@@ -18,7 +18,7 @@
 - [x] **Phase 28: Data Layer & Backend API** - Menu config storage, NavigationContext, REST API
 - [x] **Phase 29: Settings UI Basic** - Folder CRUD and item assignment via dropdowns
 - [x] **Phase 30: Settings UI DnD Enhancement** - Drag-and-drop for folder/item reordering
-- [ ] **Phase 31: Navigation Integration** - Collapsible folders in sidebar with persistence
+- [x] **Phase 31: Navigation Integration** - Collapsible folders in sidebar with persistence
 
 ### Phase 28: Data Layer & Backend API
 **Goal**: Backend can store and serve menu configuration, frontend context manages state
@@ -81,8 +81,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 31-01-PLAN.md — useCollapsedFolders hook and CollapsibleFolder component
-- [ ] 31-02-PLAN.md — HierarchicalNavigation and Layout.jsx integration
+- [x] 31-01-PLAN.md — useCollapsedFolders hook and CollapsibleFolder component
+- [x] 31-02-PLAN.md — HierarchicalNavigation and Layout.jsx integration
 
 <details>
 <summary>v1.0 Jira Integration MVP (Phases 1-5) - SHIPPED 2026-01-21</summary>
@@ -562,9 +562,9 @@ v1.7: 28 -> 29 (depends on 28) -> 30 (depends on 29) -> 31 (depends on 28)
 | 28. Data Layer & Backend API | v1.7 | 2/2 | Complete | 2026-01-29 |
 | 29. Settings UI Basic | v1.7 | 2/2 | Complete | 2026-01-29 |
 | 30. Settings UI DnD Enhancement | v1.7 | 1/1 | Complete | 2026-01-29 |
-| 31. Navigation Integration | v1.7 | 0/2 | Not started | - |
+| 31. Navigation Integration | v1.7 | 2/2 | Complete | 2026-01-29 |
 
 **Summary:**
 - v1.0-v1.6: 56 plans (Phases 1-27) - SHIPPED
-- v1.7: 7 plans (Phases 28-31) - IN PROGRESS
-- **Total: 63 plans across 31 phases**
+- v1.7: 7 plans (Phases 28-31) - COMPLETE
+- **Total: 63 plans across 31 phases — ALL COMPLETE**

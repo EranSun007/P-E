@@ -74,6 +74,7 @@ Progress: [===============================] 100% (63/63 plans)
 | mode-reread | Re-read localStorage when mode changes | Independent collapse state per mode |
 | item-match-by-name | Match navigation items by name property | Layout.jsx uses name as identifier |
 | skip-empty-folders | Don't render folders with no items | Cleaner UI without empty groups |
+| animation-keyframes | collapsible-down/up in tailwind.config.js | Smooth height transitions using Radix CSS variables |
 
 ### Blockers/Concerns
 
@@ -82,9 +83,11 @@ None — all milestones shipped successfully.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed 31-02-PLAN.md
+Stopped at: Phase 31 verified and complete
 Resume file: None
 
 ## Next Steps
 
-All planned phases complete. v1.7 Menu Clustering milestone shipped.
+1. Run `/gsd:audit-milestone` to verify v1.7 Menu Clustering
+2. Run `/gsd:complete-milestone` to archive v1.7
+3. Plan next milestone (v1.8)
