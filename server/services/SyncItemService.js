@@ -11,7 +11,7 @@ class SyncItemService {
     try {
       const { category, team_department, archived = false } = filters;
 
-      const conditions = ['is_sync_item = true', 'user_id = $1', 'archived = $2'];
+      const conditions = ['p.is_sync_item = true', 'p.user_id = $1', 'p.archived = $2'];
       const params = [userId, archived];
       let paramIndex = 3;
 
@@ -107,9 +107,9 @@ class SyncItemService {
         INSERT INTO projects (
           user_id, name, description, category, sync_status,
           team_department, assigned_to_id, sprint_id, week_start_date,
-          status_history, is_sync_item, archived, display_order
+          status_history, is_sync_item, archived, display_order, status
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, false, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, false, $11, 'active')
         RETURNING *
       `;
 
@@ -343,13 +343,13 @@ class SyncItemService {
       let paramIndex = 2;
 
       if (from_date) {
-        conditions.push(`updated_date >= $${paramIndex}`);
+        conditions.push(`created_date >= $${paramIndex}`);
         params.push(from_date);
         paramIndex++;
       }
 
       if (to_date) {
-        conditions.push(`updated_date <= $${paramIndex}`);
+        conditions.push(`created_date <= $${paramIndex}`);
         params.push(to_date);
         paramIndex++;
       }
@@ -357,7 +357,7 @@ class SyncItemService {
       const sql = `
         SELECT * FROM projects
         WHERE ${conditions.join(' AND ')}
-        ORDER BY updated_date DESC
+        ORDER BY created_date DESC
       `;
 
       const result = await query(sql, params);
