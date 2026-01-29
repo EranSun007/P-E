@@ -28,6 +28,7 @@ export function AIChatPanel() {
     cancelStreaming,
     clearChat,
     quickAction,
+    searchKnowledgeBase,
     // Page context
     pageContext,
     contextTimestamp,
@@ -254,6 +255,7 @@ export function AIChatPanel() {
         <ChatInput
           onSend={sendMessageStreaming}
           onCancel={cancelStreaming}
+          onSearchCommand={searchKnowledgeBase}
           isLoading={isLoading}
           isStreaming={isStreaming}
           isProductMode={isProductMode}

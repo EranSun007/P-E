@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useRef, useMemo } from 'react';
 import { aiClient } from '@/api/aiClient';
+import { apiClient } from '@/api/apiClient';
 
 const AIContext = createContext(null);
 
@@ -264,6 +265,41 @@ export function AIProvider({ children }) {
     return sendMessageStreaming(prompt);
   }, [sendMessageStreaming]);
 
+  /**
+   * Search knowledge base and display results in chat
+   */
+  const searchKnowledgeBase = useCallback(async (query) => {
+    setIsLoading(true);
+    setError(null);
+
+    // Add user command message to chat
+    const commandMessage = { role: 'user', content: `/search ${query}`, type: 'command' };
+    setMessages(prev => [...prev, commandMessage]);
+
+    try {
+      // Query both code and docs in parallel
+      const [codeResults, docsResults] = await Promise.all([
+        apiClient.knowledge.searchCode({ query, limit: 3, threshold: 0.6 }),
+        apiClient.knowledge.searchDocs({ query, limit: 3, threshold: 0.6 })
+      ]);
+
+      // Add search result message
+      const resultMessage = {
+        role: 'assistant',
+        type: 'search_result',
+        query,
+        codeResults: codeResults.results || [],
+        docsResults: docsResults.results || []
+      };
+      setMessages(prev => [...prev, resultMessage]);
+    } catch (err) {
+      console.error('Knowledge base search failed:', err);
+      setError('Knowledge search failed: ' + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const value = {
     // State
     messages,
@@ -291,6 +327,7 @@ export function AIProvider({ children }) {
     checkAvailability,
     getSummary,
     quickAction,
+    searchKnowledgeBase,
 
     // Page context actions
     updatePageContext,
