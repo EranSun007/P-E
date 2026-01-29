@@ -10,6 +10,8 @@
 - **v1.5 Knowledge Base Integration & Team Status** - Phases 19-22 (shipped 2026-01-29) — [Archive](milestones/v1.5-ROADMAP.md)
 - **v1.6 TeamSync Integration** - Phases 23-27 (shipped 2026-01-29) — [Archive](milestones/v1.6-ROADMAP.md)
 
+**Next:** Run `/gsd:new-milestone` to plan v1.7
+
 ## Phases
 
 <details>
@@ -351,7 +353,7 @@ Plans:
 
 </details>
 
-## v1.5 Knowledge Base Integration & Team Status (IN PROGRESS)
+## v1.5 Knowledge Base Integration & Team Status (SHIPPED 2026-01-29)
 
 **Milestone Goal:** Integrate with MCP knowledge base server for semantic code/documentation search, enhance AI chat with knowledge context, and add team status dashboard for daily summaries.
 
@@ -428,7 +430,8 @@ Plans:
 - [x] 22-02-PLAN.md — Dashboard components (MetricsBanner, MemberCard, TimelineNav, health indicators)
 - [x] 22-03-PLAN.md — Gap closure: PostgreSQL team_summaries table to fix data structure mismatch
 
-## v1.6 TeamSync Integration (SHIPPED 2026-01-29)
+<details>
+<summary>v1.6 TeamSync Integration (Phases 23-27) - SHIPPED 2026-01-29</summary>
 
 **Milestone Goal:** Build a team synchronization feature for tracking goals, blockers, dependencies, and emphasis items with Kanban board interface, item management, and archive functionality.
 
@@ -438,21 +441,9 @@ Plans:
 - [x] **Phase 26: Item Modal & Subtasks** - SyncItemModal with view/edit modes, subtask drag-and-drop
 - [x] **Phase 27: Archive Flow** - Archive modal, restore functionality, auto-archive on resolve
 
-### Phase 27: Archive Flow
-**Goal**: User can archive resolved items and restore them from archive modal
-**Depends on**: Phase 26
-**Requirements**: UI-16, UI-17, UI-18, UI-19
-**Success Criteria** (what must be TRUE):
-  1. Archive button in header shows count badge of archived items
-  2. Archive modal lists archived items with date filter
-  3. Restore action moves item back to active Kanban board
-  4. Setting status to "Done" automatically archives the item
-**Plans**: 3 plans
+**Total:** 5 phases, 11 plans — [Archive](milestones/v1.6-ROADMAP.md)
 
-Plans:
-- [x] 27-01-PLAN.md — Archive modal and restore flow
-- [x] 27-02-PLAN.md — Auto-archive on resolve
-- [x] 27-03-PLAN.md — Gap closure: Fix auto-archive and archived_at timestamp
+</details>
 
 ## Progress
 
@@ -494,3 +485,9 @@ v1.6: 23 -> 24 (depends on 23) -> 25 (depends on 24) -> 26 (depends on 25) -> 27
 | 25. Frontend Context | v1.6 | 2/2 | Complete | 2026-01-29 |
 | 26. Item Modal & Subtasks | v1.6 | 2/2 | Complete | 2026-01-29 |
 | 27. Archive Flow | v1.6 | 3/3 | Complete | 2026-01-29 |
+
+**Summary:**
+- v1.0-v1.4: 35 plans (Phases 1-18)
+- v1.5: 10 plans (Phases 19-22)
+- v1.6: 11 plans (Phases 23-27)
+- **Total: 56 plans across 27 phases**

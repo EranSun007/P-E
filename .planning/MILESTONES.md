@@ -1,5 +1,104 @@
 # Project Milestones: P&E Manager
 
+## v1.6 TeamSync Integration (Shipped: 2026-01-29)
+
+**Delivered:** Team synchronization feature with Kanban board for tracking goals, blockers, dependencies, and emphasis items across team departments.
+
+**Phases completed:** 23-27 (11 plans total)
+
+**Key accomplishments:**
+
+- Database schema extensions reusing projects/tasks tables with sync flags
+- Full REST API for sync items, subtasks, and settings
+- Kanban board UI with 4-column category layout
+- Team department filtering (All Teams, Metering, Reporting)
+- Sync item modal with view/edit modes and team member assignment
+- Drag-and-drop subtask reordering with @dnd-kit
+- Archive flow with auto-archive on status="Done" and restore functionality
+
+**Stats:**
+
+- 5 phases, 11 plans (including 1 gap closure)
+- 79 files modified
+- ~11,000 lines added
+- 63 commits
+- 1 day (2026-01-29)
+
+**Git range:** `feat(23-01)` → `feat(27-03)`
+
+**What's next:** `/gsd:new-milestone` to plan v1.7
+
+---
+
+## v1.5 Knowledge Base Integration (Shipped: 2026-01-29)
+
+**Delivered:** MCP knowledge base integration with semantic search, AI chat enhancement, and team status dashboard.
+
+**Phases completed:** 19-22 (10 plans total)
+
+**Key accomplishments:**
+
+- MCP client service with JSON-RPC 2.0 protocol
+- Semantic code and documentation search via MCP tools
+- Dual-pane search UI with syntax highlighting
+- AI chat /search command with inline results
+- Team Status page with health indicators
+- PostgreSQL team_summaries table for structured status data
+
+**Stats:**
+
+- 4 phases, 10 plans (including 1 gap closure)
+- 1 day (2026-01-29)
+
+**Git range:** `feat(19-01)` → `feat(22-03)`
+
+---
+
+## v1.4 Bug Dashboard Fixes (Shipped: 2026-01-28)
+
+**Delivered:** Component extraction fixes, table enhancements with age indicators, and weekly inflow trend charts.
+
+**Phases completed:** 17-18 (4 plans total)
+
+**Key accomplishments:**
+
+- Fixed component extraction logic
+- Table sorting with age indicators (color-coded)
+- Weekly inflow trend chart
+- UI polish and filter badges
+
+**Stats:**
+
+- 2 phases, 4 plans
+- 1 day (2026-01-28)
+
+**Git range:** `feat(17-01)` → `feat(18-02)`
+
+---
+
+## v1.3 KPI Insights & Alerts (Shipped: 2026-01-28)
+
+**Delivered:** Historical KPI trends, threshold notifications, and email alerts.
+
+**Phases completed:** 13-16 (7 plans total)
+
+**Key accomplishments:**
+
+- Historical KPI query with 4/8/12 week ranges
+- Trend charts with threshold zones
+- Sparklines and trend indicators on KPI cards
+- In-app notification system with bell icon
+- Email notifications for KPI breaches
+
+**Stats:**
+
+- 4 phases, 7 plans
+- 1 day (2026-01-28)
+
+**Git range:** `feat(13-01)` → `feat(16-02)`
+
+---
+
 ## v1.2 DevOps Bug Dashboard (Shipped: 2026-01-28)
 
 **Delivered:** Bug KPI dashboard analyzing weekly JIRA exports to track DevOps duty team performance with actionable metrics, alerts, and visualizations.

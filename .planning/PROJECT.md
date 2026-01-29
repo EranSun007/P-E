@@ -2,45 +2,19 @@
 
 ## What This Is
 
-A unified people and engineering management system combining team management, web capture framework, and DevOps metrics. Features include a bug KPI dashboard that analyzes JIRA bug exports to track team DevOps duty performance with SLA compliance, resolution times, and backlog health.
+A unified people and engineering management system combining team management, web capture framework, DevOps metrics, knowledge base search, and team synchronization. Features include a bug KPI dashboard, semantic code/doc search via MCP, team status page with health indicators, and a Kanban board for tracking team goals, blockers, dependencies, and emphasis items.
 
 ## Core Value
 
 Single dashboard showing health and status across all team tools without switching contexts, with full control over what gets captured and how it connects to your data.
 
-## Current Milestone: v1.6 TeamSync Integration
+## Current State (v1.6 Shipped)
 
-**Goal:** Integrate TeamSync functionality into existing P-E entities, providing a team sync dashboard with Kanban/Gantt views for tracking goals, blockers, dependencies, and emphasis items across teams.
-
-**Target features:**
-- Extend projects table for sync items (category, sync_status, status_history audit trail)
-- Extend tasks table for subtasks linked to sync items
-- Team filtering by department (Metering, Reporting, Both)
-- Kanban view grouped by category (goals, blockers, dependencies, emphasis)
-- Gantt view using existing release cycle/sprint system
-- Archive/restore workflow with full change tracking
-- Subtask management per sync item
-- Integration with existing team_members for assignment
-- Sync settings for sprint configuration
-
-**Architecture approach:** Extend existing entities rather than parallel tables:
-- TeamSync Items → `projects` with `is_sync_item=true`
-- TeamSync Subtasks → `tasks` with `is_subtask=true` and `project_id` FK
-- TeamSync Teams → `team_members.department` filtering
-- TeamSync Sprints → existing `releaseCycles.js` utilities
-
-## Parallel Milestone: v1.5 Knowledge Base Integration (separate branch)
-
-**Goal:** Integrate with the deployed MCP Knowledge Base server and build a Team Status page.
-**Status:** In progress on `main` branch (Phases 19-22)
-
-## Current State (v1.4 Shipped)
-
-**Shipped:** 2026-01-28
-**Milestones:** v1.0 (Jira Integration), v1.1 (Web Capture Framework), v1.2 (DevOps Bug Dashboard), v1.3 (KPI Insights & Alerts), v1.4 (Bug Dashboard Fixes & Enhancements)
+**Shipped:** 2026-01-29
+**Milestones:** v1.0 (Jira Integration), v1.1 (Web Capture Framework), v1.2 (DevOps Bug Dashboard), v1.3 (KPI Insights & Alerts), v1.4 (Bug Dashboard Fixes), v1.5 (Knowledge Base Integration), v1.6 (TeamSync Integration)
 
 **Tech Stack:**
-- Frontend: React 18 + Vite + Tailwind CSS + Radix UI + Recharts
+- Frontend: React 18 + Vite + Tailwind CSS + Radix UI + Recharts + @dnd-kit
 - Backend: Express.js + PostgreSQL
 - Browser Extension: Manifest V3 + chrome.storage
 - Deployment: SAP BTP Cloud Foundry
@@ -49,22 +23,29 @@ Single dashboard showing health and status across all team tools without switchi
 
 ### Validated
 
+**Pre-existing:**
 - ✓ Full-stack React/Express/PostgreSQL application — existing
 - ✓ GitHub integration with token-based sync — existing
 - ✓ Team member management — existing
 - ✓ Task tracking with status workflow — existing
 - ✓ AI chat assistant with tool calling — existing
+
+**v1.0 Jira Integration:**
 - ✓ Browser extension capturing Jira board data — v1.0
 - ✓ Backend API receiving extension data — v1.0
 - ✓ Database schema for Jira issues — v1.0
 - ✓ Jira issues page with filtering — v1.0
 - ✓ Team workload view — v1.0
 - ✓ Jira assignee to team member mapping — v1.0
+
+**v1.1 Web Capture Framework:**
 - ✓ Configurable capture rules via UI — v1.1
 - ✓ Multi-site extension support (Grafana, Jenkins, Concourse, Dynatrace) — v1.1
 - ✓ Data staging/inbox with review workflow — v1.1
 - ✓ Flexible entity mapping system — v1.1
 - ✓ Rule builder UI with preset templates — v1.1
+
+**v1.2 DevOps Bug Dashboard:**
 - ✓ CSV upload for JIRA bug exports — v1.2
 - ✓ Bug database schema (bug_uploads, bugs, weekly_kpis tables) — v1.2
 - ✓ 9 KPI calculations (inflow, TTFR, MTTR, SLA, backlog health, etc.) — v1.2
@@ -73,37 +54,50 @@ Single dashboard showing health and status across all team tools without switchi
 - ✓ Critical alerts when KPIs breach thresholds — v1.2
 - ✓ Aging bugs table with JIRA links — v1.2
 - ✓ Charts for MTTR by priority and category distribution — v1.2
-- ✓ Component extraction and filtering fix — v1.4
-- ✓ Table sorting with age indicators — v1.4
-- ✓ Weekly inflow trend charts — v1.4
+
+**v1.3 KPI Insights & Alerts:**
 - ✓ Historical KPI trends and threshold notifications — v1.3
 - ✓ Email notifications for KPI breaches — v1.3
 
-### Active (v1.6 TeamSync Integration)
+**v1.4 Bug Dashboard Fixes:**
+- ✓ Component extraction and filtering fix — v1.4
+- ✓ Table sorting with age indicators — v1.4
+- ✓ Weekly inflow trend charts — v1.4
 
-- [ ] Database schema extensions for sync items and subtasks
-- [ ] Backend sync items service (CRUD, archive, restore, status tracking)
-- [ ] Backend subtask service (CRUD, reorder, completion tracking)
-- [ ] Sync settings service for user preferences
-- [ ] REST API routes for sync operations
-- [ ] Frontend API client for sync items
-- [ ] SyncContext for state management
-- [ ] TeamSync page with team department tabs
-- [ ] Kanban view grouped by category
-- [ ] Gantt view with sprint timeline
-- [ ] Sync item card with status, assignee, subtask count
-- [ ] Sync item modal for create/edit with team member assignment
-- [ ] Status history timeline display
-- [ ] Archive modal with date filtering
-- [ ] Subtask list component with drag reorder
-- [ ] Sync settings UI for sprint configuration
+**v1.5 Knowledge Base Integration:**
+- ✓ MCP client service with session management and JSON-RPC 2.0 protocol — v1.5
+- ✓ Semantic code and documentation search via MCP tools — v1.5
+- ✓ Knowledge search UI with dual-pane results and syntax highlighting — v1.5
+- ✓ AI chat /search command with inline results — v1.5
+- ✓ Team Status page with health indicators — v1.5
+- ✓ PostgreSQL team_summaries table for status data — v1.5
 
-### Active (v1.5 - parallel on main branch)
+**v1.6 TeamSync Integration:**
+- ✓ Database schema extensions for sync items and subtasks — v1.6
+- ✓ Backend sync items service (CRUD, archive, restore, status tracking) — v1.6
+- ✓ Backend subtask service (CRUD, reorder, completion tracking) — v1.6
+- ✓ Sync settings service for user preferences — v1.6
+- ✓ REST API routes for sync operations — v1.6
+- ✓ Frontend API client and SyncContext for state management — v1.6
+- ✓ TeamSync page with team department tabs — v1.6
+- ✓ Kanban view grouped by category (Goals, Blockers, Dependencies, Emphasis) — v1.6
+- ✓ Sync item card with status, assignee, subtask count — v1.6
+- ✓ Sync item modal for create/edit with team member assignment — v1.6
+- ✓ Archive modal with date filtering — v1.6
+- ✓ Subtask list with drag-and-drop reordering — v1.6
+- ✓ Auto-archive on status="Done" — v1.6
 
-- [ ] MCP client service with session management and JSON-RPC 2.0 protocol
-- [ ] Integration with Knowledge Base MCP server
-- [ ] Knowledge search UI with code highlighting and filters
-- [ ] Team Status page with daily summaries
+### Active
+
+None — ready for `/gsd:new-milestone` to plan v1.7
+
+### Future Candidates (v1.7+)
+
+- Gantt view with sprint timeline
+- Status history timeline display
+- Sync settings UI for sprint configuration
+- Multi-team comparison dashboard
+- Search history and saved queries
 
 ### Out of Scope
 
@@ -111,43 +105,26 @@ Single dashboard showing health and status across all team tools without switchi
 - Real-time bug updates — weekly CSV upload workflow
 - Bug modification/write-back — read-only analytics
 - Custom KPI definitions — fixed set of 9 KPIs
-- Historical data import — starts fresh with new uploads
 - Custom MCP server deployment — using existing deployed server
 - Direct database access to knowledge base — MCP protocol only
-- Data migration from standalone TeamSync — fresh start, no legacy data
+- Data migration from standalone TeamSync — fresh start
 - Separate sync_items/subtasks tables — reuse projects/tasks with flags
 - Real-time collaborative editing — single-user updates
+- Item drag between Kanban categories — edit via modal
 
 ## Context
 
 **DevOps Duty Context:**
 Team rotates weekly DevOps duty. Each week the duty person exports bugs from JIRA and uploads CSV. Dashboard shows health of bug handling process across the team.
 
-**KPI Targets (from specification):**
-- Bug Inflow Rate: ≤6 bugs/week
-- Time to First Response: <24h for Very High, <48h median overall
-- MTTR: Very High <72h, High <168h, Medium <336h
-- SLA Compliance: 80% VH resolved <24h, 70% High <48h
-- Backlog Health Score: 100 - (VH×10) - (High×5)
-
-**Component Extraction:**
-Bugs categorized by labels/summary into: deploy-metering, service-broker, foss-vulnerabilities, cm-metering, sdm-metering, other
-
 **Knowledge Base MCP Server:**
-Deployed MCP server at `https://knowledge-base-mcp-server.cfapps.eu01-canary.hana.ondemand.com` provides semantic search over ~19,000 indexed chunks from 27 SAP repositories. Daily summaries are stored via `store_insight` tool by reporting-hub. Two teams: Metering and Reporting, with separate status views.
+Deployed MCP server at `https://knowledge-base-mcp-server.cfapps.eu01-canary.hana.ondemand.com` provides semantic search over ~19,000 indexed chunks from 27 SAP repositories. Two teams: Metering and Reporting, with separate status views.
 
-**MCP Protocol Details:**
-- JSON-RPC 2.0 over HTTP/SSE
-- Session management via `Mcp-Session-Id` header
-- 4 tools: consult_code_base, consult_documentation, store_insight, get_repository_stats
-
-## Constraints
-
-- **CSV format**: JIRA export columns (Key, Summary, Priority, Status, Created, Resolved, Reporter, Assignee, Labels)
-- **Week-ending date**: User must specify Saturday date for each upload
-- **SAP BTP deployment**: Backend deploys via cf push
-- **No API access**: Cannot fetch bugs directly from JIRA
-- **Single upload per week**: Duplicate detection, replace option available
+**TeamSync Context:**
+- Categories: goals, blockers, dependencies, emphasis (4 fixed categories)
+- Sync statuses: new, in_progress, done, blocked
+- Team departments: Metering, Reporting, Both
+- Auto-archive: Items archive when status changes to "Done"
 
 ## Key Decisions
 
@@ -157,21 +134,22 @@ Deployed MCP server at `https://knowledge-base-mcp-server.cfapps.eu01-canary.han
 | Follow GitHub integration pattern | Proven architecture in existing codebase | ✓ Good (v1.0) |
 | Configurable extractors via UI | Don't rebuild extension for each new site | ✓ Good (v1.1) |
 | Data staging workflow | Quality control before data enters main system | ✓ Good (v1.1) |
-| Generic entity mapping | Flexible connections, not hardcoded per source | ✓ Good (v1.1) |
-| Rule-based extraction | Selectors defined in config, not code | ✓ Good (v1.1) |
 | CSV upload for bugs | JIRA API not available, CSV export is standard workflow | ✓ Good (v1.2) |
 | Pre-calculated KPIs | Performance optimization, avoid recalculating on page load | ✓ Good (v1.2) |
-| 3-table schema | bug_uploads (meta), bugs (data), weekly_kpis (calculated) | ✓ Good (v1.2) |
-| fast-csv for parsing | Streaming CSV parsing efficient for large files | ✓ Good (v1.2) |
-| XMLHttpRequest for uploads | fetch lacks progress events needed for upload UI | ✓ Good (v1.2) |
+| MCP protocol for knowledge base | Standard protocol, deployed server available | ✓ Good (v1.5) |
+| PostgreSQL for team summaries | Structured data, fits existing stack | ✓ Good (v1.5) |
+| Extend projects/tasks tables | Reuse existing entities with flags instead of new tables | ✓ Good (v1.6) |
+| JSONB status_history | Full audit trail without separate history table | ✓ Good (v1.6) |
+| @dnd-kit for drag-and-drop | Accessible, modern library with React hooks | ✓ Good (v1.6) |
+| Optimistic updates with rollback | Better UX, handles failures gracefully | ✓ Good (v1.6) |
 
-**TeamSync Integration Context:**
-- Categories: goals, blockers, dependencies, emphasis (4 fixed categories)
-- Sync statuses: new, in_progress, resolved, blocked (maps to standard project statuses)
-- Team departments: Metering, Reporting, Both (filter via team_members.department)
-- Sprints: Use existing releaseCycles.js utilities, not new tables
-- Status history: JSONB audit trail tracking all field changes
-- Auto-archive: Items automatically archive when status changes to "resolved"
+## Constraints
+
+- **CSV format**: JIRA export columns (Key, Summary, Priority, Status, Created, Resolved, Reporter, Assignee, Labels)
+- **Week-ending date**: User must specify Saturday date for each upload
+- **SAP BTP deployment**: Backend deploys via cf push
+- **No API access**: Cannot fetch bugs directly from JIRA
+- **Single upload per week**: Duplicate detection, replace option available
 
 ---
-*Last updated: 2026-01-29 after v1.6 milestone started (feature/v1.6 branch)*
+*Last updated: 2026-01-29 after v1.6 milestone complete*
