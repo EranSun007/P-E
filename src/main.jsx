@@ -8,19 +8,22 @@ import { DisplayModeProvider } from '@/contexts/DisplayModeContext.jsx'
 import { AppModeProvider } from '@/contexts/AppModeContext.jsx'
 import { AIProvider } from '@/contexts/AIContext.jsx'
 import { NotificationProvider } from '@/contexts/NotificationContext.jsx'
+import { SyncProvider } from '@/contexts/SyncContext.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
     <AuthProvider>
       <NotificationProvider>
-        <AppModeProvider>
-          <DisplayModeProvider>
-            <AppProvider>
-              <AIProvider>
-                <App />
-              </AIProvider>
-            </AppProvider>
-          </DisplayModeProvider>
-        </AppModeProvider>
+        <SyncProvider>
+          <AppModeProvider>
+            <DisplayModeProvider>
+              <AppProvider>
+                <AIProvider>
+                  <App />
+                </AIProvider>
+              </AppProvider>
+            </DisplayModeProvider>
+          </AppModeProvider>
+        </SyncProvider>
       </NotificationProvider>
     </AuthProvider>
 ) 
