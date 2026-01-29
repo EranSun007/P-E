@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 
 ## Current Position
 
-Phase: 25 of 27 (Frontend Foundation)
-Plan: 1 of 2 in current phase
+Phase: 21 of 27 (AI Chat Integration)
+Plan: 1 of 2 in current phase (Phase 21 plan 1 complete)
 Status: In progress
-Last activity: 2026-01-29 — Completed 25-01-PLAN.md (SyncContext and API Client)
+Last activity: 2026-01-29 — Completed 21-01-PLAN.md (Knowledge Base Search Commands)
 
-Progress: [#######################.......] 44/47 plans (94% overall)
+Progress: [#######################.......] 45/47 plans (96% overall)
 
 ## Milestone Summary
 
@@ -26,13 +26,13 @@ Progress: [#######################.......] 44/47 plans (94% overall)
 
 **v1.5 Knowledge Base (parallel on feature/v1.6):**
 - Phases: 19-22
-- Status: Phase 19 complete, Phase 20 complete (both plans complete)
-- Next: Phase 21 (Knowledge Stats Dashboard)
+- Status: Phase 19 complete, Phase 20 complete, Phase 21 plan 1 complete
+- Next: Phase 21 plan 2 (AI Chat Knowledge Integration continuation)
 
 ## Performance Metrics
 
 **v1.0-v1.4:** 35 plans completed across 18 phases
-**v1.5:** 4 plans completed (Phase 19 complete, Phase 20 complete)
+**v1.5:** 5 plans completed (Phase 19 complete, Phase 20 complete, Phase 21 plan 1 complete)
 **v1.6:** 5 plans completed (Phase 23 complete, Phase 24 complete, Phase 25 plan 1 complete)
 
 ## Accumulated Context
@@ -70,6 +70,10 @@ Key patterns established:
 - Lazy-loading for archived items (load on demand, show count badge) (25-01)
 - Server-side filtering via query params (not client-side) (25-01)
 - Computed grouping with useMemo (itemsByCategory) (25-01)
+- Command parsing in chat input with / prefix for commands (21-01)
+- Parallel knowledge base queries (code + docs) for search (21-01)
+- Automatic context injection based on keyword detection (21-01)
+- Graceful fallback on knowledge base errors (continue without context) (21-01)
 
 ### Pending Todos
 
@@ -87,7 +91,7 @@ None - milestone starting fresh.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed 25-01-PLAN.md execution (SyncContext and API Client - Phase 25 plan 1 complete)
+Stopped at: Completed 21-01-PLAN.md execution (Knowledge Base Search Commands - Phase 21 plan 1 complete)
 Resume file: None
 
 ## Next Steps
