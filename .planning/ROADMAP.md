@@ -402,7 +402,7 @@ Plans:
   2. User can type /search [query] in chat to explicitly search knowledge base
   3. Search results appear inline in chat with expandable code snippets
   4. AI responses include relevant code/documentation context when knowledge base has matches
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [ ] 21-01-PLAN.md — Automatic knowledge context injection and /search command
