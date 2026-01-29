@@ -880,35 +880,41 @@ export default function NavigationSettings() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {/* Root level items first */}
-            {getRootItems().map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center gap-2 py-1.5 px-3 rounded bg-gray-50"
-              >
-                <span className="text-sm">{item.name}</span>
-              </div>
-            ))}
+            {/* Root level items */}
+            {(itemContainers.root || []).map(itemId => {
+              const item = menuItems.find(m => m.id === itemId);
+              return item ? (
+                <div
+                  key={itemId}
+                  className="flex items-center gap-2 py-1.5 px-3 rounded bg-gray-50"
+                >
+                  <span className="text-sm">{item.name}</span>
+                </div>
+              ) : null;
+            })}
 
             {/* Folders with their items */}
             {folders
               .sort((a, b) => (a.order || 0) - (b.order || 0))
-              .map((folder) => (
+              .map(folder => (
                 <div key={folder.id} className="border rounded-lg p-3">
                   <div className="flex items-center gap-2 font-medium text-sm">
                     <FolderOpen className="h-4 w-4" />
                     {folder.name}
                     <Badge variant="secondary" className="text-xs">
-                      {getItemsInFolder(folder.id).length}
+                      {(itemContainers[folder.id] || []).length}
                     </Badge>
                   </div>
                   <div className="ml-6 mt-2 space-y-1">
-                    {getItemsInFolder(folder.id).map((item) => (
-                      <div key={item.id} className="text-sm text-gray-600 py-0.5">
-                        {item.name}
-                      </div>
-                    ))}
-                    {getItemsInFolder(folder.id).length === 0 && (
+                    {(itemContainers[folder.id] || []).map(itemId => {
+                      const item = menuItems.find(m => m.id === itemId);
+                      return item ? (
+                        <div key={itemId} className="text-sm text-gray-600 py-0.5">
+                          {item.name}
+                        </div>
+                      ) : null;
+                    })}
+                    {(itemContainers[folder.id] || []).length === 0 && (
                       <div className="text-sm text-gray-400 italic">No items</div>
                     )}
                   </div>
@@ -916,7 +922,7 @@ export default function NavigationSettings() {
               ))}
 
             {/* Empty state */}
-            {getRootItems().length === 0 && folders.length === 0 && (
+            {(itemContainers.root || []).length === 0 && folders.length === 0 && (
               <div className="text-center text-gray-500 py-4">
                 No items to display
               </div>
