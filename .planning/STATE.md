@@ -9,20 +9,20 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 
 ## Current Position
 
-Phase: 22 of 27 (Team Status Page)
-Plan: 2 of 2 in current phase (Phase 22 complete)
-Status: Phase 22 complete
-Last activity: 2026-01-29 — Completed 22-02-PLAN.md (Team Status UI Components)
+Phase: 27 of 27 (Archive Flow)
+Plan: 2 of 2 in current phase
+Status: Phase 27 complete
+Last activity: 2026-01-29 — Completed 27-02-PLAN.md (Auto-Archive on Done)
 
-Progress: [##########################....] 51/54 plans (94% overall)
+Progress: [##############################] 52/54 plans (96% overall)
 
 ## Milestone Summary
 
 **v1.6 TeamSync Integration:**
 - Phases: 23-27 (5 phases)
-- Plans: 10 total (9 complete)
+- Plans: 10 total (10 complete)
 - Requirements: 59 mapped
-- Status: Phase 23 complete, Phase 24 complete, Phase 25 complete, Phase 26 complete (UI-05 to UI-15 fulfilled)
+- Status: Phase 23 complete, Phase 24 complete, Phase 25 complete, Phase 26 complete, Phase 27 complete (UI-05 to UI-19 fulfilled)
 
 **v1.5 Knowledge Base (parallel on feature/v1.6):**
 - Phases: 19-22 (4 phases)
@@ -33,7 +33,7 @@ Progress: [##########################....] 51/54 plans (94% overall)
 
 **v1.0-v1.4:** 35 plans completed across 18 phases
 **v1.5:** 9 plans completed (Phase 19 complete, Phase 20 complete, Phase 21 complete, Phase 22 complete)
-**v1.6:** 9 plans completed (Phase 23 complete, Phase 24 complete, Phase 25 complete, Phase 26 complete)
+**v1.6:** 10 plans completed (Phase 23 complete, Phase 24 complete, Phase 25 complete, Phase 26 complete, Phase 27 complete)
 
 ## Accumulated Context
 
@@ -97,10 +97,13 @@ Key patterns established:
 - Collapsible member cards with colored left border for health indicators (22-02)
 - 3-column metrics banner for aggregate team data (22-02)
 - Timeline navigation shows weeks 1-2 or 3-4 with sprint ID (22-02)
+- Auto-archive triggers on transition TO done, not when already done (27-02)
+- Single API call combines user updates with archived:true flag (27-02)
+- Optimistic removal from active items on auto-archive (27-02)
 
 ### Pending Todos
 
-None - milestone starting fresh.
+None - v1.6 milestone complete.
 
 ### Blockers/Concerns
 
@@ -114,14 +117,18 @@ None - milestone starting fresh.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed 22-02-PLAN.md execution (Team Status UI Components)
+Stopped at: Completed 27-02-PLAN.md execution (Auto-Archive on Done)
 Resume file: None
 
 ## Next Steps
 
 **v1.6 TeamSync Integration:**
-1. Execute Phase 27: Settings & Archive Management
-2. TeamSync integration complete
+Complete - all phases (23-27) finished. Ready for merge to main.
 
 **v1.5 Knowledge Base:**
-Complete - all phases (19-22) finished
+Complete - all phases (19-22) finished.
+
+**Post-milestone:**
+1. Merge feature/v1.6 to main
+2. Tag v1.6 release
+3. Plan v1.7 features
