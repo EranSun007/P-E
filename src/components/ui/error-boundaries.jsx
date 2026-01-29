@@ -176,31 +176,57 @@ export class ChunkLoadErrorBoundary extends Component {
   }
 }
 
+// DEBUG: Track error boundary instances
+let pageChunkErrorBoundaryCount = 0;
+
 // Specialized error boundary for page-level chunks
 export class PageChunkErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { 
-      hasError: false, 
+    this.state = {
+      hasError: false,
       error: null,
       retryCount: 0,
       isRetrying: false
     };
+    this.instanceId = ++pageChunkErrorBoundaryCount;
+    console.log('[PageChunkErrorBoundary] Instance', this.instanceId, 'created for:', props.pageName);
   }
 
   static getDerivedStateFromError(error) {
+    console.log('[PageChunkErrorBoundary] getDerivedStateFromError:', error?.message);
     return { hasError: true, error };
   }
 
+  componentDidMount() {
+    console.log('[PageChunkErrorBoundary] Instance', this.instanceId, 'mounted:', this.props.pageName);
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    console.log('[PageChunkErrorBoundary] Instance', this.instanceId, 'updated:', {
+      pageName: this.props.pageName,
+      hasError: this.state.hasError,
+      prevHasError: prevState.hasError
+    });
+  }
+
+  componentWillUnmount() {
+    console.log('[PageChunkErrorBoundary] Instance', this.instanceId, 'unmounting:', this.props.pageName);
+  }
+
   componentDidCatch(error, errorInfo) {
-    console.error('Page chunk loading error:', error, errorInfo);
-    
+    console.error('[PageChunkErrorBoundary] Instance', this.instanceId, 'caught error:', {
+      page: this.props.pageName,
+      error: error?.message,
+      stack: error?.stack?.slice(0, 500)
+    });
+
     // Report error with page context
     if (window.reportError) {
-      window.reportError(error, { 
-        context: 'page_chunk_loading', 
+      window.reportError(error, {
+        context: 'page_chunk_loading',
         page: this.props.pageName,
-        errorInfo 
+        errorInfo
       });
     }
   }

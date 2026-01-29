@@ -10,6 +10,14 @@ import { cn } from '@/lib/utils';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useAppMode } from '@/contexts/AppModeContext';
 import { CollapsibleFolder } from '@/components/navigation/CollapsibleFolder';
+import { NativeCollapsibleFolder } from '@/components/navigation/NativeCollapsibleFolder';
+
+// DEBUG: Toggle this to switch between Radix and Native collapsible for testing
+// Set to true to use native HTML details/summary instead of Radix Collapsible
+const USE_NATIVE_COLLAPSIBLE = false;
+
+// DEBUG: Track render count
+let hierNavRenderCount = 0;
 
 /**
  * HierarchicalNavigation renders navigation items grouped by folder
@@ -20,6 +28,15 @@ import { CollapsibleFolder } from '@/components/navigation/CollapsibleFolder';
 export function HierarchicalNavigation({ navigation, onItemClick }) {
   const { folders, items } = useNavigation();
   const { isProductMode } = useAppMode();
+
+  // DEBUG: Track renders
+  hierNavRenderCount++;
+  console.log('[HierarchicalNavigation] Render #', hierNavRenderCount, {
+    foldersCount: folders?.length,
+    itemsCount: items?.length,
+    navigationCount: navigation?.length,
+    isProductMode
+  });
 
   // Group navigation items by folder
   // NavigationSettings stores itemId as lowercase (e.g., "tasks", "github")
@@ -42,7 +59,10 @@ export function HierarchicalNavigation({ navigation, onItemClick }) {
     <Link
       key={item.name}
       to={item.href}
-      onClick={onItemClick}
+      onClick={(e) => {
+        console.log('[HierarchicalNavigation] Link clicked:', item.name, item.href);
+        onItemClick?.(e);
+      }}
       className={cn(
         'flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors duration-200',
         isProductMode
@@ -59,6 +79,10 @@ export function HierarchicalNavigation({ navigation, onItemClick }) {
     </Link>
   );
 
+  // Select the collapsible component based on debug flag
+  const FolderComponent = USE_NATIVE_COLLAPSIBLE ? NativeCollapsibleFolder : CollapsibleFolder;
+  console.log('[HierarchicalNavigation] Using', USE_NATIVE_COLLAPSIBLE ? 'NATIVE' : 'RADIX', 'collapsible');
+
   return (
     <>
       {/* Render folders with their nested items */}
@@ -68,13 +92,13 @@ export function HierarchicalNavigation({ navigation, onItemClick }) {
         if (!folderItems || folderItems.length === 0) return null;
 
         return (
-          <CollapsibleFolder
+          <FolderComponent
             key={folder.id}
             folder={folder}
             isProductMode={isProductMode}
           >
             {folderItems.map(renderNavLink)}
-          </CollapsibleFolder>
+          </FolderComponent>
         );
       })}
 

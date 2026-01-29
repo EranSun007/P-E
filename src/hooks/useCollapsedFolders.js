@@ -5,10 +5,13 @@
  * Separate storage keys for people/product modes
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAppMode } from '@/contexts/AppModeContext';
 
 const STORAGE_KEY_PREFIX = 'pe_manager_nav_collapsed_folders';
+
+// DEBUG: Track hook calls
+let useCollapsedFoldersCallCount = 0;
 
 /**
  * Custom hook for managing folder collapse state with persistence
@@ -18,6 +21,13 @@ export function useCollapsedFolders() {
   const { isProductMode } = useAppMode();
   const currentMode = isProductMode ? 'product' : 'people';
   const storageKey = `${STORAGE_KEY_PREFIX}_${currentMode}`;
+  const callIdRef = useRef(null);
+
+  // DEBUG: Track hook calls
+  if (!callIdRef.current) {
+    callIdRef.current = ++useCollapsedFoldersCallCount;
+  }
+  console.log('[useCollapsedFolders] Hook call #', callIdRef.current, { currentMode, storageKey });
 
   // Initialize from localStorage on mount
   const [collapsedFolders, setCollapsedFolders] = useState(() => {

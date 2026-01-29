@@ -4,7 +4,7 @@
  * Supports separate configs for People and Product modes
  */
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppMode } from '@/contexts/AppModeContext';
 import { apiClient } from '@/api/apiClient';
@@ -14,15 +14,25 @@ const NavigationContext = createContext(null);
 // Default configs (match backend defaults)
 const DEFAULT_CONFIG = { folders: [], items: [] };
 
+// DEBUG: Track provider renders
+let navProviderRenderCount = 0;
+
 export function NavigationProvider({ children }) {
   const { isAuthenticated } = useAuth();
   const { isProductMode } = useAppMode();
+
+  // DEBUG: Track renders
+  navProviderRenderCount++;
+  console.log('[NavigationProvider] Render #', navProviderRenderCount, { isAuthenticated, isProductMode });
 
   // Separate state for each mode
   const [peopleConfig, setPeopleConfig] = useState(DEFAULT_CONFIG);
   const [productConfig, setProductConfig] = useState(DEFAULT_CONFIG);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Track if initial data has been loaded to prevent re-fetch on navigation
+  const dataLoadedRef = useRef(false);
 
   // Current mode's config
   const currentConfig = isProductMode ? productConfig : peopleConfig;
@@ -41,11 +51,18 @@ export function NavigationProvider({ children }) {
   }, []);
 
   // Load both configs on auth
+  // Only fetch once per authentication session to prevent re-fetch on navigation
   useEffect(() => {
     if (!isAuthenticated) {
+      dataLoadedRef.current = false;
       setPeopleConfig(DEFAULT_CONFIG);
       setProductConfig(DEFAULT_CONFIG);
       setLoading(false);
+      return;
+    }
+
+    // Skip if already loaded
+    if (dataLoadedRef.current) {
       return;
     }
 
@@ -59,6 +76,7 @@ export function NavigationProvider({ children }) {
         ]);
         setPeopleConfig(people);
         setProductConfig(product);
+        dataLoadedRef.current = true;
       } catch (err) {
         setError(err.message);
       } finally {

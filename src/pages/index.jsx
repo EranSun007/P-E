@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import Layout from "./Layout.jsx";
 import ProtectedRoute from "@/components/auth/ProtectedRoute.jsx";
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
@@ -153,12 +153,37 @@ function getLoadingFallback(pathname) {
     return <PageLoadingFallback />;
 }
 
+// DEBUG: Track navigation count
+let pagesContentRenderCount = 0;
+let navigationCount = 0;
+
 // Create a wrapper component that uses useLocation inside the Router context
 function PagesContent() {
     const location = useLocation();
     const currentPage = _getCurrentPage(location.pathname);
     const loadingFallback = getLoadingFallback(location.pathname);
-    
+    const prevLocationRef = useRef(location.pathname);
+
+    // DEBUG: Track renders
+    pagesContentRenderCount++;
+    console.log('[PagesContent] Render #', pagesContentRenderCount, {
+      pathname: location.pathname,
+      currentPage
+    });
+
+    // DEBUG: Track location changes
+    useEffect(() => {
+      if (prevLocationRef.current !== location.pathname) {
+        navigationCount++;
+        console.log('[PagesContent] Navigation #', navigationCount, {
+          from: prevLocationRef.current,
+          to: location.pathname,
+          timestamp: new Date().toISOString()
+        });
+        prevLocationRef.current = location.pathname;
+      }
+    }, [location.pathname]);
+
     return (
         <Layout currentPageName={currentPage}>
             <PageChunkErrorBoundary pageName={currentPage}>

@@ -11,6 +11,9 @@ const STORAGE_KEY = 'pe_manager_app_mode';
 
 const AppModeContext = createContext(null);
 
+// DEBUG: Track provider renders
+let appModeProviderRenderCount = 0;
+
 /**
  * Custom hook to use the app mode context
  * @returns {object} App mode context value
@@ -29,6 +32,10 @@ export const useAppMode = () => {
  * Manages app mode state with localStorage persistence
  */
 export const AppModeProvider = ({ children }) => {
+  // DEBUG: Track renders
+  appModeProviderRenderCount++;
+  console.log('[AppModeProvider] Render #', appModeProviderRenderCount);
+
   const [isProductMode, setIsProductMode] = useState(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -52,6 +59,7 @@ export const AppModeProvider = ({ children }) => {
    * Returns the new mode for navigation handling
    */
   const toggleAppMode = useCallback(() => {
+    console.log('[AppModeProvider] toggleAppMode called, current isProductMode:', isProductMode);
     setIsProductMode(prev => !prev);
     return !isProductMode;
   }, [isProductMode]);
