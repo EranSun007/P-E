@@ -15,11 +15,11 @@ Requirements for Menu Clustering milestone. Each maps to roadmap phases.
 
 ### Folder Management (Settings UI)
 
-- [ ] **FOLDER-01**: User can create a folder with a name
-- [ ] **FOLDER-02**: User can rename an existing folder
-- [ ] **FOLDER-03**: User can delete a folder (items return to root level)
-- [ ] **FOLDER-04**: User can assign menu items to folders via dropdown
-- [ ] **FOLDER-05**: User can remove items from folders
+- [x] **FOLDER-01**: User can create a folder with a name
+- [x] **FOLDER-02**: User can rename an existing folder
+- [x] **FOLDER-03**: User can delete a folder (items return to root level)
+- [x] **FOLDER-04**: User can assign menu items to folders via dropdown
+- [x] **FOLDER-05**: User can remove items from folders
 - [ ] **FOLDER-06**: User can drag-and-drop items between folders and root
 - [ ] **FOLDER-07**: User can reorder folders via drag-and-drop
 - [ ] **FOLDER-08**: User can reorder items within a folder via drag-and-drop
@@ -70,11 +70,11 @@ Requirements for Menu Clustering milestone. Each maps to roadmap phases.
 | API-01 | Phase 28 | Complete |
 | API-02 | Phase 28 | Complete |
 | API-03 | Phase 28 | Complete |
-| FOLDER-01 | Phase 29 | Pending |
-| FOLDER-02 | Phase 29 | Pending |
-| FOLDER-03 | Phase 29 | Pending |
-| FOLDER-04 | Phase 29 | Pending |
-| FOLDER-05 | Phase 29 | Pending |
+| FOLDER-01 | Phase 29 | Complete |
+| FOLDER-02 | Phase 29 | Complete |
+| FOLDER-03 | Phase 29 | Complete |
+| FOLDER-04 | Phase 29 | Complete |
+| FOLDER-05 | Phase 29 | Complete |
 | FOLDER-06 | Phase 30 | Pending |
 | FOLDER-07 | Phase 30 | Pending |
 | FOLDER-08 | Phase 30 | Pending |

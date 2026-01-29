@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 
 ## Current Position
 
-Phase: 29 of 31 (Settings UI Basic)
+Phase: 29 of 31 (Settings UI Basic) — COMPLETE
 Plan: 2 of 2 complete
-Status: Phase complete
-Last activity: 2026-01-29 — Completed 29-02-PLAN.md (Item Assignment and Folder Preview)
+Status: Ready for Phase 30
+Last activity: 2026-01-29 — Phase 29 verified and complete
 
 Progress: [==============================] 95% (60/63 plans)
 
@@ -28,7 +28,7 @@ Progress: [==============================] 95% (60/63 plans)
 - v1.6 TeamSync Integration (Phases 23-27, 11 plans) — 2026-01-29
 
 **Current Milestone:**
-- v1.7 Menu Clustering (Phases 28-31, 7 plans) — IN PROGRESS (4/7 plans)
+- v1.7 Menu Clustering (Phases 28-31, 7 plans) — IN PROGRESS (5/7 plans)
 
 **Total: 7 milestones shipped, 28 phases, 60 plans completed**
 
@@ -80,4 +80,6 @@ Resume file: None
 
 ## Next Steps
 
-Execute Phase 30 Plan 01 (DnD Enhancement) to add drag-and-drop reordering for folders and items.
+1. Plan Phase 30 (Settings UI DnD Enhancement) — add drag-and-drop for folder/item reordering
+2. Execute Phase 30 plans
+3. Continue to Phase 31 (Navigation Integration) — collapsible folders in sidebar

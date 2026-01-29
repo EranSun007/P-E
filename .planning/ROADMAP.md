@@ -16,7 +16,7 @@
 **Milestone Goal:** Add collapsible folder navigation to organize the 13+ sidebar menu items into logical groups, with user-configurable folder structure via Settings UI.
 
 - [x] **Phase 28: Data Layer & Backend API** - Menu config storage, NavigationContext, REST API
-- [ ] **Phase 29: Settings UI Basic** - Folder CRUD and item assignment via dropdowns
+- [x] **Phase 29: Settings UI Basic** - Folder CRUD and item assignment via dropdowns
 - [ ] **Phase 30: Settings UI DnD Enhancement** - Drag-and-drop for folder/item reordering
 - [ ] **Phase 31: Navigation Integration** - Collapsible folders in sidebar with persistence
 
@@ -49,8 +49,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 29-01-PLAN.md — Navigation Settings tab with folder CRUD
-- [ ] 29-02-PLAN.md — Item assignment dropdown and folder preview
+- [x] 29-01-PLAN.md — Navigation Settings tab with folder CRUD
+- [x] 29-02-PLAN.md — Item assignment dropdown and folder preview
 
 ### Phase 30: Settings UI DnD Enhancement
 **Goal**: User can reorder folders and items via drag-and-drop in Settings
@@ -560,7 +560,7 @@ v1.7: 28 -> 29 (depends on 28) -> 30 (depends on 29) -> 31 (depends on 28)
 | 26. Item Modal & Subtasks | v1.6 | 2/2 | Complete | 2026-01-29 |
 | 27. Archive Flow | v1.6 | 3/3 | Complete | 2026-01-29 |
 | 28. Data Layer & Backend API | v1.7 | 2/2 | Complete | 2026-01-29 |
-| 29. Settings UI Basic | v1.7 | 0/2 | Not started | - |
+| 29. Settings UI Basic | v1.7 | 2/2 | Complete | 2026-01-29 |
 | 30. Settings UI DnD Enhancement | v1.7 | 0/1 | Not started | - |
 | 31. Navigation Integration | v1.7 | 0/2 | Not started | - |
 
