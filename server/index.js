@@ -37,6 +37,7 @@ import captureInboxRouter from './routes/captureInbox.js';
 import entityMappingsRouter from './routes/entityMappings.js';
 import bugsRouter from './routes/bugs.js';
 import emailPreferencesRouter from './routes/emailPreferences.js';
+import syncRouter from './routes/sync.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -147,6 +148,7 @@ app.use('/api/capture-inbox', captureInboxRouter);
 app.use('/api/entity-mappings', entityMappingsRouter);
 app.use('/api/bugs', bugsRouter);
 app.use('/api/email-preferences', emailPreferencesRouter);
+app.use('/api/sync', syncRouter);
 
 // 404 handler
 app.use((req, res) => {
