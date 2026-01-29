@@ -1,764 +1,450 @@
-# Domain Pitfalls: Adding KPI Trends and Notifications
+# Pitfalls Research: Entity Model Editor
 
-**Domain:** Bug Dashboard with KPI Trend Visualization and Notification System
-**Researched:** 2026-01-28
-**Context:** Adding trend charts and notifications to existing React dashboard with weekly CSV uploads
+**Domain:** Schema management / migration tool for existing P&E Manager
+**Researched:** 2026-01-29
+**Context:** Building schema introspection and visual editor INSIDE the app that uses the same database
+
+---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, data loss, or major architectural issues.
+Mistakes that cause data loss, broken production, or major rewrites.
 
-### Pitfall 1: Time Series Data Model Mismatch
+### Pitfall 1: Destructive Operations Without Confirmation Gates
 
-**What goes wrong:** Adding trend charts without restructuring the data model for time-series queries. Current schema stores KPIs in JSONB blobs (`weekly_kpis.kpi_data`), which prevents efficient historical queries and chart rendering.
+**What goes wrong:** User clicks "Drop Column" or "Delete Table" in the visual editor, migration runs immediately, data is permanently lost. No undo possible.
 
 **Why it happens:**
-- Existing system designed for single-point-in-time analysis (per upload)
-- JSONB storage optimized for current week, not historical trends
-- No time-series indexes (GIN/GiST on JSONB doesn't help with temporal queries)
-- Query pattern becomes "scan all uploads, parse all JSONB" (O(n) with uploads)
+- UI designed for efficiency makes destructive actions too easy
+- Generated migrations execute without human review
+- No distinction between "design mode" and "commit mode"
 
 **Consequences:**
-- Chart rendering times explode as historical data grows (500ms → 5s+)
-- PostgreSQL can't optimize JSONB time-series queries effectively
-- Forced to fetch all data to frontend and calculate there (defeats backend purpose)
-- Impossible to add "show last 12 weeks" without full table scan
+- Permanent data loss in production database
+- Cascading foreign key deletions (ON DELETE CASCADE) remove more than expected
+- The running P&E Manager app crashes with missing columns/tables
 
 **Prevention:**
-1. **Normalize KPI data into columns or time-series table**
-   ```sql
-   CREATE TABLE kpi_history (
-     id UUID PRIMARY KEY,
-     user_id VARCHAR(255),
-     upload_id UUID REFERENCES bug_uploads(id),
-     week_ending DATE,
-     kpi_name VARCHAR(50),  -- 'bug_inflow_rate', 'mttr_vh', etc.
-     kpi_value NUMERIC,
-     component VARCHAR(100),
-     metadata JSONB,
-     created_at TIMESTAMP DEFAULT NOW()
-   );
-   CREATE INDEX idx_kpi_history_time_series
-     ON kpi_history (user_id, kpi_name, component, week_ending);
-   ```
+1. **Multi-step confirmation for destructive operations**:
+   - First: "This will delete column X"
+   - Second: "This column has Y rows of data. Type 'DELETE' to confirm"
+   - Third: Show generated SQL before execution
+2. **Generate migrations as files, never execute directly**: User must run `npm run migrate` manually
+3. **Classify operations by danger level**:
+   - GREEN: Add column, add table, add index
+   - YELLOW: Rename column, add constraint
+   - RED: Drop column, drop table, drop constraint
+4. **Never generate DROP statements by default**: Require explicit "Include destructive changes" checkbox
 
-2. **Add migration to backfill from existing JSONB**
-   - Extract all KPIs from `weekly_kpis.kpi_data` JSONB
-   - Insert into normalized structure
-   - Keep JSONB for dashboard UI (current week), use normalized for trends
+**Detection (warning signs):**
+- No confirmation dialog in mockups
+- Migration runs on button click
+- No "preview SQL" step in workflow
 
-3. **Design API for time-series from day one**
-   ```javascript
-   GET /api/bugs/kpis/trends?kpi=bug_inflow_rate&weeks=12&component=all
-   // Returns array of {week_ending, value}
-   ```
-
-**Detection:** Query slow (>500ms) once you have >10 uploads, or you're fetching all KPIs to frontend for charting.
-
-**Phase to address:** Phase 1 (Data Model) - must precede chart implementation.
+**Phase to address:** Phase 1 (Foundation) - Build safety gates before any migration generation
 
 ---
 
-### Pitfall 2: Chart Re-render Thrashing
+### Pitfall 2: Live Database Introspection Breaking the Running App
 
-**What goes wrong:** React charts (Recharts) re-render on every parent state change, causing UI freezes and dropped frames. With multiple trend charts on the same page, the compound effect causes 200-500ms jank on filter changes.
+**What goes wrong:** Schema introspection queries lock tables or run expensive scans, causing the P&E Manager app to hang or timeout during normal operation.
 
 **Why it happens:**
-- Recharts components are expensive to render (SVG path calculations)
-- Parent dashboard updates filters → all charts re-render even if data unchanged
-- No memoization of chart data transformations
-- Loading multiple charts simultaneously blocks the main thread
+- `information_schema` queries can be slow on large schemas
+- Introspection runs automatically (on page load, on interval)
+- No isolation between "admin" database operations and "app" database operations
 
 **Consequences:**
-- Selecting a filter dropdown feels sluggish (visible delay)
-- Scrolling dashboard with visible charts causes dropped frames
-- Mobile devices become nearly unusable
-- User perception: "The new features made the app slower"
+- Users experience app slowdowns during schema inspection
+- Long-running queries on `pg_catalog` block other transactions
+- Connection pool exhaustion (introspection uses connections needed by app)
 
 **Prevention:**
-1. **Memoize chart data transformations**
-   ```javascript
-   const chartData = useMemo(() => {
-     return kpiTrends.map(week => ({
-       date: format(new Date(week.week_ending), 'MMM d'),
-       value: week.value,
-       status: getThresholdStatus(week.value)
-     }));
-   }, [kpiTrends]); // Only recompute if actual data changes
-   ```
+1. **Use dedicated connection for introspection**: Separate from app connection pool
+2. **Cache schema metadata aggressively**: Query on-demand, not on every render
+3. **Prefer `pg_catalog` over `information_schema`**: Direct system catalog access is faster
+4. **Set statement timeout for introspection queries**: `SET statement_timeout = '5s'`
+5. **Run introspection during low-traffic periods**: Or make it manual-only
 
-2. **Wrap charts in React.memo with custom comparison**
-   ```javascript
-   const TrendChart = React.memo(({ data, title }) => {
-     return <ResponsiveContainer>...</ResponsiveContainer>;
-   }, (prevProps, nextProps) => {
-     // Only re-render if data actually changed
-     return prevProps.data === nextProps.data;
-   });
-   ```
+**Detection (warning signs):**
+- Introspection runs on component mount
+- No caching layer between UI and database queries
+- Using same connection pool as main app
 
-3. **Lazy load off-screen charts**
-   ```javascript
-   import { lazy, Suspense } from 'react';
-   const TrendChart = lazy(() => import('./TrendChart'));
-
-   // In component
-   <Suspense fallback={<ChartSkeleton />}>
-     <TrendChart data={data} />
-   </Suspense>
-   ```
-
-4. **Limit chart complexity**
-   - Max 52 data points (1 year weekly data) per chart
-   - Aggregate older data into monthly buckets
-   - Use `<Line>` not `<Area>` for simpler SVG paths
-   - Disable animations on trend charts (only needed for dashboard KPI cards)
-
-**Detection:**
-- React DevTools Profiler shows chart components taking >50ms to render
-- Filters/dropdowns have visible delay between click and update
-- Browser performance timeline shows long tasks (>50ms) during state updates
-
-**Phase to address:** Phase 2 (Chart Implementation) - add memoization from start.
+**Phase to address:** Phase 1 (Foundation) - Design introspection architecture before UI
 
 ---
 
-### Pitfall 3: Email Notifications Without Delivery Infrastructure
+### Pitfall 3: Generated Migration Breaks Running Application
 
-**What goes wrong:** Adding email notifications without properly configuring SAP BTP email service, SMTP credentials, or error handling. Emails silently fail in production, users never receive alerts, and you only discover it weeks later.
-
-**Why it happens:**
-- SAP BTP doesn't include SMTP service by default (must bind separately)
-- Development uses nodemailer with fake SMTP that "succeeds" without sending
-- No monitoring/logging of email delivery failures
-- Missing retry logic for transient failures (SMTP timeouts, rate limits)
-- Email service credentials expire or get rotated without warning
-
-**Consequences:**
-- Users configure thresholds but never receive alerts (trust broken)
-- P0 bug threshold breaches go unnoticed (defeats purpose)
-- Email queue grows unbounded on persistent failures (memory leak)
-- Manual support tickets: "I never got the alert email"
-
-**Prevention:**
-1. **Use SAP BTP Mail Service or external provider from day one**
-   ```javascript
-   // manifest.yml
-   services:
-     - pe-manager-postgres
-     - pe-manager-mail  // SAP Mail service instance
-
-   // server/services/EmailService.js
-   import { getServices } from '@sap/xsenv';
-   const mailService = getServices({ mail: { tag: 'mail' } });
-   ```
-
-2. **Implement email queue with retry logic**
-   ```javascript
-   // Don't send email synchronously in request handler
-   // Queue for async processing with retries
-
-   class EmailQueue {
-     async enqueue(email) {
-       await query(`
-         INSERT INTO email_queue (user_id, to_email, subject, body, attempts)
-         VALUES ($1, $2, $3, $4, 0)
-       `, [userId, email, subject, body]);
-     }
-
-     async processQueue() {
-       // Background job: every 1 minute
-       const pending = await query(`
-         SELECT * FROM email_queue
-         WHERE sent_at IS NULL AND attempts < 3
-         ORDER BY created_at ASC
-         LIMIT 10
-       `);
-
-       for (const email of pending.rows) {
-         try {
-           await this.sendEmail(email);
-           await query(`UPDATE email_queue SET sent_at = NOW() WHERE id = $1`, [email.id]);
-         } catch (err) {
-           await query(`
-             UPDATE email_queue
-             SET attempts = attempts + 1, last_error = $2
-             WHERE id = $1
-           `, [email.id, err.message]);
-         }
-       }
-     }
-   }
-   ```
-
-3. **Add email_queue table to schema**
-   ```sql
-   CREATE TABLE email_queue (
-     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-     user_id VARCHAR(255) NOT NULL,
-     to_email VARCHAR(255) NOT NULL,
-     subject VARCHAR(255) NOT NULL,
-     body TEXT NOT NULL,
-     attempts INTEGER DEFAULT 0,
-     sent_at TIMESTAMP,
-     last_error TEXT,
-     created_at TIMESTAMP DEFAULT NOW()
-   );
-   CREATE INDEX idx_email_queue_pending ON email_queue(sent_at) WHERE sent_at IS NULL;
-   ```
-
-4. **Comprehensive error handling and logging**
-   ```javascript
-   try {
-     await emailService.send(email);
-     logger.info('Email sent', { to: email.to, subject: email.subject });
-   } catch (err) {
-     logger.error('Email failed', {
-       error: err.message,
-       code: err.code,  // SMTP error codes
-       to: email.to
-     });
-     // Don't throw - queue for retry
-   }
-   ```
-
-5. **Health check endpoint for email service**
-   ```javascript
-   // GET /api/health/email
-   async healthCheckEmail() {
-     try {
-       await emailService.verify(); // SMTP connection test
-       return { status: 'healthy', service: 'email' };
-     } catch (err) {
-       return { status: 'unhealthy', error: err.message };
-     }
-   }
-   ```
-
-**Detection:**
-- Emails don't arrive in inbox/spam during testing
-- SAP BTP logs show "Connection refused" or "Authentication failed"
-- No email-related logs in application logs (means not even attempting)
-
-**Phase to address:** Phase 3 (Email Setup) - infrastructure before notification logic.
-
----
-
-### Pitfall 4: Notification Spam and Fatigue
-
-**What goes wrong:** Sending notifications on every CSV upload without debouncing or smart batching. User uploads 3 CSVs (fixing errors), gets 3 identical "MTTR threshold exceeded" emails in 5 minutes. Users disable all notifications.
+**What goes wrong:** User generates and applies a migration that removes a column the app still references. App crashes with "column X does not exist" errors.
 
 **Why it happens:**
-- Threshold checks run on every upload (makes sense for data consistency)
-- No deduplication logic ("already sent this notification today")
-- No batching of multiple threshold breaches into single email
-- No user preference for notification frequency (immediate vs daily digest)
+- Schema editor only knows database state, not application code state
+- No validation that app code matches schema changes
+- Migrations applied without deployment coordination
 
 **Consequences:**
-- Email fatigue → users ignore/delete without reading
-- Important alerts buried in noise (P0 bugs lost among Medium priority noise)
-- Support requests to "turn off all these emails"
-- Defeats purpose of notification system
+- Production downtime
+- Error logs flooded with SQL errors
+- Users lose access to app features
 
 **Prevention:**
-1. **Add notification_sent tracking table**
-   ```sql
-   CREATE TABLE notification_log (
-     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-     user_id VARCHAR(255) NOT NULL,
-     notification_type VARCHAR(50), -- 'threshold_breach', 'weekly_summary'
-     kpi_name VARCHAR(50),
-     sent_at TIMESTAMP DEFAULT NOW(),
-     metadata JSONB
-   );
-   CREATE INDEX idx_notification_log_recent
-     ON notification_log(user_id, notification_type, sent_at DESC);
-   ```
+1. **Two-environment workflow**:
+   - Generate migrations in schema editor
+   - Apply to dev database first
+   - Run app tests against dev database
+   - Only then apply to production
+2. **Warn about high-risk removals**: "Column 'status' is commonly used in application queries"
+3. **Staged rollout for destructive changes**:
+   - First migration: Mark column as deprecated (add comment)
+   - Deploy code that no longer uses column
+   - Second migration: Actually drop column
+4. **Integration with app code** (future): Scan `server/services/*.js` for column references
 
-2. **Implement smart notification logic**
-   ```javascript
-   async shouldSendNotification(userId, kpiName, currentValue, threshold) {
-     // Check if already sent in last 24 hours
-     const recent = await query(`
-       SELECT id FROM notification_log
-       WHERE user_id = $1
-         AND notification_type = 'threshold_breach'
-         AND kpi_name = $2
-         AND sent_at > NOW() - INTERVAL '24 hours'
-       LIMIT 1
-     `, [userId, kpiName]);
+**Detection (warning signs):**
+- No "test migration" workflow in plan
+- Migrations apply directly to production database
+- No consideration of zero-downtime deployments
 
-     if (recent.rows.length > 0) {
-       return false; // Already notified recently
-     }
-
-     // Check if value significantly changed (>10% change)
-     const lastNotification = await getLastNotificationValue(userId, kpiName);
-     if (lastNotification && Math.abs(currentValue - lastNotification) < threshold * 0.1) {
-       return false; // Value hasn't changed meaningfully
-     }
-
-     return true;
-   }
-   ```
-
-3. **Batch multiple breaches into single email**
-   ```javascript
-   async sendWeeklyDigest(userId) {
-     // Check all thresholds, collect breaches
-     const breaches = await getAllThresholdBreaches(userId);
-
-     if (breaches.length === 0) return;
-
-     // Group by severity
-     const critical = breaches.filter(b => b.status === 'red');
-     const warnings = breaches.filter(b => b.status === 'yellow');
-
-     // Single email with sections
-     await emailService.send({
-       to: user.email,
-       subject: `Bug Dashboard Alert: ${critical.length} critical issues`,
-       body: renderDigestTemplate({ critical, warnings, weekEnding })
-     });
-   }
-   ```
-
-4. **User preferences for notification frequency**
-   ```javascript
-   // user_settings table
-   notification_preferences: {
-     threshold_alerts: 'immediate', // or 'daily', 'weekly', 'off'
-     summary_emails: 'weekly',
-     min_severity: 'yellow' // Don't notify for green zone
-   }
-   ```
-
-5. **Rate limiting per notification type**
-   ```javascript
-   // Max 1 email per KPI per day
-   // Max 5 total notification emails per user per day
-   ```
-
-**Detection:**
-- User complaints about too many emails
-- Email open rates <20% (normal is 30-40%)
-- Multiple notifications sent within 5 minutes for same KPI
-
-**Phase to address:** Phase 4 (Notification Logic) - before enabling for production users.
+**Phase to address:** Phase 2 (Migration Generator) - Build workflow, not just SQL generation
 
 ---
 
 ## Moderate Pitfalls
 
-Mistakes that cause delays, poor UX, or technical debt.
+Mistakes that cause delays, technical debt, or user confusion.
 
-### Pitfall 5: In-App Notification State Management Complexity
+### Pitfall 4: PostgreSQL-Specific Features Lost in Introspection
 
-**What goes wrong:** Adding in-app notifications (toast messages, bell icon badge) without centralized state management. Notification state scattered across components, causing:
-- Badge count wrong after dismissing notification
-- Stale notifications showing after refresh
-- No way to mark all as read
-- Duplicate notifications rendered
+**What goes wrong:** Schema introspection misses PostgreSQL-specific features like:
+- UUID extensions (`uuid_generate_v4()`)
+- Array types (`TEXT[]`)
+- JSONB columns and their operators
+- Custom triggers and functions
+- Partial indexes
 
-**Prevention:**
-1. **Use existing NotificationService and React Context**
-   ```javascript
-   // src/contexts/NotificationContext.jsx
-   const NotificationContext = createContext();
+**Why it happens:**
+- `information_schema` is SQL-standard and omits PostgreSQL extensions
+- Generic schema models don't have fields for PG-specific features
+- Developer assumes "standard SQL" is sufficient
 
-   export function NotificationProvider({ children }) {
-     const [notifications, setNotifications] = useState([]);
-     const [unreadCount, setUnreadCount] = useState(0);
-
-     const fetchNotifications = async () => {
-       const data = await apiClient.notifications.list();
-       setNotifications(data);
-       setUnreadCount(data.filter(n => !n.is_read).length);
-     };
-
-     const markAsRead = async (id) => {
-       await apiClient.notifications.update(id, { is_read: true });
-       await fetchNotifications(); // Refresh
-     };
-
-     useEffect(() => {
-       fetchNotifications();
-       const interval = setInterval(fetchNotifications, 60000); // Poll every minute
-       return () => clearInterval(interval);
-     }, []);
-
-     return (
-       <NotificationContext.Provider value={{
-         notifications,
-         unreadCount,
-         markAsRead,
-         refresh: fetchNotifications
-       }}>
-         {children}
-       </NotificationContext.Provider>
-     );
-   }
-   ```
-
-2. **Existing notifications table already in schema** (lines 1-61 in notifications.js)
-   - Don't recreate infrastructure
-   - Extend existing NotificationService for threshold alerts
-
-3. **Badge count in navigation**
-   ```javascript
-   const { unreadCount } = useNotifications();
-   <Bell className="h-4 w-4" />
-   {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
-   ```
-
-**Detection:** Badge count doesn't update, or shows wrong number after actions.
-
-**Phase to address:** Phase 5 (In-App Notifications) - UI layer.
-
----
-
-### Pitfall 6: Threshold Configuration Without Validation
-
-**What goes wrong:** Users can set thresholds that make no sense (yellow > red, negative values, thresholds beyond data range). Leads to constant false positives or notifications never triggering.
+**Consequences:**
+- Generated schema missing critical functionality
+- Round-trip (introspect -> generate -> apply) corrupts schema
+- Triggers/functions silently dropped during migration
 
 **Prevention:**
-1. **Validation in threshold settings form**
-   ```javascript
-   const thresholdSchema = z.object({
-     kpi_name: z.string(),
-     yellow_threshold: z.number().positive(),
-     red_threshold: z.number().positive(),
-   }).refine(data => {
-     // Yellow must be better than red
-     if (data.kpi_name === 'mttr_vh') {
-       return data.yellow_threshold < data.red_threshold; // Lower is better
-     } else if (data.kpi_name === 'backlog_health_score') {
-       return data.yellow_threshold > data.red_threshold; // Higher is better
-     }
-     return true;
-   }, {
-     message: "Threshold ordering is invalid"
-   });
-   ```
-
-2. **Store threshold direction metadata**
-   ```javascript
-   const KPI_METADATA = {
-     mttr_vh: {
-       direction: 'lower_is_better',
-       unit: 'hours',
-       typical_range: [0, 48]
-     },
-     backlog_health_score: {
-       direction: 'higher_is_better',
-       unit: 'score',
-       typical_range: [0, 100]
-     }
-   };
-   ```
-
-3. **Show suggested thresholds based on historical data**
-   ```javascript
-   // Calculate p75, p90 from last 12 weeks
-   // Suggest yellow = p75, red = p90
-   ```
-
-**Detection:** Users report "never getting alerts" or "getting alerts when things look fine".
-
-**Phase to address:** Phase 6 (Threshold UI) - add validation before allowing input.
-
----
-
-### Pitfall 7: Missing Historical Context in Alerts
-
-**What goes wrong:** Email says "MTTR is 36 hours" but doesn't show if this is getting better, worse, or how it compares to average. User can't assess urgency without opening dashboard.
-
-**Prevention:**
-1. **Include trend context in email**
-   ```javascript
-   emailTemplate = `
-     MTTR for Very High priority bugs: 36 hours (RED)
-     - Your threshold: 24 hours
-     - Last week: 28 hours (↑ 29%)
-     - 4-week average: 22 hours
-
-     This is the worst MTTR in 8 weeks. [View Dashboard →]
-   `;
-   ```
-
-2. **Inline sparkline charts in email (optional)**
-   - Use Chart.js or similar to generate PNG
-   - Embed as inline image in HTML email
-
-3. **Link directly to relevant chart**
-   ```javascript
-   const dashboardLink = `${frontendUrl}/bugs?highlight=mttr_vh&scroll=trends`;
-   ```
-
-**Detection:** Email click-through rates are low (users can't tell if they need to act).
-
-**Phase to address:** Phase 4 (Notification Logic) - enhance email content.
-
----
-
-### Pitfall 8: Performance Degradation on Weekly Upload
-
-**What goes wrong:** CSV upload takes 30+ seconds once you add:
-- Historical KPI calculations for trends
-- Notification threshold checks
-- Email sending
-All running synchronously in the upload request.
-
-**Prevention:**
-1. **Split upload into phases**
-   ```javascript
-   async uploadCSV(userId, fileBuffer, filename, weekEnding) {
-     // Phase 1: Parse and store (synchronous)
-     const uploadId = await this.storeUploadData(userId, fileBuffer, ...);
-
-     // Phase 2: Background processing
-     // Don't await - return immediately to user
-     this.processUploadBackground(uploadId, userId).catch(err => {
-       logger.error('Background processing failed', { uploadId, error: err });
-     });
-
-     return { uploadId, status: 'processing' };
-   }
-
-   async processUploadBackground(uploadId, userId) {
-     // Calculate KPIs
-     await this.calculateKPIs(uploadId);
-
-     // Check thresholds and send notifications
-     await this.checkThresholdsAndNotify(uploadId, userId);
-   }
-   ```
-
-2. **Add processing status to bug_uploads table**
+1. **Query `pg_catalog` directly for PostgreSQL features**:
    ```sql
-   ALTER TABLE bug_uploads ADD COLUMN processing_status VARCHAR(20) DEFAULT 'pending';
-   -- Values: 'pending', 'calculating', 'complete', 'error'
+   -- Get array columns
+   SELECT column_name, udt_name FROM information_schema.columns
+   WHERE data_type = 'ARRAY';
+
+   -- Get triggers
+   SELECT * FROM pg_trigger WHERE tgrelid = 'tablename'::regclass;
    ```
+2. **Build PostgreSQL-specific schema model**: Not a generic database model
+3. **Preserve unknown/complex elements**: If introspection can't model it, preserve verbatim
+4. **Test round-trip integrity**: Introspect -> Generate SQL -> Compare to original
 
-3. **Show processing indicator in UI**
-   ```javascript
-   if (upload.processing_status === 'pending') {
-     return <div>Calculating KPIs... <Loader2 className="animate-spin" /></div>;
-   }
-   ```
+**Detection (warning signs):**
+- Schema model uses generic "type: string" instead of PostgreSQL types
+- No handling for arrays, JSONB, or extensions
+- information_schema is only data source
 
-**Detection:** CSV upload request takes >10 seconds, UI feels sluggish.
-
-**Phase to address:** Phase 2 (Data Model) - design for async from start.
+**Phase to address:** Phase 1 (Foundation) - Design schema model with PostgreSQL specifics
 
 ---
 
-### Pitfall 9: No Notification Unsubscribe Mechanism
+### Pitfall 5: Graph Visualization Performance Collapse
 
-**What goes wrong:** Users have no way to disable notifications except contacting support. Violates email best practices and could flag as spam.
+**What goes wrong:** With 20+ entities (tables), the graph editor becomes:
+- Sluggish during drag/pan/zoom
+- Unusable for selection
+- Laggy when adding/removing nodes
+
+**Why it happens:**
+- React re-renders all nodes on any state change
+- Custom node components not memoized
+- Expensive calculations in render cycle
+- CSS shadows/gradients on every node
+
+**Consequences:**
+- Users avoid the visual editor
+- Browser tab becomes unresponsive
+- Feature abandoned due to poor UX
 
 **Prevention:**
-1. **Add notification preferences to user settings**
-   ```javascript
-   // In existing UserSettingsService
-   notification_preferences: {
-     email_enabled: true,
-     threshold_alerts: ['mttr_vh', 'sla_compliance'], // Which KPIs to alert on
-     frequency: 'immediate', // or 'daily_digest'
-   }
+1. **Memoize aggressively**:
+   ```jsx
+   const TableNode = React.memo(({ data }) => { ... });
    ```
+2. **Use `useCallback` for all handlers passed to ReactFlow**
+3. **Avoid inline objects/functions**: Create stable references
+4. **Simplify node styling**: Remove shadows, gradients, animations for 20+ nodes
+5. **Implement node collapsing**: Hide column details when zoomed out
+6. **Use virtualization**: ReactFlow does this by default, don't override
+7. **Lazy-load edge rendering**: Only render visible edges
 
-2. **Unsubscribe link in every email**
-   ```javascript
-   emailTemplate += `
-     <hr>
-     <small>
-       <a href="${frontendUrl}/settings/notifications?token=${unsubToken}">
-         Manage notification preferences
-       </a>
-     </small>
-   `;
-   ```
+**Detection (warning signs):**
+- No `React.memo` in node component code
+- Inline callbacks in ReactFlow props
+- Complex CSS on node elements
 
-3. **One-click unsubscribe (RFC 8058)**
-   ```javascript
-   headers: {
-     'List-Unsubscribe': `<${apiUrl}/unsubscribe?token=${token}>`,
-     'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
-   }
-   ```
+**Phase to address:** Phase 3 (Visual Editor) - Performance testing from day one
 
-**Detection:** Users report "can't turn off emails" or mark emails as spam.
+---
 
-**Phase to address:** Phase 4 (Notification Logic) - must have before sending to users.
+### Pitfall 6: Schema Diff Algorithm False Positives
+
+**What goes wrong:** Diff algorithm reports changes that don't exist:
+- Column order changes (databases don't care)
+- Default value formatting differences (`now()` vs `CURRENT_TIMESTAMP`)
+- Constraint name differences (auto-generated vs user-defined)
+- Whitespace in CHECK constraints
+
+**Why it happens:**
+- String comparison of SQL instead of semantic comparison
+- Database normalizes SQL on storage differently than input
+- Different introspection methods return different formats
+
+**Consequences:**
+- User confused by "phantom changes"
+- Unnecessary migrations generated
+- Trust in tool eroded
+
+**Prevention:**
+1. **Normalize before comparing**:
+   - Ignore column order (not semantically meaningful in PostgreSQL)
+   - Canonicalize default values
+   - Compare constraint semantics, not SQL text
+2. **Use database's own normalization**: Compare `pg_get_constraintdef()` output
+3. **Filter known false positives**: Column order, case differences, formatting
+4. **Show confidence level**: "Likely change" vs "Definite change"
+
+**Detection (warning signs):**
+- Diff based on string comparison of CREATE TABLE statements
+- No normalization layer
+- Testing only with simple schemas
+
+**Phase to address:** Phase 2 (Migration Generator) - Build normalization into diff engine
+
+---
+
+### Pitfall 7: Unnamed Constraints Make Diff Unreliable
+
+**What goes wrong:** PostgreSQL auto-generates constraint names like `tasks_pkey` or `tasks_check`. When comparing schemas:
+- Different databases generate different names
+- Constraint appears as "removed and added" instead of "unchanged"
+- Migration generates DROP + CREATE unnecessarily
+
+**Why it happens:**
+- PostgreSQL doesn't enforce unique constraint names across schemas
+- Auto-generated names include table/column info that may vary
+- Diff algorithm uses name as identity
+
+**Consequences:**
+- Unnecessary constraint recreation
+- Brief window of missing constraints
+- Index rebuilds cause performance issues
+
+**Prevention:**
+1. **Identify constraints by structure, not name**:
+   - Match by columns involved + constraint type
+   - Name is metadata, not identity
+2. **Recommend naming all constraints**: Lint warning for unnamed constraints
+3. **Preserve auto-generated names**: Don't try to rename unless requested
+
+**Detection (warning signs):**
+- Constraint comparison uses `constraint_name` as primary key
+- No structural matching fallback
+- Tests use only manually-named constraints
+
+**Phase to address:** Phase 2 (Migration Generator) - Constraint matching logic
 
 ---
 
 ## Minor Pitfalls
 
-Mistakes that cause annoyance but are easily fixable.
+Mistakes that cause annoyance but are fixable.
 
-### Pitfall 10: Chart Accessibility Issues
+### Pitfall 8: Confusing Visual Editor Interactions
 
-**What goes wrong:** Charts are pure visual (SVG) without text alternatives. Screen readers can't interpret data, keyboard navigation doesn't work.
+**What goes wrong:**
+- Users don't know how to add relationships (double-click? drag? menu?)
+- Column editing requires too many clicks
+- Undo doesn't work as expected
+- Selection feedback unclear
+
+**Why it happens:**
+- No established conventions for schema editors
+- Developer assumes familiarity with graph tools
+- Insufficient user testing
 
 **Prevention:**
-1. **Add ARIA labels to charts**
-   ```javascript
-   <ResponsiveContainer aria-label="MTTR trend chart showing weekly values">
-     <LineChart data={data} aria-describedby="chart-description">
-       ...
-     </LineChart>
-   </ResponsiveContainer>
-   <div id="chart-description" className="sr-only">
-     Line chart showing MTTR trend over 12 weeks, from {firstWeek} to {lastWeek}.
-     Current value is {currentValue} hours.
-   </div>
-   ```
+1. **Provide multiple interaction paths**: Right-click menu + keyboard shortcuts + toolbar
+2. **Use familiar patterns**: Drag to create relationship (like ERD tools)
+3. **Implement full undo/redo**: Track all changes in history stack
+4. **Clear selection states**: Visual distinction for selected/hovered/edited
+5. **Onboarding hints**: First-run tooltips showing key interactions
 
-2. **Provide data table alternative**
-   ```javascript
-   <details>
-     <summary>View data table</summary>
-     <table>
-       <thead><tr><th>Week</th><th>Value</th></tr></thead>
-       <tbody>
-         {data.map(d => <tr><td>{d.week}</td><td>{d.value}</td></tr>)}
-       </tbody>
-     </table>
-   </details>
-   ```
+**Detection (warning signs):**
+- Single interaction method per action
+- No undo system in scope
+- No user testing planned
 
-**Detection:** Run Lighthouse accessibility audit, or test with screen reader.
-
-**Phase to address:** Phase 2 (Chart Implementation) - add as part of component creation.
+**Phase to address:** Phase 3 (Visual Editor) - UX design before implementation
 
 ---
 
-### Pitfall 11: Date/Time Zone Confusion in Trends
+### Pitfall 9: Foreign Key Visualization Becomes Spaghetti
 
-**What goes wrong:** CSV uploaded in timezone A, displayed in timezone B, weekly groupings get misaligned (Friday bugs show up in next week).
+**What goes wrong:** With many relationships, edges overlap and obscure the graph. Users can't trace relationships or understand table connections.
+
+**Why it happens:**
+- Default edge routing draws straight lines
+- No edge bundling or routing optimization
+- All edges rendered with same style
+
+**Consequences:**
+- Graph becomes unreadable
+- Users miss important relationships
+- Visual editor provides no value over text view
 
 **Prevention:**
-1. **Store all dates in UTC** (already done in schema: `created_date TIMESTAMP`)
-2. **Week boundaries use UTC** (Saturday 00:00 UTC = end of week)
-3. **Display in user's timezone, but calculate in UTC**
-   ```javascript
-   // In chart data transformation
-   const weekLabel = formatInTimeZone(
-     new Date(row.week_ending),
-     userTimezone,
-     'MMM d'
-   );
-   ```
+1. **Use edge routing**: Orthogonal (right-angle) edges are clearer than bezier
+2. **Implement edge bundling**: Group parallel edges
+3. **Edge highlighting on hover**: Dim unrelated edges
+4. **Auto-layout options**: Dagre, ELK for hierarchical layouts
+5. **Allow manual edge routing**: User-defined control points
 
-4. **Document timezone behavior in UI**
-   ```
-   "All dates displayed in your local timezone (PST).
-    Weekly boundaries calculated in UTC."
-   ```
+**Detection (warning signs):**
+- Using default ReactFlow edge styles
+- No layout algorithm integration
+- Testing with < 5 tables only
 
-**Detection:** Users report "bugs from Friday showing in wrong week".
-
-**Phase to address:** Phase 2 (Chart Implementation) - clarify from start.
+**Phase to address:** Phase 3 (Visual Editor) - Edge rendering system
 
 ---
 
-### Pitfall 12: No Loading States for Trend Charts
+### Pitfall 10: Migration File Naming Conflicts
 
-**What goes wrong:** Trend chart area is blank for 2-3 seconds during data fetch, users think it's broken.
+**What goes wrong:** Generated migration files have naming collisions:
+- Two developers generate migrations with same timestamp
+- Manual and generated migrations in wrong order
+- Descriptive names too long for filesystem
+
+**Why it happens:**
+- Timestamp-based naming with second precision
+- No coordination between developers
+- Mixing migration generation styles
 
 **Prevention:**
-1. **Chart skeleton loader**
-   ```javascript
-   {trendDataLoading ? (
-     <Card>
-       <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
-       <CardContent>
-         <Skeleton className="h-64 w-full" />
-       </CardContent>
-     </Card>
-   ) : (
-     <TrendChart data={trendData} />
-   )}
-   ```
+1. **Use version prefix**: `028_add_new_column.sql` (sequential with project migrations)
+2. **Read existing migrations**: Next version = max(existing) + 1
+3. **Validate on generation**: Warn if version already exists
+4. **Safe file names**: Limit length, sanitize special characters
 
-2. **Stale-while-revalidate pattern**
-   ```javascript
-   // Show cached data immediately, fetch in background
-   const [data, setData] = useState(cachedData);
-   useEffect(() => {
-     fetchTrendData().then(fresh => {
-       setData(fresh);
-       updateCache(fresh);
-     });
-   }, [filters]);
-   ```
+**Detection (warning signs):**
+- Timestamp-only naming
+- No check for existing migration files
+- No versioning scheme defined
 
-**Detection:** Blank chart areas during loading.
-
-**Phase to address:** Phase 2 (Chart Implementation) - add with initial component.
+**Phase to address:** Phase 2 (Migration Generator) - File naming conventions
 
 ---
+
+## Project-Specific Pitfalls
+
+Issues specific to building this tool inside P&E Manager.
+
+### Pitfall 11: Self-Referential Danger
+
+**What goes wrong:** The Entity Model Editor manages the same database it runs on. User could:
+- Drop the `migrations` table
+- Modify the `users` table breaking authentication
+- Alter columns that the editor's own queries depend on
+
+**Why it happens:**
+- Tool has full database access
+- No distinction between "system tables" and "user tables"
+- Power corrupts (with great introspection comes great responsibility)
+
+**Prevention:**
+1. **Mark system tables as protected**:
+   - `migrations` - Never allow modification
+   - `users` - Warn before any change
+   - Core tables critical to app function
+2. **Show protection status in UI**: Lock icon on protected tables
+3. **Require elevated permission for system table changes**
+4. **Test with "what if I modify migrations table" scenario**
+
+**Detection (warning signs):**
+- No table classification system
+- All tables treated equally
+- No "system vs user" distinction
+
+**Phase to address:** Phase 1 (Foundation) - Table classification system
+
+---
+
+### Pitfall 12: Existing Migration System Compatibility
+
+**What goes wrong:** P&E Manager already has 27 migrations in `server/db/`. Generated migrations:
+- Use different naming convention
+- Don't integrate with existing `migrate.js`
+- Create parallel migration history
+
+**Why it happens:**
+- Greenfield migration generator design
+- Didn't analyze existing system
+- Two migration sources = confusion
+
+**Prevention:**
+1. **Integrate with existing system**: Generate migrations compatible with `MIGRATIONS` array in `migrate.js`
+2. **Match existing conventions**: `028_description.sql` format
+3. **Update `migrate.js` array**: Or generate a JSON manifest
+4. **Single source of truth**: All migrations in same directory, same format
+
+**Detection (warning signs):**
+- New migration folder/format in design
+- No analysis of existing `migrate.js`
+- "We'll handle compatibility later"
+
+**Phase to address:** Phase 2 (Migration Generator) - Compatibility with existing system
+
+---
+
+## Confidence Assessment
+
+| Area | Confidence | Source |
+|------|------------|--------|
+| PostgreSQL introspection | HIGH | Official PostgreSQL docs, existing P&E schema analysis |
+| React Flow performance | HIGH | Official React Flow docs + GitHub discussions |
+| Migration safety patterns | HIGH | Prisma, Graphile-migrate, Atlas official docs |
+| Schema diff edge cases | MEDIUM | Knex.js docs + constraint documentation |
+| UX patterns | MEDIUM | General graph editor patterns, limited domain-specific sources |
+
+## Sources
+
+- [PostgreSQL information_schema documentation](https://www.postgresql.org/docs/current/information-schema.html) - Constraint naming, PostgreSQL-specific features
+- [React Flow Performance Guide](https://reactflow.dev/learn/advanced-use/performance) - Memoization, re-render prevention
+- [React Flow GitHub Discussions](https://github.com/xyflow/xyflow/discussions) - Real-world performance issues at scale
+- [Prisma Shadow Database](https://www.prisma.io/docs/orm/prisma-migrate/understanding-prisma-migrate/shadow-database) - Validation patterns for migrations
+- [Graphile-migrate](https://github.com/graphile/migrate) - Safety mechanisms, hash verification
+- [Atlas Dev Database](https://atlasgo.io/concepts/dev-database) - Pre-validation workflow
+- [Knex.js Migrations](https://knexjs.org/guide/migrations.html) - Lock management, transaction pitfalls
+- Existing P&E Manager codebase (`server/db/schema.sql`, `server/db/migrate.js`) - Current migration patterns
 
 ## Phase-Specific Warnings
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|-------------|---------------|------------|
-| Phase 1: Data Model | Time series schema mismatch (Pitfall 1) | Normalize KPI data into time-series table before implementing charts |
-| Phase 2: Trend Charts | Chart re-render thrashing (Pitfall 2) | Memoize data transformations, use React.memo, limit data points |
-| Phase 3: Email Setup | Silent email failures (Pitfall 3) | Configure SAP BTP Mail service, add email queue with retries |
-| Phase 4: Notification Logic | Notification spam (Pitfall 4) | Implement deduplication, batching, and rate limiting |
-| Phase 5: In-App Notifications | State management chaos (Pitfall 5) | Use existing NotificationService + React Context |
-| Phase 6: Threshold UI | Invalid threshold configs (Pitfall 6) | Add validation, show suggested values, prevent nonsensical inputs |
-| Phase 7: Testing | Performance regression on upload (Pitfall 8) | Move heavy calculations to background, add status tracking |
-
----
-
-## Critical Integration Points (Existing System)
-
-**Don't break these:**
-
-1. **Weekly CSV upload workflow**
-   - Current: Synchronous parse → store → calculate → return
-   - With trends: Must stay under 10s for UX, move heavy work to background
-
-2. **BugService.calculateKPIs() is called on every upload**
-   - Currently stores in JSONB (`weekly_kpis.kpi_data`)
-   - Must also populate normalized time-series table for trend queries
-
-3. **Existing notification infrastructure** (NotificationService + routes)
-   - Don't create duplicate notification system
-   - Extend for threshold alerts
-
-4. **Multi-tenancy via user_id**
-   - All time-series queries MUST filter by user_id
-   - All notifications MUST filter by user_id
-   - Email queue MUST be per-user
-
-5. **Recharts already used** (MTTRBarChart, BugCategoryChart)
-   - Performance patterns established (ResponsiveContainer, Cell colors)
-   - Use same patterns for trend charts
-
----
-
-## Sources and Confidence
-
-**Confidence:** HIGH - Based on codebase analysis and domain knowledge of:
-- PostgreSQL time-series data modeling
-- React performance optimization (Recharts memoization)
-- Email notification systems in Node.js/Express
-- SAP BTP Cloud Foundry deployment constraints
-
-**Evidence:**
-- Analyzed existing BugService.js (weekly upload pattern, JSONB KPI storage)
-- Analyzed existing BugDashboard.jsx (filter state management, Recharts usage)
-- Analyzed existing NotificationService (infrastructure already present)
-- Analyzed database schema (019_bug_dashboard.sql - no time-series indexes)
-- Reviewed package.json (Recharts 2.15.1, React 18.2.0, pg 8.11.3)
-
-**Low confidence areas:**
-- SAP BTP Mail service configuration specifics (would need to verify service catalog)
-- Exact email delivery rates and spam filter behavior (depends on domain reputation)
-
-These pitfalls are specific to this project's architecture (weekly CSV uploads, PostgreSQL JSONB KPIs, Recharts on React, SAP BTP deployment) and reflect actual integration challenges, not generic advice.
+| Phase | Likely Pitfall | Mitigation |
+|-------|---------------|------------|
+| Phase 1: Foundation | Pitfall 4 (PG features lost) | Design PostgreSQL-specific schema model from start |
+| Phase 1: Foundation | Pitfall 11 (Self-referential) | Classify tables as system/user immediately |
+| Phase 2: Migrations | Pitfall 1 (Destructive ops) | Build confirmation gates before any DROP generation |
+| Phase 2: Migrations | Pitfall 3 (Break running app) | Workflow design with dev-first testing |
+| Phase 2: Migrations | Pitfall 12 (Compatibility) | Analyze and match existing migrate.js patterns |
+| Phase 3: Visual | Pitfall 5 (Performance) | Performance budget from day one, test with 20+ tables |
+| Phase 3: Visual | Pitfall 9 (Edge spaghetti) | Edge routing and layout algorithms in initial design |

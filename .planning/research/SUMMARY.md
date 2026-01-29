@@ -1,229 +1,171 @@
 # Project Research Summary
 
-**Project:** P&E Manager v1.7 Menu Clustering
-**Domain:** Collapsible folder navigation for React sidebar with drag-and-drop configuration
+**Project:** P&E Manager v1.8 Entity Model Editor
+**Domain:** Visual Database Schema Management Tool
 **Researched:** 2026-01-29
 **Confidence:** HIGH
 
 ## Executive Summary
 
-Menu clustering is a low-risk, high-leverage feature that requires **zero new dependencies**. The existing P&E Manager codebase already contains every library and pattern needed: `@radix-ui/react-collapsible` (v1.1.3) for expand/collapse behavior, `@dnd-kit/core` + `@dnd-kit/sortable` (v6.3.1/v10.0.0) for drag-and-drop item assignment, shadcn/ui sidebar components with `SidebarMenuSub` for nested items, and the `user_settings` table for persisting configuration per user. The architecture integrates cleanly with existing patterns like `AppModeContext` and `UserSettingsService`.
+The Entity Model Editor is a visual schema management tool for PostgreSQL that follows a well-established pattern: introspect current database state, allow users to define a target schema visually, compare the two states, and generate migration SQL. Research across pgAdmin ERD, DBeaver, dbdiagram.io, Prisma, and Drizzle confirms the core workflow is consistent: **view current -> define target -> preview diff -> generate migration**. The user's preference for "form-based with live graph preview" aligns perfectly with how successful tools like dbdiagram.io approach this problem.
 
-The recommended approach is to store menu configuration as JSON in the existing `user_settings` table (keys: `menu_config_people`, `menu_config_product`), introduce a `NavigationContext` for app-wide state management, and add a "Navigation" tab to Settings.jsx for folder CRUD and item assignment. The flat navigation arrays in Layout.jsx will be transformed to a hierarchical structure using `HierarchicalNavigation` and `CollapsibleFolder` components. This approach maintains backward compatibility: users without custom configuration see the existing flat navigation.
+The recommended approach maximizes reuse of the existing P&E Manager stack. PostgreSQL's native `information_schema` and `pg_catalog` provide complete schema introspection without new libraries. The only new dependency is @xyflow/react (formerly React Flow) for graph visualization — a battle-tested library with 3.85M weekly downloads. Migration SQL generation uses custom implementation rather than adopting an ORM, maintaining compatibility with the existing `server/db/migrate.js` system.
 
-The primary risks are (1) breaking the People/Product mode toggle with shared configuration, (2) dnd-kit ID collisions when rendering drag overlays, and (3) accessibility regression by removing keyboard navigation. All three are well-documented pitfalls with established prevention patterns. The mode separation must be designed into the data model from day one (separate configs per mode). Drag overlay components must be presentational-only (no `useSortable` hooks). Keyboard and screen reader support must be explicitly tested, not assumed from library defaults.
+The primary risks are architectural: (1) destructive operations must have confirmation gates since this tool modifies the database it runs on, (2) introspection queries must not block the running application, and (3) generated migrations must integrate with the existing 27-migration system, not create a parallel one. These risks are well-understood and mitigatable with proper phase ordering — build safety gates and backend foundation before the visual editor.
 
 ## Key Findings
 
 ### Recommended Stack
 
-**No new dependencies required.** All capabilities are already installed and in use elsewhere in the codebase.
+The stack additions are minimal and targeted. Only one new npm package is required.
 
-**Core technologies (already installed):**
-- `@radix-ui/react-collapsible` (v1.1.3): Folder expand/collapse behavior with ARIA compliance
-- `@dnd-kit/core` + `@dnd-kit/sortable` (v6.3.1/v10.0.0): Drag-and-drop for item assignment to folders
-- `user_settings` table + `UserSettingsService`: Backend persistence of configuration
-- shadcn/ui sidebar components (`SidebarMenuSub`, `SidebarMenuSubItem`): Nested navigation styling
+**Core technologies:**
+- **PostgreSQL information_schema + pg_catalog:** Schema introspection — native SQL queries via existing `pg` library, no new dependency
+- **@xyflow/react v12.10.0:** Graph visualization — MIT-licensed, React-native, built-in ER diagram support, excellent customization
+- **Custom SQL generator:** Migration generation — matches existing migrate.js pattern, no ORM lock-in
 
-**Libraries to NOT add:**
-- react-beautiful-dnd (deprecated, @dnd-kit is already superior and installed)
-- framer-motion for collapse (Radix Collapsible handles this)
-- react-sortable-hoc (legacy, @dnd-kit is the modern replacement)
+**Technologies NOT to add:**
+- No Prisma, TypeORM, or Knex (would require ORM adoption, conflicts with raw-pg approach)
+- No pg-introspection (overkill, native queries are simpler)
+- No vis-network or d3 raw (less React-native than @xyflow/react)
 
 ### Expected Features
 
 **Must have (table stakes):**
-- Collapse/expand folders with visual indicator (chevron rotation)
-- Persist folder open/closed state across sessions (localStorage)
-- Create, rename, and delete folders via Settings UI
-- Assign/unassign items to folders
-- Separate folder configurations for People and Product modes
-- Ungrouped items remain visible at root level
-- Items return to root on folder delete (not deleted)
+- Entity boxes displaying tables with columns, types, PK indicators
+- FK relationship lines with cardinality notation
+- Load current schema from database via introspection
+- Add/edit entities and fields via forms (user requirement)
+- Current vs target schema comparison view
+- Generate CREATE/ALTER/DROP SQL statements
+- Preview and copy generated SQL
 
 **Should have (differentiators):**
-- Drag-and-drop folder reordering in Settings
-- Drag-and-drop item assignment (vs. dropdown selection)
-- Folder item count badges on collapsed folders
-- "Reset to default" option in Settings
+- Live preview while editing forms (dbdiagram.io's killer feature)
+- Data-safe migration warnings for destructive changes
+- Undo/redo history for confidence to experiment
+- Migration ordering to handle FK dependencies automatically
+- Table grouping and color coding by domain
 
 **Defer (v2+):**
-- Folder icons and color customization
-- Nested folders (folders within folders)
-- Real-time sync across devices (localStorage is sufficient for v1)
-- Accordion mode (only one folder open at a time)
+- DBML text input/parser (high complexity, marginal benefit)
+- Rollback SQL generation
+- Direct execution from UI (dangerous)
+- Multiple notation styles (crow's foot vs Chen)
+- Support for triggers/functions editing
 
 ### Architecture Approach
 
-The architecture follows existing P&E Manager patterns: a React Context (`NavigationContext`) provides menu configuration to Layout.jsx and Settings.jsx, backed by the `user_settings` table via `UserSettingsService`. Configuration is loaded on auth, stored as JSON, and updated optimistically with background persistence. The data model separates folder structure from expanded state: structure is persisted to backend, expanded state is local (localStorage) since it's transient UI preference.
+The Entity Model Editor integrates into P&E Manager as a new feature area, following established patterns: PostgreSQL backend with service class, REST routes, React frontend with Context provider. The key architectural decision is to generate migration files for manual review rather than executing DDL directly — this maintains safety and integrates with the existing git-tracked migration workflow.
 
 **Major components:**
-1. **NavigationContext** (new): Centralize menu config state, load from backend, provide `createFolder`, `moveItemToFolder`, `deleteFolder` operations
-2. **HierarchicalNavigation** (new): Transform flat array to folder/item hierarchy, render in Layout.jsx
-3. **CollapsibleFolder** (new): Wrap Radix Collapsible with sidebar styling, handle active item highlighting within folders
-4. **NavigationSettings** (new): Settings tab for folder CRUD and item assignment
-5. **Layout.jsx** (modify): Replace flat navigation map with HierarchicalNavigation component
+1. **SchemaService** (`server/services/SchemaService.js`) — introspection queries, model CRUD, diff calculation, SQL generation
+2. **Schema Routes** (`server/routes/schema.js`) — REST endpoints for introspection, models, comparison, migration preview
+3. **entity_models table** — stores target schema definitions as JSONB with visual layout positions
+4. **EntityModelContext** (`src/contexts/EntityModelContext.jsx`) — manages editor state, selection, local changes before save
+5. **Visual Editor Components** (`src/components/schema/`) — EntityBox, FieldForm, SchemaCanvas, MigrationPreview
 
 ### Critical Pitfalls
 
-1. **ID collision in DragOverlay with useSortable** — Create separate presentational components for drag overlays; never render a component that calls `useSortable` inside `<DragOverlay>`
-
-2. **Breaking mode switching (People/Product)** — Store separate configs per mode (`menu_config_people`, `menu_config_product`); never share folder state between modes
-
-3. **SortableContext items array mismatch** — Derive items array from the same source as render order; use `useMemo` for sorting, never sort inline during render
-
-4. **Orphaned items on folder delete** — Use `ON DELETE SET NULL` in foreign key or explicitly move items to root before deleting folder; always confirm with user and preview behavior
-
-5. **Accessibility regression** — Explicitly add keyboard support for folder expand/collapse; customize dnd-kit announcements for screen readers; manage focus after drag operations
+1. **Destructive operations without confirmation gates** — User could drop columns or tables instantly; generated migrations must be file output only, never execute directly; require multi-step confirmation for any DROP operations
+2. **Live introspection breaking running app** — Cache schema metadata aggressively, use separate connection, set statement timeout; introspection should be manual/on-demand, not automatic
+3. **Generated migration breaks running application** — Schema editor doesn't know app code state; require dev-first workflow (generate -> apply to dev -> test -> then production)
+4. **PostgreSQL features lost in introspection** — Must query pg_catalog for arrays, JSONB, triggers; build PostgreSQL-specific model, not generic database model
+5. **Self-referential danger** — This tool manages the database it runs on; mark system tables (migrations, users) as protected; show lock icons, require elevated confirmation
 
 ## Implications for Roadmap
 
 Based on research, suggested phase structure:
 
-### Phase 1: Data Layer and Context
+### Phase 1: Backend Foundation
+**Rationale:** All other phases depend on introspection and storage; must establish safety patterns from day one
+**Delivers:** Schema introspection API, entity_models table, SchemaService with CRUD
+**Addresses:** Load current schema (table stakes), PostgreSQL-specific introspection
+**Avoids:** Pitfall 2 (introspection blocking app), Pitfall 4 (PG features lost), Pitfall 11 (self-referential danger)
 
-**Rationale:** Data model must encode mode separation from day one to prevent Pitfall 4 (breaking mode switching). Context provides foundation for all subsequent UI work.
+### Phase 2: Frontend Data Layer
+**Rationale:** Cannot build visual editor without data flow; API client and Context enable component development
+**Delivers:** EntityModel API client, EntityModelContext, model loading/saving
+**Uses:** SchemaService from Phase 1
+**Implements:** Data flow architecture, multi-tenancy enforcement
 
-**Delivers:**
-- `NavigationContext.jsx` with default configs for People and Product modes
-- `useNavigation()` hook for consuming context
-- Integration with `UserSettingsService` for backend persistence
-- Loading/saving config via `UserSettings.get()/set()`
+### Phase 3: Form-Based Editing
+**Rationale:** User explicitly prefers forms over pure drag-drop; forms are simpler to implement than canvas
+**Delivers:** Entity form, field form, relationship form; basic schema manipulation without visual canvas
+**Addresses:** Add/edit entities via form (table stakes), field definition, relationship builder
+**Avoids:** Delaying usable functionality while building complex visual editor
 
-**Addresses:** Config persistence (table stake), mode-specific groupings (table stake)
+### Phase 4: Visual Canvas
+**Rationale:** Depends on data layer and basic editing; performance must be designed in from start
+**Delivers:** @xyflow/react canvas, EntityBox nodes, FK edge rendering, auto-layout
+**Uses:** @xyflow/react v12.10.0
+**Avoids:** Pitfall 5 (performance collapse), Pitfall 9 (edge spaghetti)
 
-**Avoids:** Pitfall 4 (mode confusion), Pitfall 9 (sync conflicts)
+### Phase 5: Diff and Migration
+**Rationale:** Core value proposition; requires both current introspection and target model from earlier phases
+**Delivers:** Schema comparison, diff highlighting, SQL generation, migration file output
+**Addresses:** Current vs target comparison (table stakes), generate migration SQL (table stakes)
+**Avoids:** Pitfall 1 (destructive ops), Pitfall 6 (false positives), Pitfall 12 (compatibility with existing migrate.js)
 
-### Phase 2: Collapsible Folder Rendering
-
-**Rationale:** Core visible feature; must work before Settings UI can configure it. Depends on Phase 1 context being complete.
-
-**Delivers:**
-- `CollapsibleFolder.jsx` component using Radix Collapsible
-- `HierarchicalNavigation.jsx` to transform flat array to hierarchy
-- Modified `Layout.jsx` to consume NavigationContext
-- Active item highlighting within folders
-- Local expanded state persistence (localStorage)
-
-**Uses:** @radix-ui/react-collapsible, shadcn/ui sidebar primitives
-
-**Implements:** HierarchicalNavigation, CollapsibleFolder components
-
-**Avoids:** Pitfall 6 (animation jank) by using Radix Collapsible's built-in animation
-
-### Phase 3: Settings UI (Basic)
-
-**Rationale:** Users need UI to create/delete folders and assign items. Basic functionality without drag-drop is faster to build and lower risk.
-
-**Delivers:**
-- "Navigation" tab in Settings.jsx
-- Folder CRUD: create, rename, delete folders
-- Item assignment via dropdown or click-to-assign
-- Reset to defaults button
-- Delete confirmation with preview (shows items will move to root)
-
-**Addresses:** Create folders, delete folders, assign items (all table stakes)
-
-**Avoids:** Pitfall 8 (orphaned items) by showing confirmation with behavior preview
-
-### Phase 4: Settings UI (Drag-and-Drop Enhancement)
-
-**Rationale:** Drag-and-drop is differentiator, not table stake. Building on working basic UI reduces risk. dnd-kit patterns already exist in SubtaskList.jsx.
-
-**Delivers:**
-- Drag-and-drop item assignment to folders
-- Folder reordering via drag-and-drop
-- Item reordering within folders
-- Touch device support with proper sensor configuration
-
-**Uses:** @dnd-kit/core, @dnd-kit/sortable (reuse SubtaskList patterns)
-
-**Avoids:** Pitfall 1 (ID collision) by using presentational overlay components; Pitfall 2 (items array mismatch) by deriving from single source; Pitfall 7 (stale closures) by using functional state updates
-
-### Phase 5: Accessibility and Polish
-
-**Rationale:** Accessibility must be explicitly verified, not assumed. Polish items improve UX but are not blockers.
-
-**Delivers:**
-- Keyboard navigation for folders (Tab, Enter/Space to expand)
-- Custom dnd-kit announcements for screen readers
-- Focus management after drag operations
-- Empty folder visual treatment
-- Expand all / Collapse all buttons (optional)
-
-**Addresses:** Keyboard navigation (differentiator), accessibility compliance
-
-**Avoids:** Pitfall 5 (accessibility regression)
+### Phase 6: Polish and Safety
+**Rationale:** Refinement after core functionality works
+**Delivers:** Live preview while editing, undo/redo, data-safe warnings, protected table indicators
+**Addresses:** Should-have differentiators
 
 ### Phase Ordering Rationale
 
-- **Phase 1 before Phase 2:** Context must exist before components can consume it
-- **Phase 2 before Phase 3:** Must be able to see folders before configuring them (validates architecture)
-- **Phase 3 before Phase 4:** Basic CRUD is table stakes; drag-drop is enhancement layer
-- **Phase 5 last:** Accessibility testing happens on working feature, not incrementally (but guidelines should inform Phase 2-4 development)
-
-**Alternative condensed approach:** Phases 3 and 4 can be merged if drag-and-drop is considered essential from start. However, separating them reduces risk and allows earlier user testing.
+- **Backend before frontend:** API must exist before UI can consume it; introspection is foundation for everything
+- **Forms before canvas:** Simpler to build, validates data model; canvas adds complexity and new dependency
+- **Editing before diff:** Users need to create target models before comparison makes sense
+- **Safety throughout:** Confirmation gates and file-only output built into Phase 1/5, not bolted on later
+- **Polish last:** Undo/redo and warnings are refinements, not blockers
 
 ### Research Flags
 
-**Phases likely needing deeper research during planning:**
-- **Phase 4 (DnD Enhancement):** Cross-container drag with multiple SortableContexts is complex; review dnd-kit multi-container examples carefully
+Phases likely needing deeper research during planning:
+- **Phase 4 (Visual Canvas):** @xyflow/react integration, custom node types, edge routing — verify API patterns with current docs
+- **Phase 5 (Diff/Migration):** SQL generation edge cases (constraint naming, partial indexes, triggers) — may need iteration
 
-**Phases with standard patterns (skip research-phase):**
-- **Phase 1:** Standard React Context + API integration pattern
-- **Phase 2:** Radix Collapsible is well-documented; existing codebase has example in OneOnOneComplianceCard.jsx
-- **Phase 3:** Settings tab pattern already exists in Settings.jsx
-- **Phase 5:** dnd-kit accessibility guide provides exact patterns
+Phases with standard patterns (skip research-phase):
+- **Phase 1 (Backend Foundation):** Standard PostgreSQL information_schema queries, follows existing P&E service patterns
+- **Phase 2 (Frontend Data Layer):** Standard React Context, existing apiClient patterns
+- **Phase 3 (Form-Based Editing):** Standard React forms with existing shadcn/ui components
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All libraries verified installed via npm list; versions confirmed current or compatible |
-| Features | HIGH | Based on codebase analysis of Layout.jsx, Settings.jsx, and standard UI patterns |
-| Architecture | HIGH | All integration points verified against existing code; uses established patterns |
-| Pitfalls | HIGH | dnd-kit pitfalls from official docs; mode switching from codebase analysis |
+| Stack | HIGH | @xyflow/react verified via official docs; native PG queries documented; minimal additions |
+| Features | HIGH | Consistent patterns across pgAdmin, DBeaver, dbdiagram.io; user requirements clear |
+| Architecture | HIGH | Directly follows existing P&E patterns (services, routes, contexts); verified against codebase |
+| Pitfalls | HIGH | PostgreSQL docs, React Flow performance guides, Prisma/Graphile migration safety patterns |
 
 **Overall confidence:** HIGH
 
-The research is based entirely on:
-1. Direct codebase analysis of P&E Manager (Layout.jsx, Settings.jsx, SubtaskList.jsx, sidebar.jsx, collapsible.jsx)
-2. Verified package versions from npm list
-3. Official library documentation (@dnd-kit, @radix-ui/react-collapsible)
-
 ### Gaps to Address
 
-- **Touch device testing:** dnd-kit touch support is documented but not tested in current P&E Manager usage (SubtaskList may not be used on mobile). Requires manual testing in Phase 4.
-
-- **UserSettings API compatibility:** Research assumes `UserSettings.get(key)`/`UserSettings.set(key, value)` work for arbitrary keys. Verify this during Phase 1 implementation.
-
-- **Large navigation item counts:** Current People mode has 16 items. If this grows significantly (50+), Settings UI may need pagination or search. Not a v1.7 concern but worth noting.
+- **Visual canvas performance at scale:** Need to test with 20+ tables; may require node collapsing or simplified styling
+- **Constraint matching in diff:** Auto-generated constraint names make structural matching necessary; needs iteration during implementation
+- **Index management scope:** Decision needed: include indexes in model or handle separately?
+- **Trigger preservation:** P&E has one trigger (update_updated_date); decide if migrations should preserve/recreate triggers
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- P&E Manager codebase:
-  - `/src/pages/Layout.jsx` — Navigation arrays (lines 91-228)
-  - `/src/pages/Settings.jsx` — Settings tab pattern (lines 272-525)
-  - `/src/components/ui/collapsible.jsx` — Radix Collapsible wrapper
-  - `/src/components/ui/sidebar.jsx` — SidebarMenuSub components (lines 554-592)
-  - `/src/components/sync/SubtaskList.jsx` — Existing @dnd-kit pattern
-  - `/src/contexts/AppModeContext.jsx` — Mode switching pattern
-  - `/server/services/UserSettingsService.js` — Backend persistence
-  - `/server/db/016_github_integration.sql` — user_settings table schema
-
-- npm registry verification (2026-01-29):
-  - @dnd-kit/core@6.3.1 (latest)
-  - @dnd-kit/sortable@10.0.0 (latest)
-  - @radix-ui/react-collapsible@1.1.3 (compatible with latest 1.1.12)
+- PostgreSQL Information Schema Documentation — introspection queries
+- PostgreSQL System Catalogs Documentation — pg_catalog for PG-specific features
+- React Flow Documentation (reactflow.dev) — visualization patterns, performance, v12.10.0 API
+- Existing P&E Manager codebase — service patterns, route patterns, migration system
 
 ### Secondary (MEDIUM confidence)
-- dnd-kit Sortable Documentation — ID collision patterns, items array ordering
-- dnd-kit Accessibility Guide — Screen reader announcements, keyboard support
-- Radix UI Collapsible — CSS animation variables, ARIA attributes
+- pgAdmin ERD Tool Documentation — workflow patterns
+- dbdiagram.io Documentation — form-based editing patterns
+- Prisma Migrate Documentation — safety patterns, shadow database concept
+- Graphile-migrate — hash verification, safety mechanisms
 
 ### Tertiary (LOW confidence)
-- None — all patterns verified against existing codebase or official documentation
+- DBeaver ER Documentation — exploration patterns
+- Knex.js Migrations — constraint comparison edge cases
 
 ---
 *Research completed: 2026-01-29*
