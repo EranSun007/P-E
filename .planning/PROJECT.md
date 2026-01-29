@@ -8,9 +8,19 @@ A unified people and engineering management system combining team management, we
 
 Single dashboard showing health and status across all team tools without switching contexts, with full control over what gets captured and how it connects to your data.
 
-## Current State (v1.6 Shipped)
+## Current Milestone: v1.7 Menu Clustering
 
-**Shipped:** 2026-01-29
+**Goal:** Enable users to organize sidebar menu items into collapsible folder groups with a drag-and-drop settings UI.
+
+**Target features:**
+- Collapsible folder groups in both People and Product navigation
+- Settings UI with @dnd-kit for folder/item management
+- Backend API (PostgreSQL) for menu configuration persistence
+- Folder expand/collapse state with localStorage caching
+
+## Shipped State (v1.6)
+
+**Last shipped:** 2026-01-29
 **Milestones:** v1.0 (Jira Integration), v1.1 (Web Capture Framework), v1.2 (DevOps Bug Dashboard), v1.3 (KPI Insights & Alerts), v1.4 (Bug Dashboard Fixes), v1.5 (Knowledge Base Integration), v1.6 (TeamSync Integration)
 
 **Tech Stack:**
@@ -89,7 +99,13 @@ Single dashboard showing health and status across all team tools without switchi
 
 ### Active
 
-None — ready for `/gsd:new-milestone` to plan v1.7
+**v1.7 Menu Clustering:**
+- [ ] Collapsible folder groups in sidebar navigation (People & Product modes)
+- [ ] Settings UI for folder creation/editing/deletion
+- [ ] Drag-and-drop item assignment to folders (@dnd-kit)
+- [ ] Backend API for menu configuration (PostgreSQL)
+- [ ] Folder expand/collapse state persistence
+- [ ] Reorder items within folders and at root level
 
 ### Future Candidates (v1.7+)
 
@@ -152,4 +168,4 @@ Deployed MCP server at `https://knowledge-base-mcp-server.cfapps.eu01-canary.han
 - **Single upload per week**: Duplicate detection, replace option available
 
 ---
-*Last updated: 2026-01-29 after v1.6 milestone complete*
+*Last updated: 2026-01-29 after v1.7 milestone started*

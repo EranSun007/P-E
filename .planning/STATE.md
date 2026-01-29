@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-29)
 
 **Core value:** Single dashboard showing health and status across all team tools without switching contexts
-**Current focus:** Planning next milestone (v1.7)
+**Current focus:** v1.7 Menu Clustering — collapsible folder navigation
 
 ## Current Position
 
-Phase: 27 of 27 complete
-Plan: All complete
-Status: Ready for v1.7 milestone
-Last activity: 2026-01-29 — v1.6 milestone archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v1.7 Menu Clustering
+Last activity: 2026-01-29 — Milestone v1.7 started
 
-Progress: [██████████████████████████████] 56/56 plans (100%)
+Progress: — (requirements phase)
 
 ## Milestone Summary
 
@@ -56,11 +56,6 @@ Resume file: None
 
 ## Next Steps
 
-Run `/gsd:new-milestone` to plan v1.7
+Defining requirements for v1.7 Menu Clustering.
 
-**Future candidates from PROJECT.md:**
-- Gantt view with sprint timeline
-- Status history timeline display
-- Sync settings UI for sprint configuration
-- Multi-team comparison dashboard
-- Search history and saved queries
+**After requirements:** Run `/gsd:plan-phase [N]` to start execution.
