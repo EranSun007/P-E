@@ -370,7 +370,7 @@ Plans:
   4. User can call /api/knowledge/stats to view repository statistics from MCP server
   5. MCP session persists across requests (Mcp-Session-Id header managed server-side)
   6. Session recovery handles timeout/disconnect gracefully with automatic reconnect
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [ ] 19-01-PLAN.md — MCP client service with session management and JSON-RPC protocol
@@ -456,7 +456,7 @@ v1.5: 19 -> 20 (depends on 19), 21 (depends on 19), 22 (depends on 19)
 | 16. Email Notifications & Preferences | v1.3 | 2/2 | Complete | 2026-01-28 |
 | 17. Core Bug Fixes | v1.4 | 2/2 | Complete | 2026-01-28 |
 | 18. Table Enhancements & UI Polish | v1.4 | 2/2 | Complete | 2026-01-28 |
-| 19. MCP Client Backend | v1.5 | 0/2 | Not started | - |
+| 19. MCP Client Backend | v1.5 | 0/2 | Planned | - |
 | 20. Knowledge Search UI | v1.5 | 0/2 | Not started | - |
 | 21. AI Chat Integration | v1.5 | 0/2 | Not started | - |
 | 22. Team Status Page | v1.5 | 0/2 | Not started | - |
