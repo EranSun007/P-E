@@ -167,6 +167,70 @@ function SortableFolderRow({ folder, getItemsCount, openEditDialog, openDeleteDi
   );
 }
 
+// Sortable menu item component
+function SortableMenuItem({ itemId, menuItems }) {
+  const item = menuItems.find(m => m.id === itemId);
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: itemId });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  if (!item) return null;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 py-2 px-3 bg-white border rounded mb-1"
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        aria-label="Drag to reorder"
+        className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-gray-100"
+        style={{ touchAction: 'none' }}
+      >
+        <GripVertical className="h-4 w-4 text-gray-400" />
+      </button>
+      <span className="text-sm font-medium">{item.name}</span>
+    </div>
+  );
+}
+
+// Droppable container for items
+function DroppableContainer({ id, children, label, isEmpty }) {
+  const { isOver, setNodeRef } = useDroppable({ id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`min-h-[80px] p-3 rounded-lg border-2 transition-colors ${
+        isOver ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-gray-50'
+      }`}
+    >
+      {label && (
+        <div className="text-xs font-medium text-gray-500 mb-2">{label}</div>
+      )}
+      {children}
+      {isEmpty && (
+        <div className="text-sm text-gray-400 italic text-center py-4">
+          Drop items here
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * NavigationSettings component
  * Manages folder CRUD operations for sidebar navigation organization
@@ -192,9 +256,51 @@ export default function NavigationSettings() {
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState(null);
   const [activeFolderId, setActiveFolderId] = useState(null);
+  const [activeItemId, setActiveItemId] = useState(null);
+  const [itemContainers, setItemContainers] = useState({});
 
   // Get menu items based on current mode
   const menuItems = currentMode === "product" ? PRODUCT_MENU_ITEMS : PEOPLE_MENU_ITEMS;
+
+  // Transform context config to DnD container state
+  const buildItemContainers = () => {
+    const containers = { root: [] };
+
+    // Initialize folder containers
+    folders.forEach(folder => {
+      containers[folder.id] = [];
+    });
+
+    // Get assigned items per folder
+    items.forEach(item => {
+      if (item.folderId && containers[item.folderId]) {
+        containers[item.folderId].push(item.itemId);
+      }
+    });
+
+    // Root items are those not assigned to any folder
+    const assignedIds = items.filter(i => i.folderId).map(i => i.itemId);
+    containers.root = menuItems
+      .filter(m => !assignedIds.includes(m.id))
+      .map(m => m.id);
+
+    return containers;
+  };
+
+  // Find which container an item belongs to
+  const findItemContainer = (itemId) => {
+    for (const [containerId, itemIds] of Object.entries(itemContainers)) {
+      if (itemIds.includes(itemId)) {
+        return containerId;
+      }
+    }
+    return null;
+  };
+
+  // Sync itemContainers when context changes
+  useEffect(() => {
+    setItemContainers(buildItemContainers());
+  }, [folders, items, menuItems]);
 
   // Sensors for drag-and-drop
   const sensors = useSensors(
@@ -452,6 +558,115 @@ export default function NavigationSettings() {
     }
   };
 
+  // Item drag handlers
+  const handleItemDragStart = ({ active }) => {
+    setActiveItemId(active.id);
+  };
+
+  const handleItemDragOver = ({ active, over }) => {
+    if (!over) return;
+
+    const activeContainer = findItemContainer(active.id);
+    let overContainer = over.id in itemContainers ? over.id : findItemContainer(over.id);
+
+    if (!activeContainer || !overContainer || activeContainer === overContainer) return;
+
+    // Move item to new container in local state (visual feedback only)
+    setItemContainers(prev => {
+      const activeItems = [...prev[activeContainer]];
+      const overItems = [...prev[overContainer]];
+
+      const activeIndex = activeItems.indexOf(active.id);
+      activeItems.splice(activeIndex, 1);
+
+      // Determine position in new container
+      let overIndex = overItems.length;
+      if (over.id !== overContainer) {
+        overIndex = overItems.indexOf(over.id);
+        if (overIndex === -1) overIndex = overItems.length;
+      }
+
+      overItems.splice(overIndex, 0, active.id);
+
+      return {
+        ...prev,
+        [activeContainer]: activeItems,
+        [overContainer]: overItems,
+      };
+    });
+  };
+
+  const handleItemDragEnd = async ({ active, over }) => {
+    setActiveItemId(null);
+
+    if (saving) {
+      setItemContainers(buildItemContainers());
+      return;
+    }
+
+    if (!over) {
+      // Reset to context state if dropped outside
+      setItemContainers(buildItemContainers());
+      return;
+    }
+
+    const activeContainer = findItemContainer(active.id);
+    const overContainer = over.id in itemContainers ? over.id : findItemContainer(over.id);
+
+    if (!activeContainer || !overContainer) {
+      setItemContainers(buildItemContainers());
+      return;
+    }
+
+    // Handle reordering within same container
+    if (activeContainer === overContainer && active.id !== over.id) {
+      const containerItems = [...itemContainers[activeContainer]];
+      const oldIndex = containerItems.indexOf(active.id);
+      const newIndex = containerItems.indexOf(over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const reordered = arrayMove(containerItems, oldIndex, newIndex);
+        setItemContainers(prev => ({
+          ...prev,
+          [activeContainer]: reordered,
+        }));
+      }
+    }
+
+    // Save to backend
+    setSaving(true);
+    setLocalError(null);
+
+    try {
+      // Convert itemContainers back to items array format
+      const updatedItems = [];
+
+      for (const [containerId, itemIds] of Object.entries(itemContainers)) {
+        if (containerId === 'root') continue; // Root items have no assignment
+
+        itemIds.forEach(itemId => {
+          updatedItems.push({ itemId, folderId: containerId });
+        });
+      }
+
+      const success = await saveConfig({
+        ...config,
+        items: updatedItems,
+      });
+
+      if (!success) {
+        setLocalError("Failed to save item assignment. Please try again.");
+        setItemContainers(buildItemContainers()); // Rollback
+      }
+    } catch (err) {
+      console.error("Error saving item assignment:", err);
+      setLocalError("An unexpected error occurred. Please try again.");
+      setItemContainers(buildItemContainers()); // Rollback
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -563,48 +778,83 @@ export default function NavigationSettings() {
         <CardHeader>
           <CardTitle>Menu Items</CardTitle>
           <CardDescription>
-            Assign items to folders or leave at root level
+            Drag items between containers to organize your navigation
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Item Name</TableHead>
-                <TableHead>Folder Assignment</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {menuItems.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell>
-                    <span className="font-medium">{item.name}</span>
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={getItemFolder(item.id) || "root"}
-                      onValueChange={(value) => handleItemFolderChange(item.id, value)}
-                      disabled={saving}
-                    >
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Select folder" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="root">Root Level</SelectItem>
-                        {folders
-                          .sort((a, b) => (a.order || 0) - (b.order || 0))
-                          .map((folder) => (
-                            <SelectItem key={folder.id} value={folder.id}>
-                              {folder.name}
-                            </SelectItem>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleItemDragStart}
+            onDragOver={handleItemDragOver}
+            onDragEnd={handleItemDragEnd}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Root level container */}
+              <div>
+                <h4 className="text-sm font-medium mb-2">Root Level</h4>
+                <DroppableContainer
+                  id="root"
+                  isEmpty={(itemContainers.root || []).length === 0}
+                >
+                  <SortableContext
+                    items={itemContainers.root || []}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {(itemContainers.root || []).map(itemId => (
+                      <SortableMenuItem
+                        key={itemId}
+                        itemId={itemId}
+                        menuItems={menuItems}
+                      />
+                    ))}
+                  </SortableContext>
+                </DroppableContainer>
+              </div>
+
+              {/* Folder containers */}
+              <div className="space-y-4">
+                {folders
+                  .sort((a, b) => (a.order || 0) - (b.order || 0))
+                  .map(folder => (
+                    <div key={folder.id}>
+                      <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                        <FolderOpen className="h-4 w-4" />
+                        {folder.name}
+                      </h4>
+                      <DroppableContainer
+                        id={folder.id}
+                        isEmpty={(itemContainers[folder.id] || []).length === 0}
+                      >
+                        <SortableContext
+                          items={itemContainers[folder.id] || []}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          {(itemContainers[folder.id] || []).map(itemId => (
+                            <SortableMenuItem
+                              key={itemId}
+                              itemId={itemId}
+                              menuItems={menuItems}
+                            />
                           ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                        </SortableContext>
+                      </DroppableContainer>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            <DragOverlay>
+              {activeItemId ? (
+                <div className="bg-white border-2 border-blue-400 rounded shadow-lg p-2 flex items-center gap-2">
+                  <GripVertical className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm font-medium">
+                    {menuItems.find(m => m.id === activeItemId)?.name}
+                  </span>
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         </CardContent>
       </Card>
 
