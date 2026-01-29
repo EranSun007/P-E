@@ -67,6 +67,9 @@ const KnowledgeSearch = lazy(() => retryImport(() => import(/* webpackChunkName:
 // TeamSync (v1.6 - Team Sync integration)
 const TeamSync = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-teamsync" */ "./TeamSync"), 3, 1000));
 
+// TeamStatus (v1.6 - Team Status page)
+const TeamStatus = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-team-status" */ "./TeamStatus"), 3, 1000));
+
 const PAGES = {
     
     Tasks: Tasks,
@@ -123,6 +126,9 @@ const PAGES = {
 
     // TeamSync (v1.6)
     TeamSync: TeamSync,
+
+    // TeamStatus (v1.6)
+    TeamStatus: TeamStatus,
 }
 
 function _getCurrentPage(url) {
@@ -210,6 +216,9 @@ function PagesContent() {
 
                         {/* TeamSync (v1.6 - Team Sync integration) */}
                         <Route path="/teamsync" element={<TeamSync />} />
+
+                        {/* TeamStatus (v1.6 - Team Status page) */}
+                        <Route path="/teamstatus" element={<TeamStatus />} />
 
                     </Routes>
                 </Suspense>

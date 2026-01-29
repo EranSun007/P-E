@@ -27,7 +27,8 @@ import {
   Rocket,
   Inbox,
   FileCode,
-  Search
+  Search,
+  Activity
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { User as UserEntity } from "@/api/entities";
@@ -177,6 +178,12 @@ export default function Layout({ children, currentPageName }) {
       icon: Users,
       href: createPageUrl("TeamSync"),
       current: currentPageName === "TeamSync"
+    },
+    {
+      name: "Team Status",
+      icon: Activity,
+      href: createPageUrl("TeamStatus"),
+      current: currentPageName === "TeamStatus"
     }
   ];
 
