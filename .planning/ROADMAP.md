@@ -8,6 +8,7 @@
 - **v1.3 KPI Insights & Alerts** - Phases 13-16 (shipped 2026-01-28) — [Archive](milestones/v1.3-ROADMAP.md)
 - **v1.4 Bug Dashboard Fixes & Enhancements** - Phases 17-18 (shipped 2026-01-28) — [Archive](milestones/v1.4-ROADMAP.md)
 - **v1.5 Knowledge Base Integration & Team Status** - Phases 19-22 (in progress)
+- **v1.6 TeamSync Integration** - Phases 23-27 (in progress)
 
 ## Phases
 
@@ -427,6 +428,31 @@ Plans:
 - [x] 22-02-PLAN.md — Dashboard components (MetricsBanner, MemberCard, TimelineNav, health indicators)
 - [ ] 22-03-PLAN.md — Gap closure: PostgreSQL team_summaries table to fix data structure mismatch
 
+## v1.6 TeamSync Integration (IN PROGRESS)
+
+**Milestone Goal:** Build a team synchronization feature for tracking goals, blockers, dependencies, and emphasis items with Kanban board interface, item management, and archive functionality.
+
+- [x] **Phase 23: Backend Foundation** - Database schema, SyncItemService, REST API for sync items
+- [x] **Phase 24: API Routes** - Subtask operations, sync settings, archive endpoints
+- [x] **Phase 25: Frontend Context** - SyncContext for state management, Kanban board components
+- [x] **Phase 26: Item Modal & Subtasks** - SyncItemModal with view/edit modes, subtask drag-and-drop
+- [ ] **Phase 27: Archive Flow** - Archive modal, restore functionality, auto-archive on resolve
+
+### Phase 27: Archive Flow
+**Goal**: User can archive resolved items and restore them from archive modal
+**Depends on**: Phase 26
+**Requirements**: UI-16, UI-17, UI-18, UI-19
+**Success Criteria** (what must be TRUE):
+  1. Archive button in header shows count badge of archived items
+  2. Archive modal lists archived items with date filter
+  3. Restore action moves item back to active Kanban board
+  4. Setting status to "Done" automatically archives the item
+**Plans**: 2 plans
+
+Plans:
+- [ ] 27-01-PLAN.md — Archive modal and restore flow
+- [ ] 27-02-PLAN.md — Auto-archive on resolve
+
 ## Progress
 
 **Execution Order:**
@@ -436,6 +462,7 @@ v1.2: 10 -> 11 (depends on 10) -> 12 (depends on 10+11)
 v1.3: 13 -> 14 (depends on 13) -> 15 (depends on 13) -> 16 (depends on 15)
 v1.4: 17 -> 18 (depends on 17)
 v1.5: 19 -> 20 (depends on 19), 21 (depends on 19), 22 (depends on 19)
+v1.6: 23 -> 24 (depends on 23) -> 25 (depends on 24) -> 26 (depends on 25) -> 27 (depends on 26)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -461,3 +488,8 @@ v1.5: 19 -> 20 (depends on 19), 21 (depends on 19), 22 (depends on 19)
 | 20. Knowledge Search UI | v1.5 | 2/2 | Complete | 2026-01-29 |
 | 21. AI Chat Integration | v1.5 | 2/2 | Complete | 2026-01-29 |
 | 22. Team Status Page | v1.5 | 2/3 | Gap closure | - |
+| 23. Backend Foundation | v1.6 | 2/2 | Complete | 2026-01-29 |
+| 24. API Routes | v1.6 | 2/2 | Complete | 2026-01-29 |
+| 25. Frontend Context | v1.6 | 2/2 | Complete | 2026-01-29 |
+| 26. Item Modal & Subtasks | v1.6 | 2/2 | Complete | 2026-01-29 |
+| 27. Archive Flow | v1.6 | 0/2 | Planned | - |
