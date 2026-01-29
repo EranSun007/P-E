@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-29)
 
 **Core value:** Single dashboard showing health and status across all team tools without switching contexts
-**Current focus:** v1.7 Menu Clustering — collapsible folder navigation for sidebar
+**Current focus:** v1.8 Entity Model Editor — visual schema management with diff and migration generation
 
 ## Current Position
 
-Phase: 31 of 31 (Navigation Integration) — COMPLETE
-Plan: 2 of 2 complete
-Status: Phase 31 complete, v1.7 milestone complete
-Last activity: 2026-01-29 — Completed 31-02-PLAN.md
+Phase: Not started (defining requirements)
+Plan: —
+Status: Researching domain ecosystem
+Last activity: 2026-01-29 — Milestone v1.8 started
 
-Progress: [===============================] 100% (63/63 plans)
+Progress: Defining milestone...
 
 ## Milestone Summary
 
@@ -29,6 +29,8 @@ Progress: [===============================] 100% (63/63 plans)
 - v1.7 Menu Clustering (Phases 28-31, 7 plans) — 2026-01-29
 
 **Total: 8 milestones shipped, 31 phases, 63 plans completed**
+
+**Current Milestone:** v1.8 Entity Model Editor (in progress)
 
 ## Performance Metrics
 
@@ -88,6 +90,6 @@ Resume file: None
 
 ## Next Steps
 
-1. Run `/gsd:audit-milestone` to verify v1.7 Menu Clustering
-2. Run `/gsd:complete-milestone` to archive v1.7
-3. Plan next milestone (v1.8)
+1. Complete research phase
+2. Define requirements
+3. Create roadmap (phases continue from 32)

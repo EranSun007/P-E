@@ -8,20 +8,22 @@ A unified people and engineering management system combining team management, we
 
 Single dashboard showing health and status across all team tools without switching contexts, with full control over what gets captured and how it connects to your data.
 
-## Current Milestone: v1.7 Menu Clustering
+## Current Milestone: v1.8 Entity Model Editor
 
-**Goal:** Enable users to organize sidebar menu items into collapsible folder groups with a drag-and-drop settings UI.
+**Goal:** Build a visual schema management tool that shows current database state, lets you design the target state, highlights gaps, and generates migrations to close them.
 
 **Target features:**
-- Collapsible folder groups in both People and Product navigation
-- Settings UI with @dnd-kit for folder/item management
-- Backend API (PostgreSQL) for menu configuration persistence
-- Folder expand/collapse state with localStorage caching
+- Schema introspection reading current PostgreSQL structure (tables, columns, types, constraints, FKs)
+- Form-based entity editor with fields, types, relationships
+- Interactive node graph visualization showing entities and connections
+- Current vs target diff highlighting schema mismatches
+- Migration script generator to transform current → target state
+- Entity model definitions stored in PostgreSQL
 
 ## Shipped State (v1.6)
 
 **Last shipped:** 2026-01-29
-**Milestones:** v1.0 (Jira Integration), v1.1 (Web Capture Framework), v1.2 (DevOps Bug Dashboard), v1.3 (KPI Insights & Alerts), v1.4 (Bug Dashboard Fixes), v1.5 (Knowledge Base Integration), v1.6 (TeamSync Integration)
+**Milestones:** v1.0 (Jira Integration), v1.1 (Web Capture Framework), v1.2 (DevOps Bug Dashboard), v1.3 (KPI Insights & Alerts), v1.4 (Bug Dashboard Fixes), v1.5 (Knowledge Base Integration), v1.6 (TeamSync Integration), v1.7 (Menu Clustering)
 
 **Tech Stack:**
 - Frontend: React 18 + Vite + Tailwind CSS + Radix UI + Recharts + @dnd-kit
@@ -99,15 +101,16 @@ Single dashboard showing health and status across all team tools without switchi
 
 ### Active
 
-**v1.7 Menu Clustering:**
-- [ ] Collapsible folder groups in sidebar navigation (People & Product modes)
-- [ ] Settings UI for folder creation/editing/deletion
-- [ ] Drag-and-drop item assignment to folders (@dnd-kit)
-- [ ] Backend API for menu configuration (PostgreSQL)
-- [ ] Folder expand/collapse state persistence
-- [ ] Reorder items within folders and at root level
+**v1.8 Entity Model Editor:**
+- [ ] Schema introspection API to read current PostgreSQL structure
+- [ ] Entity model storage tables (entity_definitions, field_definitions, relationships)
+- [ ] Form-based entity editor UI with live preview
+- [ ] Interactive node graph visualization (React Flow or similar)
+- [ ] Current vs target schema diff highlighting
+- [ ] Migration script generator (current → target SQL)
+- [ ] Migration history tracking and application
 
-### Future Candidates (v1.7+)
+### Future Candidates (v1.9+)
 
 - Gantt view with sprint timeline
 - Status history timeline display
@@ -168,4 +171,4 @@ Deployed MCP server at `https://knowledge-base-mcp-server.cfapps.eu01-canary.han
 - **Single upload per week**: Duplicate detection, replace option available
 
 ---
-*Last updated: 2026-01-29 after v1.7 milestone started*
+*Last updated: 2026-01-29 after v1.8 milestone started*
