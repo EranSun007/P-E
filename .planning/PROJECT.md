@@ -8,21 +8,23 @@ A unified people and engineering management system combining team management, we
 
 Single dashboard showing health and status across all team tools without switching contexts, with full control over what gets captured and how it connects to your data.
 
-## Current Milestone: v1.4 Bug Dashboard Fixes & Enhancements
+## Current Milestone: v1.5 Knowledge Base Integration & Team Status
 
-**Goal:** Fix component extraction/filtering bugs and add missing UI features to complete the bug dashboard vision.
+**Goal:** Integrate with the deployed MCP Knowledge Base server and build a Team Status page visualizing daily summaries with interactive controls.
 
 **Target features:**
-- Fix component extraction logic (currently all bugs categorized as one component)
-- Working component filter dropdown that updates all KPIs, charts, and table
-- Table enhancements: search, age indicators, component column, sortable columns
-- Weekly inflow trend chart when multiple weeks uploaded
-- KPI status badges and UI polish
+- MCP client integration (session management, JSON-RPC 2.0, all 4 tools)
+- Knowledge search UI (code and documentation search)
+- Team Status page with two teams (Metering & Reporting)
+- Dashboard cards showing progress metrics, blockers, velocity
+- Timeline view of daily summary history
+- Health indicators per team member/workstream
+- Extensibility foundation for future datasets
 
-## Current State (v1.2 Shipped)
+## Current State (v1.4 Shipped)
 
 **Shipped:** 2026-01-28
-**Milestones:** v1.0 (Jira Integration), v1.1 (Web Capture Framework), v1.2 (DevOps Bug Dashboard)
+**Milestones:** v1.0 (Jira Integration), v1.1 (Web Capture Framework), v1.2 (DevOps Bug Dashboard), v1.3 (KPI Insights & Alerts), v1.4 (Bug Dashboard Fixes & Enhancements)
 
 **Tech Stack:**
 - Frontend: React 18 + Vite + Tailwind CSS + Radix UI + Recharts
@@ -58,20 +60,23 @@ Single dashboard showing health and status across all team tools without switchi
 - ✓ Critical alerts when KPIs breach thresholds — v1.2
 - ✓ Aging bugs table with JIRA links — v1.2
 - ✓ Charts for MTTR by priority and category distribution — v1.2
+- ✓ Component extraction and filtering fix — v1.4
+- ✓ Table sorting with age indicators — v1.4
+- ✓ Weekly inflow trend charts — v1.4
+- ✓ Historical KPI trends and threshold notifications — v1.3
+- ✓ Email notifications for KPI breaches — v1.3
 
 ### Active
 
-- [ ] Component extraction logic fix (currently categorizing all bugs as one component)
-- [ ] Component filter dropdown working properly (updates KPIs, charts, table)
-- [ ] Category distribution chart showing correct breakdown
-- [ ] Bug inflow rate calculation verification
-- [ ] Table search functionality
-- [ ] Visual age indicators in aging bugs table
-- [ ] Component column in aging bugs table
-- [ ] Weekly inflow trend chart (when multiple weeks uploaded)
-- [ ] KPI status badges on cards
-- [ ] Sortable table columns
-- [ ] UI/UX improvements (dropdown labels, filter badges)
+- [ ] MCP client service with session management and JSON-RPC 2.0 protocol
+- [ ] Integration with Knowledge Base MCP server (4 tools: consult_code_base, consult_documentation, store_insight, get_repository_stats)
+- [ ] Knowledge search UI with code highlighting and filters
+- [ ] Team Status page with Metering and Reporting team views
+- [ ] Daily summaries visualization from reporting-hub data
+- [ ] Dashboard cards (progress metrics, blockers, velocity)
+- [ ] Interactive timeline of daily summaries
+- [ ] Health indicators (red/yellow/green) per team member/workstream
+- [ ] Repository statistics dashboard
 
 ### Out of Scope
 
@@ -80,6 +85,8 @@ Single dashboard showing health and status across all team tools without switchi
 - Bug modification/write-back — read-only analytics
 - Custom KPI definitions — fixed set of 9 KPIs
 - Historical data import — starts fresh with new uploads
+- Custom MCP server deployment — using existing deployed server
+- Direct database access to knowledge base — MCP protocol only
 
 ## Context
 
@@ -95,6 +102,14 @@ Team rotates weekly DevOps duty. Each week the duty person exports bugs from JIR
 
 **Component Extraction:**
 Bugs categorized by labels/summary into: deploy-metering, service-broker, foss-vulnerabilities, cm-metering, sdm-metering, other
+
+**Knowledge Base MCP Server:**
+Deployed MCP server at `https://knowledge-base-mcp-server.cfapps.eu01-canary.hana.ondemand.com` provides semantic search over ~19,000 indexed chunks from 27 SAP repositories. Daily summaries are stored via `store_insight` tool by reporting-hub. Two teams: Metering and Reporting, with separate status views.
+
+**MCP Protocol Details:**
+- JSON-RPC 2.0 over HTTP/SSE
+- Session management via `Mcp-Session-Id` header
+- 4 tools: consult_code_base, consult_documentation, store_insight, get_repository_stats
 
 ## Constraints
 
@@ -121,4 +136,4 @@ Bugs categorized by labels/summary into: deploy-metering, service-broker, foss-v
 | XMLHttpRequest for uploads | fetch lacks progress events needed for upload UI | ✓ Good (v1.2) |
 
 ---
-*Last updated: 2026-01-28 after v1.4 milestone started*
+*Last updated: 2026-01-29 after v1.5 milestone started*
