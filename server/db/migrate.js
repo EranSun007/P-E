@@ -121,6 +121,11 @@ const MIGRATIONS = [
     version: '023_team_summaries',
     name: 'Create team_summaries table for structured team status data',
     file: '023_team_summaries.sql'
+  },
+  {
+    version: '024_archived_at',
+    name: 'Add archived_at timestamp column to projects',
+    file: '024_archived_at.sql'
   }
 ];
 
