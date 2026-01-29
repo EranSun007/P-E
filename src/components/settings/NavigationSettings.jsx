@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigation } from "@/contexts/NavigationContext";
 import {
   Card,
@@ -50,7 +50,26 @@ import {
   Loader2,
   MoreVertical,
   RotateCcw,
+  GripVertical,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  DragOverlay,
+  useDroppable,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+  sortableKeyboardCoordinates,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // Menu items for People mode (from Layout.jsx)
 const PEOPLE_MENU_ITEMS = [
@@ -82,6 +101,72 @@ const PRODUCT_MENU_ITEMS = [
   { id: "releases", name: "Releases", icon: "Rocket" },
 ];
 
+// Sortable folder row component
+function SortableFolderRow({ folder, getItemsCount, openEditDialog, openDeleteDialog }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: folder.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <TableRow ref={setNodeRef} style={style}>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <button
+            {...attributes}
+            {...listeners}
+            aria-label="Drag to reorder"
+            className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-gray-100"
+            style={{ touchAction: 'none' }}
+          >
+            <GripVertical className="h-4 w-4 text-gray-400" />
+          </button>
+          <FolderOpen className="h-4 w-4 text-gray-500" />
+          <span className="font-medium">{folder.name}</span>
+        </div>
+      </TableCell>
+      <TableCell>
+        <Badge variant="secondary">
+          {getItemsCount(folder.id)}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <span className="sr-only">Open menu</span>
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => openEditDialog(folder)}>
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-red-600"
+              onClick={() => openDeleteDialog(folder)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 /**
  * NavigationSettings component
  * Manages folder CRUD operations for sidebar navigation organization
@@ -106,9 +191,22 @@ export default function NavigationSettings() {
   const [folderToDelete, setFolderToDelete] = useState(null);
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState(null);
+  const [activeFolderId, setActiveFolderId] = useState(null);
 
   // Get menu items based on current mode
   const menuItems = currentMode === "product" ? PRODUCT_MENU_ITEMS : PEOPLE_MENU_ITEMS;
+
+  // Sensors for drag-and-drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // 8px before drag activates
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Calculate items count per folder
   const getItemsCount = (folderId) => {
@@ -311,6 +409,49 @@ export default function NavigationSettings() {
     }
   };
 
+  // Folder drag handlers
+  const handleFolderDragStart = ({ active }) => {
+    setActiveFolderId(active.id);
+  };
+
+  const handleFolderDragEnd = async ({ active, over }) => {
+    setActiveFolderId(null);
+
+    if (saving) return; // Don't process if already saving
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = folders.findIndex(f => f.id === active.id);
+    const newIndex = folders.findIndex(f => f.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    // Reorder and recalculate order field
+    const reordered = arrayMove(folders, oldIndex, newIndex);
+    const foldersWithOrder = reordered.map((folder, index) => ({
+      ...folder,
+      order: index + 1,
+    }));
+
+    setSaving(true);
+    setLocalError(null);
+
+    try {
+      const success = await saveConfig({
+        ...config,
+        folders: foldersWithOrder,
+      });
+
+      if (!success) {
+        setLocalError("Failed to save folder order. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error saving folder order:", err);
+      setLocalError("An unexpected error occurred. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -367,57 +508,52 @@ export default function NavigationSettings() {
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {folders
-                  .sort((a, b) => (a.order || 0) - (b.order || 0))
-                  .map((folder) => (
-                    <TableRow key={folder.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <FolderOpen className="h-4 w-4 text-gray-500" />
-                          <span className="font-medium">{folder.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          {getItemsCount(folder.id)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <span className="sr-only">Open menu</span>
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEditDialog(folder)}>
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-red-600"
-                              onClick={() => openDeleteDialog(folder)}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleFolderDragStart}
+              onDragEnd={handleFolderDragEnd}
+            >
+              <SortableContext
+                items={folders.sort((a, b) => (a.order || 0) - (b.order || 0)).map(f => f.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Items</TableHead>
+                      <TableHead className="w-[100px]">Actions</TableHead>
                     </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {folders
+                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                      .map((folder) => (
+                        <SortableFolderRow
+                          key={folder.id}
+                          folder={folder}
+                          getItemsCount={getItemsCount}
+                          openEditDialog={openEditDialog}
+                          openDeleteDialog={openDeleteDialog}
+                        />
+                      ))}
+                  </TableBody>
+                </Table>
+              </SortableContext>
+
+              <DragOverlay>
+                {activeFolderId ? (
+                  <div className="bg-white border rounded shadow-lg p-3 flex items-center gap-2">
+                    <GripVertical className="h-4 w-4 text-gray-400" />
+                    <FolderOpen className="h-4 w-4 text-gray-500" />
+                    <span className="font-medium">
+                      {folders.find(f => f.id === activeFolderId)?.name}
+                    </span>
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
           )}
         </CardContent>
       </Card>
