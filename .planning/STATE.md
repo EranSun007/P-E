@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 
 ## Current Position
 
-Phase: 30 of 31 (Settings UI DnD Enhancement) — COMPLETE
-Plan: 1 of 1 complete
-Status: Ready for Phase 31
-Last activity: 2026-01-29 — Phase 30 verified and complete
+Phase: 31 of 31 (Navigation Integration) — IN PROGRESS
+Plan: 1 of 3 complete
+Status: Executing Phase 31
+Last activity: 2026-01-29 — Completed 31-01-PLAN.md
 
-Progress: [==============================] 97% (61/63 plans)
+Progress: [==============================] 98% (62/63 plans)
 
 ## Milestone Summary
 
@@ -55,8 +55,10 @@ Progress: [==============================] 97% (61/63 plans)
 - DnD state transformation pattern (buildItemContainers, findItemContainer)
 - DroppableContainer component with hover highlights
 - DragOverlay for visual feedback during drag operations
+- useCollapsedFolders hook pattern (localStorage + mode-aware keys)
+- CollapsibleFolder component wrapping Radix Collapsible
 
-### Decisions Made (Phases 29-30)
+### Decisions Made (Phases 29-31)
 
 | ID | Decision | Rationale |
 |----|----------|-----------|
@@ -69,6 +71,8 @@ Progress: [==============================] 97% (61/63 plans)
 | dnd-save-timing | saveConfig in onDragEnd, not onDragOver | Persist after drag completes, not during |
 | dnd-transform | itemContainers state with buildItemContainers() | Transform context to DnD format in real-time |
 | dnd-rollback | setItemContainers(buildItemContainers()) on error | Rollback to context state on save failure |
+| collapsed-storage | Store collapsed IDs (not expanded) | Opt-in to collapse, empty array = all expanded |
+| mode-reread | Re-read localStorage when mode changes | Independent collapse state per mode |
 
 ### Blockers/Concerns
 
@@ -77,11 +81,11 @@ None — all milestones shipped successfully.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed 30-01-PLAN.md
+Stopped at: Completed 31-01-PLAN.md
 Resume file: None
 
 ## Next Steps
 
-1. Plan Phase 31 (Navigation Integration) — collapsible folders in sidebar
-2. Execute Phase 31 plans
+1. Execute 31-02-PLAN.md (HierarchicalNavigation component)
+2. Execute 31-03-PLAN.md (Layout.jsx integration)
 3. Verify v1.7 Menu Clustering milestone complete
