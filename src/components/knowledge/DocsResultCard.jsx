@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { FileText, ExternalLink } from 'lucide-react';
+import { SimilarityScore } from './SimilarityScore';
 
 export function DocsResultCard({ result }) {
   const title = result.title || result.name || 'Untitled';
@@ -10,6 +11,7 @@ export function DocsResultCard({ result }) {
   const domain = result.domain || '';
   const category = result.category || '';
   const url = result.url || result.source_url || '';
+  const similarity = result.similarity || result.score || result.similarity_score;
 
   return (
     <Card className="mb-4">
@@ -20,6 +22,9 @@ export function DocsResultCard({ result }) {
             <span className="font-medium truncate">{title}</span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {similarity !== undefined && (
+              <SimilarityScore score={similarity} showLabel={false} size="small" />
+            )}
             {domain && (
               <Badge variant="outline" className="text-xs">
                 {domain}
@@ -63,6 +68,9 @@ DocsResultCard.propTypes = {
     category: PropTypes.string,
     url: PropTypes.string,
     source_url: PropTypes.string,
+    similarity: PropTypes.number,
+    score: PropTypes.number,
+    similarity_score: PropTypes.number,
     id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   }).isRequired,
 };

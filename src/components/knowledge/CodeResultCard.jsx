@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { FileCode } from 'lucide-react';
 import { detectLanguage } from './LanguageDetector';
+import { SimilarityScore } from './SimilarityScore';
 
 // Register only needed languages (bundle optimization)
 import javascript from 'react-syntax-highlighter/dist/esm/languages/hljs/javascript';
@@ -31,6 +32,7 @@ export function CodeResultCard({ result }) {
   const filePath = result.filePath || result.file_path || 'unknown';
   const code = result.code || result.content || '';
   const repoName = result.repoName || result.repo_name || '';
+  const similarity = result.similarity || result.score || result.similarity_score;
 
   return (
     <Card className="mb-4">
@@ -41,6 +43,9 @@ export function CodeResultCard({ result }) {
             <code className="text-sm truncate">{filePath}</code>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {similarity !== undefined && (
+              <SimilarityScore score={similarity} showLabel={false} size="small" />
+            )}
             {repoName && (
               <Badge variant="outline" className="text-xs">
                 {repoName}
@@ -82,6 +87,9 @@ CodeResultCard.propTypes = {
     content: PropTypes.string,
     repoName: PropTypes.string,
     repo_name: PropTypes.string,
+    similarity: PropTypes.number,
+    score: PropTypes.number,
+    similarity_score: PropTypes.number,
     id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   }).isRequired,
 };
