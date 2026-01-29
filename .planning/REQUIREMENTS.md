@@ -29,10 +29,10 @@ Requirements for Knowledge Base Integration & Team Status milestone. Each maps t
 
 ### AI Chat Integration
 
-- [ ] **CHAT-01**: AI chat automatically queries relevant code/docs based on conversation context
-- [ ] **CHAT-02**: Explicit /search command in chat to query knowledge base
-- [ ] **CHAT-03**: Search results displayed inline in chat with expandable code snippets
-- [ ] **CHAT-04**: AI responses enriched with knowledge base context when relevant
+- [x] **CHAT-01**: AI chat automatically queries relevant code/docs based on conversation context
+- [x] **CHAT-02**: Explicit /search command in chat to query knowledge base
+- [x] **CHAT-03**: Search results displayed inline in chat with expandable code snippets
+- [x] **CHAT-04**: AI responses enriched with knowledge base context when relevant
 
 ### Team Status Page
 
@@ -97,10 +97,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SEARCH-04 | Phase 20 | Complete |
 | SEARCH-05 | Phase 20 | Complete |
 | SEARCH-06 | Phase 20 | Complete |
-| CHAT-01 | Phase 21 | Pending |
-| CHAT-02 | Phase 21 | Pending |
-| CHAT-03 | Phase 21 | Pending |
-| CHAT-04 | Phase 21 | Pending |
+| CHAT-01 | Phase 21 | Complete |
+| CHAT-02 | Phase 21 | Complete |
+| CHAT-03 | Phase 21 | Complete |
+| CHAT-04 | Phase 21 | Complete |
 | TEAM-01 | Phase 22 | Pending |
 | TEAM-02 | Phase 22 | Pending |
 | TEAM-03 | Phase 22 | Pending |

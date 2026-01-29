@@ -356,7 +356,7 @@ Plans:
 
 - [x] **Phase 19: MCP Client Backend** - MCP protocol client, session management, REST API
 - [x] **Phase 20: Knowledge Search UI** - Search page with dual-pane results, filters, repository stats
-- [ ] **Phase 21: AI Chat Integration** - Knowledge-aware chat with inline search results
+- [x] **Phase 21: AI Chat Integration** - Knowledge-aware chat with inline search results
 - [ ] **Phase 22: Team Status Page** - Daily summaries dashboard with health indicators
 
 ### Phase 19: MCP Client Backend
@@ -405,8 +405,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 21-01-PLAN.md — Automatic knowledge context injection and /search command
-- [ ] 21-02-PLAN.md — Inline search results display and expandable code snippets
+- [x] 21-01-PLAN.md — Automatic knowledge context injection and /search command
+- [x] 21-02-PLAN.md — Inline search results display and expandable code snippets
 
 ### Phase 22: Team Status Page
 **Goal**: User can view team health and daily summaries from knowledge base insights
@@ -458,5 +458,5 @@ v1.5: 19 -> 20 (depends on 19), 21 (depends on 19), 22 (depends on 19)
 | 18. Table Enhancements & UI Polish | v1.4 | 2/2 | Complete | 2026-01-28 |
 | 19. MCP Client Backend | v1.5 | 2/2 | Complete | 2026-01-29 |
 | 20. Knowledge Search UI | v1.5 | 2/2 | Complete | 2026-01-29 |
-| 21. AI Chat Integration | v1.5 | 0/2 | Not started | - |
+| 21. AI Chat Integration | v1.5 | 2/2 | Complete | 2026-01-29 |
 | 22. Team Status Page | v1.5 | 0/2 | Not started | - |
