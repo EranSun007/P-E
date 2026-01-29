@@ -5,6 +5,7 @@
 
 import { OrchestrationClient } from '@sap-ai-sdk/orchestration';
 import AIConnectionService from './AIConnectionService.js';
+import MCPService from './MCPService.js';
 
 // System prompt for the P&E Manager AI assistant
 const BASE_SYSTEM_PROMPT = `You are an AI assistant for P&E Manager, a project and team management application.
@@ -244,6 +245,75 @@ class AIChatService {
     }
 
     throw new Error('Max tool iterations exceeded');
+  }
+
+  /**
+   * Detect if message is a code/implementation question
+   * @param {string} message - User message
+   * @returns {boolean}
+   */
+  detectCodeQuestion(message) {
+    const codeKeywords = [
+      /how (do|does|to|can) (i|we|you)/i,
+      /implement(ing|ation)?/i,
+      /\b(write|create|build|make|develop)\b/i,
+      /\b(code|function|class|method|component)\b/i,
+      /\b(API|endpoint|route|handler)\b/i,
+      /\b(error|bug|issue|problem|fix)\b/i,
+      /\b(js|jsx|ts|tsx|python|java|go|rust)\b/i
+    ];
+    return codeKeywords.some(regex => regex.test(message));
+  }
+
+  /**
+   * Format knowledge base results for AI context
+   * @param {Array} results - Code search results
+   * @returns {string}
+   */
+  formatKnowledgeContext(results) {
+    return results.map((r, idx) => {
+      const filePath = r.filePath || r.file_path || 'unknown';
+      const language = r.language || 'plaintext';
+      const code = r.code || r.content || '';
+      return `[${idx + 1}] ${filePath}:\n\`\`\`${language}\n${code}\n\`\`\``;
+    }).join('\n\n');
+  }
+
+  /**
+   * Chat with automatic knowledge base context injection
+   * @param {Array} messages - User messages
+   * @param {Object} options - Chat options (tools, messagesHistory, pageContext)
+   * @returns {Promise<Object>} Chat response
+   */
+  async chatWithKnowledgeContext(messages, options = {}) {
+    const lastUserMessage = messages[messages.length - 1]?.content || '';
+
+    // Check if message needs code context
+    if (this.detectCodeQuestion(lastUserMessage)) {
+      try {
+        const codeResults = await MCPService.searchCode({
+          query: lastUserMessage,
+          limit: 3,
+          threshold: 0.6
+        });
+
+        // Only inject if we got good results
+        if (codeResults.results && codeResults.results.length > 0) {
+          const contextMessage = {
+            role: 'system',
+            content: `Relevant code from knowledge base (use this to inform your response):\n\n${this.formatKnowledgeContext(codeResults.results)}`
+          };
+
+          // Prepend context to messages
+          messages = [contextMessage, ...messages];
+        }
+      } catch (error) {
+        console.error('Knowledge context injection failed:', error);
+        // Continue without context rather than failing
+      }
+    }
+
+    return this.chat(messages, options);
   }
 
   /**

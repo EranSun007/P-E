@@ -85,8 +85,8 @@ router.post('/chat', async (req, res) => {
         pageContext
       );
     } else {
-      // Simple chat without tools
-      response = await AIChatService.chat(messages, {
+      // Simple chat with automatic knowledge context injection
+      response = await AIChatService.chatWithKnowledgeContext(messages, {
         messagesHistory: history,
         pageContext
       });
