@@ -78,10 +78,10 @@ Plans:
   5. Folder expand/collapse state persists across page reloads (localStorage)
   6. Folders work correctly in both People and Product navigation modes
   7. Items not assigned to any folder display at root level
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 31-01-PLAN.md — CollapsibleFolder component with Radix Collapsible
+- [ ] 31-01-PLAN.md — useCollapsedFolders hook and CollapsibleFolder component
 - [ ] 31-02-PLAN.md — HierarchicalNavigation and Layout.jsx integration
 
 <details>
