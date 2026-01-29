@@ -64,12 +64,12 @@ Requirements for Menu Clustering milestone. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-01 | Phase 28 | Pending |
-| DATA-02 | Phase 28 | Pending |
-| DATA-03 | Phase 28 | Pending |
-| API-01 | Phase 28 | Pending |
-| API-02 | Phase 28 | Pending |
-| API-03 | Phase 28 | Pending |
+| DATA-01 | Phase 28 | Complete |
+| DATA-02 | Phase 28 | Complete |
+| DATA-03 | Phase 28 | Complete |
+| API-01 | Phase 28 | Complete |
+| API-02 | Phase 28 | Complete |
+| API-03 | Phase 28 | Complete |
 | FOLDER-01 | Phase 29 | Pending |
 | FOLDER-02 | Phase 29 | Pending |
 | FOLDER-03 | Phase 29 | Pending |
