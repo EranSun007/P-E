@@ -9,20 +9,20 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 
 ## Current Position
 
-Phase: 22 of 27 (Team Status Page)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-01-29 — Completed 22-01-PLAN.md (Team Status Foundation)
+Phase: 26 of 27 (Item Modal & Subtasks)
+Plan: 2 of 2 in current phase (Phase 26 complete)
+Status: Phase 26 complete
+Last activity: 2026-01-29 — Completed 26-02-PLAN.md (Subtask Management)
 
-Progress: [#########################.....] 49/54 plans (91% overall)
+Progress: [##########################....] 50/54 plans (93% overall)
 
 ## Milestone Summary
 
 **v1.6 TeamSync Integration:**
 - Phases: 23-27 (5 phases)
-- Plans: 10 total (8 complete)
+- Plans: 10 total (9 complete)
 - Requirements: 59 mapped
-- Status: Phase 23 complete, Phase 24 complete, Phase 25 complete, Phase 26 plan 01 complete (UI-05 to UI-11 fulfilled)
+- Status: Phase 23 complete, Phase 24 complete, Phase 25 complete, Phase 26 complete (UI-05 to UI-15 fulfilled)
 
 **v1.5 Knowledge Base (parallel on feature/v1.6):**
 - Phases: 19-22 (4 phases)
@@ -33,7 +33,7 @@ Progress: [#########################.....] 49/54 plans (91% overall)
 
 **v1.0-v1.4:** 35 plans completed across 18 phases
 **v1.5:** 7 plans completed (Phase 19 complete, Phase 20 complete, Phase 21 complete, Phase 22 plan 01 complete)
-**v1.6:** 8 plans completed (Phase 23 complete, Phase 24 complete, Phase 25 complete, Phase 26 plan 01 complete)
+**v1.6:** 9 plans completed (Phase 23 complete, Phase 24 complete, Phase 25 complete, Phase 26 complete)
 
 ## Accumulated Context
 
@@ -86,6 +86,9 @@ Key patterns established:
 - Modal view/edit toggle with mode state reset on open (26-01)
 - Unsaved changes confirmation with AlertDialog (26-01)
 - Sprint dropdown lists 3 cycles worth (current + 2 future) (26-01)
+- @dnd-kit for drag-and-drop: useSortable hook for items, DndContext for containers (26-02)
+- Optimistic updates with rollback pattern for subtask operations (26-02)
+- Subtask section independent of form mode (shown in both view and edit) (26-02)
 - MCP semantic search for insight retrieval with graceful fallback (22-01)
 - Sprint-based date filtering using releaseCycles utility (22-01)
 - Context refresh callback depends on [isAuthenticated, currentTeam, currentWeek] (22-01)
@@ -107,15 +110,14 @@ None - milestone starting fresh.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed 22-01-PLAN.md execution (Team Status Foundation)
+Stopped at: Completed 26-02-PLAN.md execution (Subtask Management)
 Resume file: None
 
 ## Next Steps
 
 **v1.6 TeamSync Integration:**
-1. Execute 26-02-PLAN.md - Subtask Management within Modal
-2. Execute Phase 27: Settings & Archive Management
-3. TeamSync integration complete
+1. Execute Phase 27: Settings & Archive Management
+2. TeamSync integration complete
 
 **v1.5 Knowledge Base:**
 1. Execute 22-02-PLAN.md - Team Status UI Components
