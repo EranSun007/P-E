@@ -420,11 +420,11 @@ Plans:
   5. Interactive timeline allows browsing daily summary history
   6. Health indicators (red/yellow/green) show status per team member or workstream
   7. User can filter summaries by date range
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 22-01-PLAN.md — Team Status page with navigation, team scaffold, daily summaries
-- [ ] 22-02-PLAN.md — Dashboard cards, timeline view, health indicators, date filter
+- [ ] 22-01-PLAN.md — Backend insights API, TeamStatusContext, page scaffold with routing
+- [ ] 22-02-PLAN.md — Dashboard components (MetricsBanner, MemberCard, TimelineNav, health indicators)
 
 ## Progress
 
