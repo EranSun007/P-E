@@ -104,6 +104,18 @@ export default function EntityModel() {
     );
   }
 
+  // Empty state
+  if (!loading && !error && nodes.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-120px)]">
+        <div className="text-center">
+          <div className="text-gray-400 text-5xl mb-4">📊</div>
+          <p className="text-gray-600">No tables found in database schema</p>
+        </div>
+      </div>
+    );
+  }
+
   // Main canvas
   return (
     <div className="h-[calc(100vh-120px)] flex">
