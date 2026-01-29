@@ -329,6 +329,95 @@ function createEntityMappingClient() {
   };
 }
 
+// Create SyncItem client with custom list, archive, and subtask methods
+function createSyncItemClient() {
+  const baseClient = createEntityClient('/sync');
+
+  return {
+    ...baseClient,
+
+    // List sync items with optional filtering
+    async list(filters = {}) {
+      const params = new URLSearchParams();
+      if (filters.category) params.append('category', filters.category);
+      if (filters.teamDepartment) params.append('teamDepartment', filters.teamDepartment);
+      if (filters.archived !== undefined) params.append('archived', filters.archived);
+      const queryString = params.toString();
+      return fetchWithAuth(`${API_BASE_URL}/sync${queryString ? '?' + queryString : ''}`);
+    },
+
+    // Get archived sync items with date filtering
+    async getArchived(filters = {}) {
+      const params = new URLSearchParams();
+      if (filters.from_date) params.append('from_date', filters.from_date);
+      if (filters.to_date) params.append('to_date', filters.to_date);
+      const queryString = params.toString();
+      return fetchWithAuth(`${API_BASE_URL}/sync/archived${queryString ? '?' + queryString : ''}`);
+    },
+
+    // Get count of archived sync items
+    async getArchivedCount() {
+      return fetchWithAuth(`${API_BASE_URL}/sync/archived/count`);
+    },
+
+    // Restore an archived sync item
+    async restore(id) {
+      return fetchWithAuth(`${API_BASE_URL}/sync/${id}/restore`, {
+        method: 'PUT',
+      });
+    },
+
+    // Subtask operations
+    async listSubtasks(itemId) {
+      return fetchWithAuth(`${API_BASE_URL}/sync/${itemId}/subtasks`);
+    },
+
+    async createSubtask(itemId, data) {
+      return fetchWithAuth(`${API_BASE_URL}/sync/${itemId}/subtasks`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+
+    async updateSubtask(itemId, subtaskId, updates) {
+      return fetchWithAuth(`${API_BASE_URL}/sync/${itemId}/subtasks/${subtaskId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+    },
+
+    async deleteSubtask(itemId, subtaskId) {
+      await fetchWithAuth(`${API_BASE_URL}/sync/${itemId}/subtasks/${subtaskId}`, {
+        method: 'DELETE',
+      });
+      return true;
+    },
+
+    async reorderSubtasks(itemId, orderedSubtaskIds) {
+      return fetchWithAuth(`${API_BASE_URL}/sync/${itemId}/subtasks/reorder`, {
+        method: 'PUT',
+        body: JSON.stringify({ orderedSubtaskIds }),
+      });
+    },
+  };
+}
+
+// Create SyncSettings client
+function createSyncSettingsClient() {
+  return {
+    async get() {
+      return fetchWithAuth(`${API_BASE_URL}/sync/settings`);
+    },
+
+    async update(updates) {
+      return fetchWithAuth(`${API_BASE_URL}/sync/settings`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+      });
+    },
+  };
+}
+
 // Create Notification client with custom methods
 function createNotificationClient() {
   const baseClient = createEntityClient('/notifications');
@@ -414,6 +503,9 @@ export const apiClient = {
     CaptureInbox: createCaptureInboxClient(),
     EntityMapping: createEntityMappingClient(),
     CaptureRule: createEntityClient('/capture-rules'),
+
+    // TeamSync Integration (v1.6)
+    SyncItem: createSyncItemClient(),
   },
 
   auth: {
@@ -702,5 +794,10 @@ export const apiClient = {
     async getHealth() {
       return fetchWithAuth(`${API_BASE_URL}/knowledge/health`);
     },
+  },
+
+  // TeamSync Integration API (v1.6)
+  sync: {
+    settings: createSyncSettingsClient(),
   },
 };
