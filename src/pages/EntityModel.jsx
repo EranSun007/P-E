@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   ReactFlow,
   Controls,
@@ -9,6 +9,7 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import EntityNode from '@/components/schema/EntityNode';
+import EntityDetailsPanel from '@/components/schema/EntityDetailsPanel';
 import { transformSchemaToGraph } from '@/components/schema/schemaTransform';
 
 const nodeTypes = {
@@ -26,6 +27,7 @@ export default function EntityModel() {
   const [error, setError] = useState(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [selectedNode, setSelectedNode] = useState(null);
 
   useEffect(() => {
     async function loadSchema() {
@@ -60,6 +62,14 @@ export default function EntityModel() {
     // Re-trigger useEffect by resetting state
     window.location.reload();
   };
+
+  const handleNodeClick = useCallback((event, node) => {
+    setSelectedNode(node);
+  }, []);
+
+  const handleClosePanel = useCallback(() => {
+    setSelectedNode(null);
+  }, []);
 
   // Loading state
   if (loading) {
@@ -96,20 +106,31 @@ export default function EntityModel() {
 
   // Main canvas
   return (
-    <div className="w-full h-[calc(100vh-120px)]">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        nodeTypes={nodeTypes}
-        fitView
-        minZoom={0.3}
-        maxZoom={2}
-      >
-        <Controls />
-        <Background variant="dots" />
-      </ReactFlow>
+    <div className="h-[calc(100vh-120px)] flex">
+      <div className="flex-1 relative">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          nodeTypes={nodeTypes}
+          onNodeClick={handleNodeClick}
+          onPaneClick={handleClosePanel}
+          fitView
+          fitViewOptions={{ padding: 0.2 }}
+          minZoom={0.3}
+          maxZoom={2}
+        >
+          <Controls />
+          <Background variant="dots" />
+        </ReactFlow>
+      </div>
+      {selectedNode && (
+        <EntityDetailsPanel
+          node={selectedNode}
+          onClose={handleClosePanel}
+        />
+      )}
     </div>
   );
 }

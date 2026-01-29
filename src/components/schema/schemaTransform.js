@@ -5,6 +5,8 @@
  * into ReactFlow graph format (nodes and edges).
  */
 
+import { MarkerType } from '@xyflow/react';
+
 /**
  * Enrich columns with constraint information
  * @param {Array} columns - Array of column objects from API
@@ -53,6 +55,7 @@ export function transformSchemaToGraph(tables) {
         tableName: table.tableName,
         columns: enrichedColumns,
         foreignKeys: table.foreignKeys || [],
+        indexes: table.indexes || [],
         constraints: table.constraints || {}
       },
       position: {
@@ -73,7 +76,11 @@ export function transformSchemaToGraph(tables) {
         target: fk.referencedTable,
         type: 'smoothstep',
         label: fk.columns.join(', '),
-        animated: false
+        animated: false,
+        style: { strokeWidth: 2, stroke: '#64748b' },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b' },
+        labelStyle: { fontSize: 10, fill: '#64748b' },
+        labelBgStyle: { fill: '#f8fafc', fillOpacity: 0.9 }
       });
     });
   });
