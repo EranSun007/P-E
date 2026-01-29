@@ -10,17 +10,17 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 ## Current Position
 
 Phase: 19 of 22 (MCP Client Backend)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-01-29 — Completed 19-01-PLAN.md
+Plan: 2 of 2 in current phase
+Status: Phase complete
+Last activity: 2026-01-29 — Completed 19-02-PLAN.md
 
-Progress: [####################.........] 36/43 plans (84% overall, 13% v1.5)
+Progress: [####################.........] 37/43 plans (86% overall, 50% v1.5 Phase 19)
 
 ## Parallel Work
 
 **v1.5 Knowledge Base Integration** — This branch (feature/v1.6) temporarily executing Phase 19
 - Phases 19-22
-- Status: Phase 19 Plan 01 complete, Plan 02 pending
+- Status: Phase 19 complete (both plans done)
 
 **Note:** Phase 19 work done on feature/v1.6 branch. Will need cherry-pick to main or branch coordination.
 
@@ -52,6 +52,9 @@ Key patterns established from v1.0-v1.4:
 - Lazy session initialization (only when first tool call made)
 - 404 triggers automatic re-initialization (session expired)
 - JSON-RPC 2.0 protocol with incrementing request IDs
+- All knowledge routes require authentication (no public access)
+- POST for semantic search operations (query in body, not URL)
+- 201 status for successful insight storage (resource creation)
 
 **v1.6 approach decisions:**
 - Extend existing projects/tasks tables (not new tables)
@@ -76,11 +79,13 @@ None - milestone starting fresh.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed 19-01-PLAN.md (MCP Client Backend)
+Stopped at: Completed 19-02-PLAN.md (MCP Client Backend - Phase complete)
 Resume file: None
 
 ## Next Steps
 
-1. Execute 19-02-PLAN.md (MCP API Routes)
-2. Continue Phase 20-22 for v1.5 completion
-3. Address branch coordination (Phase 19 on feature/v1.6 vs main)
+1. Continue Phase 20-22 for v1.5 completion
+2. Address branch coordination (Phase 19 on feature/v1.6 vs main)
+3. Phase 20: Team Status UI (frontend components)
+4. Phase 21: Team Status Backend (aggregation service)
+5. Phase 22: Knowledge Search UI (frontend integration)
