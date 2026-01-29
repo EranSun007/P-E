@@ -67,6 +67,9 @@ Requirements for Menu Clustering milestone. Each maps to roadmap phases.
 | DATA-01 | Phase 28 | Pending |
 | DATA-02 | Phase 28 | Pending |
 | DATA-03 | Phase 28 | Pending |
+| API-01 | Phase 28 | Pending |
+| API-02 | Phase 28 | Pending |
+| API-03 | Phase 28 | Pending |
 | FOLDER-01 | Phase 29 | Pending |
 | FOLDER-02 | Phase 29 | Pending |
 | FOLDER-03 | Phase 29 | Pending |
@@ -82,15 +85,12 @@ Requirements for Menu Clustering milestone. Each maps to roadmap phases.
 | NAV-05 | Phase 31 | Pending |
 | NAV-06 | Phase 31 | Pending |
 | NAV-07 | Phase 31 | Pending |
-| API-01 | Phase 28 | Pending |
-| API-02 | Phase 28 | Pending |
-| API-03 | Phase 28 | Pending |
 
 **Coverage:**
 - v1.7 requirements: 18 total
 - Mapped to phases: 18
-- Unmapped: 0 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-29*
-*Last updated: 2026-01-29 after initial definition*
+*Roadmap created: 2026-01-29*

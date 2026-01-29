@@ -9,10 +9,80 @@
 - **v1.4 Bug Dashboard Fixes & Enhancements** - Phases 17-18 (shipped 2026-01-28) — [Archive](milestones/v1.4-ROADMAP.md)
 - **v1.5 Knowledge Base Integration & Team Status** - Phases 19-22 (shipped 2026-01-29) — [Archive](milestones/v1.5-ROADMAP.md)
 - **v1.6 TeamSync Integration** - Phases 23-27 (shipped 2026-01-29) — [Archive](milestones/v1.6-ROADMAP.md)
+- **v1.7 Menu Clustering** - Phases 28-31 (in progress)
 
-**Next:** Run `/gsd:new-milestone` to plan v1.7
+## v1.7 Menu Clustering
 
-## Phases
+**Milestone Goal:** Add collapsible folder navigation to organize the 13+ sidebar menu items into logical groups, with user-configurable folder structure via Settings UI.
+
+- [ ] **Phase 28: Data Layer & Backend API** - Menu config storage, NavigationContext, REST API
+- [ ] **Phase 29: Settings UI Basic** - Folder CRUD and item assignment via dropdowns
+- [ ] **Phase 30: Settings UI DnD Enhancement** - Drag-and-drop for folder/item reordering
+- [ ] **Phase 31: Navigation Integration** - Collapsible folders in sidebar with persistence
+
+### Phase 28: Data Layer & Backend API
+**Goal**: Backend can store and serve menu configuration, frontend context manages state
+**Depends on**: Phase 27 (v1.6 complete)
+**Requirements**: DATA-01, DATA-02, DATA-03, API-01, API-02, API-03
+**Success Criteria** (what must be TRUE):
+  1. User's menu configuration persists across browser sessions via backend storage
+  2. People and Product navigation modes have independent folder configurations
+  3. GET /api/menu-config returns user's stored configuration (or defaults if none)
+  4. PUT /api/menu-config saves updated configuration (multi-tenancy enforced)
+  5. NavigationContext provides menu config to Layout.jsx and Settings.jsx
+**Plans**: TBD
+
+Plans:
+- [ ] 28-01-PLAN.md — Database schema, MenuConfigService, REST API routes
+- [ ] 28-02-PLAN.md — NavigationContext with UserSettings integration
+
+### Phase 29: Settings UI Basic
+**Goal**: User can create, rename, delete folders and assign items via Settings page
+**Depends on**: Phase 28 (context and API must exist)
+**Requirements**: FOLDER-01, FOLDER-02, FOLDER-03, FOLDER-04, FOLDER-05
+**Success Criteria** (what must be TRUE):
+  1. User can create a new folder with a custom name from Settings
+  2. User can rename an existing folder
+  3. User can delete a folder (items return to root level, not deleted)
+  4. User can assign menu items to folders using a dropdown selector
+  5. User can remove items from folders (move back to root)
+**Plans**: TBD
+
+Plans:
+- [ ] 29-01-PLAN.md — Navigation Settings tab with folder CRUD
+- [ ] 29-02-PLAN.md — Item assignment dropdown and folder preview
+
+### Phase 30: Settings UI DnD Enhancement
+**Goal**: User can reorder folders and items via drag-and-drop in Settings
+**Depends on**: Phase 29 (basic UI must work first)
+**Requirements**: FOLDER-06, FOLDER-07, FOLDER-08
+**Success Criteria** (what must be TRUE):
+  1. User can drag items between folders and root level
+  2. User can drag folders to reorder them
+  3. User can drag items within a folder to reorder them
+  4. Drag operations provide visual feedback (drop targets highlighted)
+**Plans**: TBD
+
+Plans:
+- [ ] 30-01-PLAN.md — @dnd-kit integration for item and folder reordering
+
+### Phase 31: Navigation Integration
+**Goal**: Sidebar displays collapsible folder groups with persistent expand/collapse state
+**Depends on**: Phase 28 (context must exist), Phase 29/30 (config can be customized)
+**Requirements**: NAV-01, NAV-02, NAV-03, NAV-04, NAV-05, NAV-06, NAV-07
+**Success Criteria** (what must be TRUE):
+  1. Sidebar displays folders as collapsible groups with nested menu items
+  2. User can click folder header to expand/collapse nested items
+  3. Chevron icon rotates to indicate folder expand/collapse state
+  4. Expand/collapse animation is smooth (CSS transition)
+  5. Folder expand/collapse state persists across page reloads (localStorage)
+  6. Folders work correctly in both People and Product navigation modes
+  7. Items not assigned to any folder display at root level
+**Plans**: TBD
+
+Plans:
+- [ ] 31-01-PLAN.md — CollapsibleFolder component with Radix Collapsible
+- [ ] 31-02-PLAN.md — HierarchicalNavigation and Layout.jsx integration
 
 <details>
 <summary>v1.0 Jira Integration MVP (Phases 1-5) - SHIPPED 2026-01-21</summary>
@@ -353,7 +423,8 @@ Plans:
 
 </details>
 
-## v1.5 Knowledge Base Integration & Team Status (SHIPPED 2026-01-29)
+<details>
+<summary>v1.5 Knowledge Base Integration & Team Status (Phases 19-22) - SHIPPED 2026-01-29</summary>
 
 **Milestone Goal:** Integrate with MCP knowledge base server for semantic code/documentation search, enhance AI chat with knowledge context, and add team status dashboard for daily summaries.
 
@@ -430,6 +501,8 @@ Plans:
 - [x] 22-02-PLAN.md — Dashboard components (MetricsBanner, MemberCard, TimelineNav, health indicators)
 - [x] 22-03-PLAN.md — Gap closure: PostgreSQL team_summaries table to fix data structure mismatch
 
+</details>
+
 <details>
 <summary>v1.6 TeamSync Integration (Phases 23-27) - SHIPPED 2026-01-29</summary>
 
@@ -455,6 +528,7 @@ v1.3: 13 -> 14 (depends on 13) -> 15 (depends on 13) -> 16 (depends on 15)
 v1.4: 17 -> 18 (depends on 17)
 v1.5: 19 -> 20 (depends on 19), 21 (depends on 19), 22 (depends on 19)
 v1.6: 23 -> 24 (depends on 23) -> 25 (depends on 24) -> 26 (depends on 25) -> 27 (depends on 26)
+v1.7: 28 -> 29 (depends on 28) -> 30 (depends on 29) -> 31 (depends on 28)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -485,9 +559,12 @@ v1.6: 23 -> 24 (depends on 23) -> 25 (depends on 24) -> 26 (depends on 25) -> 27
 | 25. Frontend Context | v1.6 | 2/2 | Complete | 2026-01-29 |
 | 26. Item Modal & Subtasks | v1.6 | 2/2 | Complete | 2026-01-29 |
 | 27. Archive Flow | v1.6 | 3/3 | Complete | 2026-01-29 |
+| 28. Data Layer & Backend API | v1.7 | 0/2 | Not started | - |
+| 29. Settings UI Basic | v1.7 | 0/2 | Not started | - |
+| 30. Settings UI DnD Enhancement | v1.7 | 0/1 | Not started | - |
+| 31. Navigation Integration | v1.7 | 0/2 | Not started | - |
 
 **Summary:**
-- v1.0-v1.4: 35 plans (Phases 1-18)
-- v1.5: 10 plans (Phases 19-22)
-- v1.6: 11 plans (Phases 23-27)
-- **Total: 56 plans across 27 phases**
+- v1.0-v1.6: 56 plans (Phases 1-27) - SHIPPED
+- v1.7: 7 plans (Phases 28-31) - IN PROGRESS
+- **Total: 63 plans across 31 phases**
