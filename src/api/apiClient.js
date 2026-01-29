@@ -781,6 +781,17 @@ export const apiClient = {
       });
     },
 
+    // Retrieve stored insights
+    async searchInsights(options) {
+      const params = new URLSearchParams();
+      if (options.startDate) params.append('startDate', options.startDate);
+      if (options.endDate) params.append('endDate', options.endDate);
+      if (options.teamDepartment) params.append('teamDepartment', options.teamDepartment);
+      if (options.category) params.append('category', options.category);
+      if (options.limit) params.append('limit', options.limit);
+      return fetchWithAuth(`${API_BASE_URL}/knowledge/insights?${params.toString()}`);
+    },
+
     // Get repository statistics
     async getStats(options = {}) {
       const params = new URLSearchParams();

@@ -288,6 +288,54 @@ class MCPService {
   }
 
   /**
+   * Retrieve stored insights from knowledge base
+   * @param {object} options - Query options
+   * @param {string} options.startDate - Start date (YYYY-MM-DD)
+   * @param {string} options.endDate - End date (YYYY-MM-DD)
+   * @param {string} options.teamDepartment - Filter by team department
+   * @param {string} options.category - Filter by category
+   * @param {number} options.limit - Max results
+   * @returns {Promise<object>} Search results with summaries
+   */
+  async getInsights(options = {}) {
+    try {
+      // Use semantic search with category filter to retrieve insights
+      // MCP server doesn't have dedicated retrieval tool, so we use search
+      const searchQuery = options.teamDepartment
+        ? `team summaries for ${options.teamDepartment}`
+        : 'team summaries';
+
+      const result = await this._callTool('consult_documentation', {
+        query: searchQuery,
+        limit: options.limit || 50,
+        threshold: 0.5, // Lower threshold for team summaries
+        category: options.category || 'team_summary',
+      });
+
+      const parsedResult = this._parseToolResult(result);
+
+      // Parse and filter results by date range if provided
+      let summaries = parsedResult.results || [];
+
+      // Note: MCP semantic search may not support date filtering directly
+      // For now, return all results - date filtering can be added later
+      // when insights include timestamp metadata
+
+      return {
+        summaries,
+        total: summaries.length
+      };
+    } catch (error) {
+      console.warn('MCP getInsights failed, returning empty results:', error.message);
+      // Graceful fallback - return empty results instead of throwing
+      return {
+        summaries: [],
+        total: 0
+      };
+    }
+  }
+
+  /**
    * Health check for MCP server
    * @returns {Promise<object>} Health status
    */

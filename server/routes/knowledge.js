@@ -99,6 +99,37 @@ router.post('/insights', async (req, res) => {
   }
 });
 
+/**
+ * GET /insights - Retrieve stored insights
+ * Query: { startDate, endDate, teamDepartment, category, limit }
+ */
+router.get('/insights', async (req, res) => {
+  try {
+    const { startDate, endDate, teamDepartment, category, limit } = req.query;
+
+    // Validate dates if provided
+    if (startDate && isNaN(Date.parse(startDate))) {
+      return res.status(400).json({ error: 'Invalid startDate format' });
+    }
+    if (endDate && isNaN(Date.parse(endDate))) {
+      return res.status(400).json({ error: 'Invalid endDate format' });
+    }
+
+    const results = await MCPService.getInsights({
+      startDate,
+      endDate,
+      teamDepartment,
+      category,
+      limit: limit ? parseInt(limit) : undefined
+    });
+
+    res.json(results);
+  } catch (error) {
+    console.error('GET /api/knowledge/insights error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================
 // Repository Statistics
 // ============================================
