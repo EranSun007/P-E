@@ -116,6 +116,11 @@ const MIGRATIONS = [
     version: '022_sync_items',
     name: 'Add sync item schema for TeamSync Integration',
     file: '022_sync_items.sql'
+  },
+  {
+    version: '023_team_summaries',
+    name: 'Create team_summaries table for structured team status data',
+    file: '023_team_summaries.sql'
   }
 ];
 
