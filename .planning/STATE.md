@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 
 ## Current Position
 
-Phase: 24 of 27 (REST API)
-Plan: 0 of 2 in current phase
-Status: Ready to plan
-Last activity: 2026-01-29 — Completed Phase 23 (Database & Backend Services)
+Phase: 20 of 22 (Knowledge Search UI)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-01-29 — Completed 20-01-PLAN.md (Knowledge Search UI)
 
-Progress: [#####################.........] 39/47 plans (83% overall)
+Progress: [####################..........] 40/47 plans (85% overall)
 
 ## Milestone Summary
 
@@ -24,15 +24,15 @@ Progress: [#####################.........] 39/47 plans (83% overall)
 - Requirements: 59 mapped
 - Status: Phase 23 complete, Phase 24 ready
 
-**v1.5 Knowledge Base (parallel on main):**
+**v1.5 Knowledge Base (parallel on feature/v1.6):**
 - Phases: 19-22
-- Status: Phase 19 complete and verified (2026-01-29)
-- Ready: Phase 20 (Knowledge Search UI)
+- Status: Phase 19 complete, Phase 20 in progress (20-01 complete)
+- Next: 20-02 (Advanced Search Filters)
 
 ## Performance Metrics
 
 **v1.0-v1.4:** 35 plans completed across 18 phases
-**v1.5:** 2 plans completed (Phase 19)
+**v1.5:** 3 plans completed (Phase 19 complete, 20-01 complete)
 **v1.6:** 2 plans completed (Phase 23 - Database & Backend Services complete)
 
 ## Accumulated Context
@@ -52,6 +52,9 @@ Key patterns established:
 - JSONB status_history parsing handles both string and object (23-02)
 - Transaction-based atomic operations for reordering (23-02)
 - UPSERT pattern for user preferences (INSERT ON CONFLICT) (23-02)
+- Light build of react-syntax-highlighter for bundle optimization (20-01)
+- Parallel API calls for code and docs search (20-01)
+- Flexible result parsing (camelCase/snake_case compatibility) (20-01)
 
 ### Pending Todos
 
@@ -67,11 +70,17 @@ None - milestone starting fresh.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed Phase 23 execution and verification
+Stopped at: Completed 20-01-PLAN.md execution
 Resume file: None
 
 ## Next Steps
 
+**v1.5 Knowledge Base:**
+1. Execute 20-02: Advanced search filters (language, repo, domain, category)
+2. Continue Phase 21: Knowledge Stats Dashboard
+3. Continue Phase 22: Health Monitoring
+
+**v1.6 TeamSync Integration:**
 1. `/gsd:plan-phase 24` - Plan REST API
 2. Execute 24-01: Sync item routes (CRUD, archive, restore)
 3. Execute 24-02: Subtask and settings routes
