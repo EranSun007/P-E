@@ -38,6 +38,7 @@ import { useDisplayMode } from "@/contexts/DisplayModeContext.jsx";
 import { useAppMode } from "@/contexts/AppModeContext.jsx";
 import { AIChatPanel, AIAssistantButton } from "@/components/ai";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { HierarchicalNavigation } from "@/components/navigation/HierarchicalNavigation";
 
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -298,26 +299,10 @@ export default function Layout({ children, currentPageName }) {
         <div className="flex flex-col h-[calc(100%-4rem)] justify-between">
           <nav className="flex-1 p-4 overflow-y-auto">
             <div className="space-y-1">
-              {navigation.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className={cn(
-                    "flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors duration-200",
-                    isProductMode
-                      ? item.current
-                        ? "bg-purple-900/50 text-purple-300"
-                        : "text-gray-300 hover:bg-gray-800 hover:text-white"
-                      : item.current
-                        ? "bg-indigo-50 text-indigo-700"
-                        : "text-gray-700 hover:bg-gray-100"
-                  )}
-                >
-                  <item.icon className="h-5 w-5 mr-3" />
-                  {item.name}
-                </Link>
-              ))}
+              <HierarchicalNavigation
+                navigation={navigation}
+                onItemClick={() => setSidebarOpen(false)}
+              />
             </div>
           </nav>
 
