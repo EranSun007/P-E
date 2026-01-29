@@ -9,20 +9,20 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 
 ## Current Position
 
-Phase: 22 of 27 (Team Status Page) - Gap Closure
+Phase: 27 of 27 (Archive Flow) - Gap Closure Complete
 Plan: 3 of 3 in current phase
-Status: Phase 22 complete (including gap closure)
-Last activity: 2026-01-29 — Completed 22-03-PLAN.md (PostgreSQL Team Summaries Gap Closure)
+Status: Phase 27 complete (including gap closure)
+Last activity: 2026-01-29 — Completed 27-03-PLAN.md (Archive Flow Gap Closure)
 
-Progress: [##############################] 53/54 plans (98% overall)
+Progress: [##############################] 54/54 plans (100% overall)
 
 ## Milestone Summary
 
 **v1.6 TeamSync Integration:**
 - Phases: 23-27 (5 phases)
-- Plans: 10 total (10 complete)
+- Plans: 11 total (11 complete - includes 27-03 gap closure)
 - Requirements: 59 mapped
-- Status: Phase 23 complete, Phase 24 complete, Phase 25 complete, Phase 26 complete, Phase 27 complete (UI-05 to UI-19 fulfilled)
+- Status: Phase 23 complete, Phase 24 complete, Phase 25 complete, Phase 26 complete, Phase 27 complete with gap closure (UI-05 to UI-19 fulfilled)
 
 **v1.5 Knowledge Base (parallel on feature/v1.6):**
 - Phases: 19-22 (4 phases)
@@ -33,7 +33,7 @@ Progress: [##############################] 53/54 plans (98% overall)
 
 **v1.0-v1.4:** 35 plans completed across 18 phases
 **v1.5:** 10 plans completed (Phase 19 complete, Phase 20 complete, Phase 21 complete, Phase 22 complete with gap closure)
-**v1.6:** 10 plans completed (Phase 23 complete, Phase 24 complete, Phase 25 complete, Phase 26 complete, Phase 27 complete)
+**v1.6:** 11 plans completed (Phase 23 complete, Phase 24 complete, Phase 25 complete, Phase 26 complete, Phase 27 complete with gap closure)
 
 ## Accumulated Context
 
@@ -107,6 +107,9 @@ Key patterns established:
 - Archive modal lazy-loads items only when opened via loadArchivedItems (27-01)
 - Native date inputs for archive filter (no additional date picker library) (27-01)
 - Clear archive filters on modal close for fresh state each open (27-01)
+- archived_at timestamp set via service layer on archive/update with archived:true (27-03)
+- Filter archived items by archived_at (not created_date) for accurate date filtering (27-03)
+- Backfill migration pattern using updated_date for existing archived items (27-03)
 
 ### Pending Todos
 
@@ -124,13 +127,13 @@ None - v1.6 milestone complete.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed 27-01-PLAN.md execution (Archive Modal UI)
+Stopped at: Completed 27-03-PLAN.md execution (Archive Flow Gap Closure)
 Resume file: None
 
 ## Next Steps
 
 **v1.6 TeamSync Integration:**
-Complete - all phases (23-27) finished. Ready for merge to main.
+Complete - all phases (23-27) finished, including 27-03 gap closure for archived_at timestamps. Ready for merge to main.
 
 **v1.5 Knowledge Base:**
 Complete - all phases (19-22) finished, including 22-03 gap closure for PostgreSQL team summaries.
