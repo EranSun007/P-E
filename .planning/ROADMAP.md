@@ -61,10 +61,10 @@ Plans:
   2. User can drag folders to reorder them
   3. User can drag items within a folder to reorder them
   4. Drag operations provide visual feedback (drop targets highlighted)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 30-01-PLAN.md — @dnd-kit integration for item and folder reordering
+- [ ] 30-01-PLAN.md — @dnd-kit integration for folder reordering and cross-container item dragging
 
 ### Phase 31: Navigation Integration
 **Goal**: Sidebar displays collapsible folder groups with persistent expand/collapse state
