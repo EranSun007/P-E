@@ -36,13 +36,13 @@ Requirements for Knowledge Base Integration & Team Status milestone. Each maps t
 
 ### Team Status Page
 
-- [ ] **TEAM-01**: Team Status page accessible from navigation
-- [ ] **TEAM-02**: Reporting team view (Metering team scaffold for future)
-- [ ] **TEAM-03**: Daily summaries retrieved from MCP store_insight data
-- [ ] **TEAM-04**: Dashboard cards showing progress metrics (completed items, blockers, velocity)
-- [ ] **TEAM-05**: Interactive timeline view of daily summary history
-- [ ] **TEAM-06**: Health indicators (red/yellow/green) per team member or workstream
-- [ ] **TEAM-07**: Filtering by date range
+- [x] **TEAM-01**: Team Status page accessible from navigation
+- [x] **TEAM-02**: Reporting team view (Metering team scaffold for future)
+- [x] **TEAM-03**: Daily summaries retrieved from PostgreSQL team_summaries table
+- [x] **TEAM-04**: Dashboard cards showing progress metrics (completed items, blockers, velocity)
+- [x] **TEAM-05**: Interactive timeline view of daily summary history
+- [x] **TEAM-06**: Health indicators (red/yellow/green) per team member or workstream
+- [x] **TEAM-07**: Filtering by date range
 
 ## Future Requirements
 
@@ -101,13 +101,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CHAT-02 | Phase 21 | Complete |
 | CHAT-03 | Phase 21 | Complete |
 | CHAT-04 | Phase 21 | Complete |
-| TEAM-01 | Phase 22 | Pending |
-| TEAM-02 | Phase 22 | Pending |
-| TEAM-03 | Phase 22 | Pending |
-| TEAM-04 | Phase 22 | Pending |
-| TEAM-05 | Phase 22 | Pending |
-| TEAM-06 | Phase 22 | Pending |
-| TEAM-07 | Phase 22 | Pending |
+| TEAM-01 | Phase 22 | Complete |
+| TEAM-02 | Phase 22 | Complete |
+| TEAM-03 | Phase 22 | Complete |
+| TEAM-04 | Phase 22 | Complete |
+| TEAM-05 | Phase 22 | Complete |
+| TEAM-06 | Phase 22 | Complete |
+| TEAM-07 | Phase 22 | Complete |
 
 **Coverage:**
 - v1.5 requirements: 25 total
