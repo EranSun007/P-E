@@ -811,4 +811,25 @@ export const apiClient = {
   sync: {
     settings: createSyncSettingsClient(),
   },
+
+  // Menu Configuration API (v1.7)
+  menuConfig: {
+    async get(mode) {
+      // mode is 'people' or 'product'
+      return fetchWithAuth(`${API_BASE_URL}/menu-config/${mode}`);
+    },
+
+    async set(mode, config) {
+      // mode is 'people' or 'product'
+      // config is { folders: [], items: [] }
+      return fetchWithAuth(`${API_BASE_URL}/menu-config/${mode}`, {
+        method: 'PUT',
+        body: JSON.stringify(config),
+      });
+    },
+
+    async getDefaults(mode) {
+      return fetchWithAuth(`${API_BASE_URL}/menu-config/${mode}/defaults`);
+    },
+  },
 };
