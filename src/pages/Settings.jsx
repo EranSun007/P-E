@@ -16,7 +16,8 @@ import {
   Database,
   Loader2,
   Github,
-  Bell
+  Bell,
+  Navigation2
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,6 +53,7 @@ import PasswordChangeForm from "@/components/auth/PasswordChangeForm";
 import UserManagement from "@/components/auth/UserManagement";
 import GitHubSettings from "@/components/github/GitHubSettings";
 import EmailPreferences from "@/components/settings/EmailPreferences";
+import NavigationSettings from "@/components/settings/NavigationSettings";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function SettingsPage() {
@@ -278,6 +280,7 @@ export default function SettingsPage() {
     ...(isAdmin ? [{ id: "users", label: "Users", icon: User }] : []),
     { id: "github", label: "GitHub", icon: Github },
     { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "navigation", label: "Navigation", icon: Navigation2 },
     { id: "data", label: "Data", icon: Database }
   ];
 
@@ -378,7 +381,7 @@ export default function SettingsPage() {
               ))}
             </TabsList>
             
-            {activeTab !== 'account' && (
+            {!['account', 'users', 'github', 'notifications', 'data', 'navigation'].includes(activeTab) && (
               <div className="flex gap-4">
                 <div className="relative flex-grow">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -389,7 +392,7 @@ export default function SettingsPage() {
                     className="pl-9"
                   />
                 </div>
-                
+
                 <Button onClick={openCreateDialog}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add New
@@ -522,6 +525,8 @@ export default function SettingsPage() {
                 <GitHubSettings />
               ) : tab.id === 'notifications' ? (
                 <EmailPreferences />
+              ) : tab.id === 'navigation' ? (
+                <NavigationSettings />
               ) : tab.id !== 'account' ? (
                 <Card>
                   <CardHeader>
