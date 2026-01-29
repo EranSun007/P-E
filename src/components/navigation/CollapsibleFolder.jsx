@@ -40,7 +40,7 @@ export function CollapsibleFolder({ folder, children, isProductMode }) {
         <span>{folder.name}</span>
       </CollapsibleTrigger>
 
-      <CollapsibleContent className="pl-6">
+      <CollapsibleContent className="overflow-hidden pl-6 data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
         {children}
       </CollapsibleContent>
     </Collapsible>
