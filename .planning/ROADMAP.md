@@ -16,7 +16,7 @@
 
 **Milestone Goal:** Build a read-only visual schema viewer that displays current database structure as an interactive node graph for understanding entity relationships.
 
-- [ ] **Phase 32: Schema Introspection Backend** - PostgreSQL introspection API
+- [x] **Phase 32: Schema Introspection Backend** - PostgreSQL introspection API
 - [ ] **Phase 33: Visual Canvas** - @xyflow/react graph with entity nodes and relationship edges
 
 ### Phase 32: Schema Introspection Backend
@@ -32,8 +32,8 @@
 **Plans**: 2 plans
 
 Plans:
-- [ ] 32-01-PLAN.md — SchemaService with information_schema queries
-- [ ] 32-02-PLAN.md — REST API routes for schema introspection
+- [x] 32-01-PLAN.md — SchemaService with information_schema queries
+- [x] 32-02-PLAN.md — REST API routes for schema introspection
 
 ### Phase 33: Visual Canvas
 **Goal**: Frontend displays schema as interactive node graph with pan, zoom, and click-to-view

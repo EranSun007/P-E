@@ -9,10 +9,10 @@ Requirements for Entity Model Viewer milestone. Read-only schema visualization.
 
 ### Schema Introspection
 
-- [ ] **INTRO-01**: System automatically reads all PostgreSQL tables in the database
-- [ ] **INTRO-02**: System reads columns with types, nullable, defaults for each table
-- [ ] **INTRO-03**: System reads foreign key relationships between tables
-- [ ] **INTRO-04**: System reads indexes and constraints
+- [x] **INTRO-01**: System automatically reads all PostgreSQL tables in the database
+- [x] **INTRO-02**: System reads columns with types, nullable, defaults for each table
+- [x] **INTRO-03**: System reads foreign key relationships between tables
+- [x] **INTRO-04**: System reads indexes and constraints
 
 ### Visual Canvas
 
@@ -59,10 +59,10 @@ Requirements for Entity Model Viewer milestone. Read-only schema visualization.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INTRO-01 | Phase 32 | Pending |
-| INTRO-02 | Phase 32 | Pending |
-| INTRO-03 | Phase 32 | Pending |
-| INTRO-04 | Phase 32 | Pending |
+| INTRO-01 | Phase 32 | Complete |
+| INTRO-02 | Phase 32 | Complete |
+| INTRO-03 | Phase 32 | Complete |
+| INTRO-04 | Phase 32 | Complete |
 | NAV-01 | Phase 33 | Pending |
 | NAV-02 | Phase 33 | Pending |
 | CANVAS-01 | Phase 33 | Pending |
