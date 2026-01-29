@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 ## Current Position
 
 Phase: 28 of 31 (Data Layer & Backend API)
-Plan: Ready to plan
-Status: Roadmap complete, ready to plan Phase 28
-Last activity: 2026-01-29 — v1.7 roadmap created (4 phases, 7 plans)
+Plan: 1 of 2 complete
+Status: In progress
+Last activity: 2026-01-29 — Completed 28-01-PLAN.md (Backend API for Menu Config)
 
-Progress: [============================] 89% (56/63 plans)
+Progress: [============================] 90% (57/63 plans)
 
 ## Milestone Summary
 
@@ -28,9 +28,9 @@ Progress: [============================] 89% (56/63 plans)
 - v1.6 TeamSync Integration (Phases 23-27, 11 plans) — 2026-01-29
 
 **Current Milestone:**
-- v1.7 Menu Clustering (Phases 28-31, 7 plans) — IN PROGRESS
+- v1.7 Menu Clustering (Phases 28-31, 7 plans) — IN PROGRESS (1/7 plans)
 
-**Total: 7 milestones shipped, 27 phases, 56 plans completed**
+**Total: 7 milestones shipped, 27 phases, 57 plans completed**
 
 ## Performance Metrics
 
@@ -47,6 +47,15 @@ Progress: [============================] 89% (56/63 plans)
 - camelCase/snake_case conversion at service layer boundary
 - @dnd-kit for accessible drag-and-drop
 - @radix-ui/react-collapsible for expand/collapse (already installed)
+- JSON config storage in user_settings (menu_config_{mode})
+
+### Decisions Made (Phase 28)
+
+| ID | Decision | Rationale |
+|----|----------|-----------|
+| json-storage | Store menu config as JSON string in user_settings | Reuses existing infrastructure |
+| separate-modes | Separate setting keys per mode | Users may have different organizations |
+| empty-defaults | Default configs are empty arrays | Let frontend determine initial ordering |
 
 ### Research Flags for v1.7
 
@@ -60,9 +69,9 @@ None — all milestones shipped successfully.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: v1.7 roadmap created
+Stopped at: Completed 28-01-PLAN.md
 Resume file: None
 
 ## Next Steps
 
-Run `/gsd:plan-phase 28` to start Data Layer & Backend API phase.
+Execute 28-02-PLAN.md (Frontend API Client) to complete Phase 28.
