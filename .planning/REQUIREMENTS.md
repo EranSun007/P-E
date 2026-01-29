@@ -9,14 +9,14 @@ Requirements for Knowledge Base Integration & Team Status milestone. Each maps t
 
 ### MCP Client Integration
 
-- [ ] **MCP-01**: Backend MCP client service with session management (Mcp-Session-Id header handling)
-- [ ] **MCP-02**: JSON-RPC 2.0 protocol implementation for tool calls
-- [ ] **MCP-03**: Support for consult_code_base tool (semantic code search)
-- [ ] **MCP-04**: Support for consult_documentation tool (semantic doc search)
-- [ ] **MCP-05**: Support for store_insight tool (persist learnings)
-- [ ] **MCP-06**: Support for get_repository_stats tool (knowledge base analytics)
-- [ ] **MCP-07**: Error handling and session recovery (timeout, reconnect)
-- [ ] **MCP-08**: REST API endpoints exposing MCP tools to frontend
+- [x] **MCP-01**: Backend MCP client service with session management (Mcp-Session-Id header handling)
+- [x] **MCP-02**: JSON-RPC 2.0 protocol implementation for tool calls
+- [x] **MCP-03**: Support for consult_code_base tool (semantic code search)
+- [x] **MCP-04**: Support for consult_documentation tool (semantic doc search)
+- [x] **MCP-05**: Support for store_insight tool (persist learnings)
+- [x] **MCP-06**: Support for get_repository_stats tool (knowledge base analytics)
+- [x] **MCP-07**: Error handling and session recovery (timeout, reconnect)
+- [x] **MCP-08**: REST API endpoints exposing MCP tools to frontend
 
 ### Knowledge Search UI
 
@@ -83,14 +83,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MCP-01 | Phase 19 | Pending |
-| MCP-02 | Phase 19 | Pending |
-| MCP-03 | Phase 19 | Pending |
-| MCP-04 | Phase 19 | Pending |
-| MCP-05 | Phase 19 | Pending |
-| MCP-06 | Phase 19 | Pending |
-| MCP-07 | Phase 19 | Pending |
-| MCP-08 | Phase 19 | Pending |
+| MCP-01 | Phase 19 | Complete |
+| MCP-02 | Phase 19 | Complete |
+| MCP-03 | Phase 19 | Complete |
+| MCP-04 | Phase 19 | Complete |
+| MCP-05 | Phase 19 | Complete |
+| MCP-06 | Phase 19 | Complete |
+| MCP-07 | Phase 19 | Complete |
+| MCP-08 | Phase 19 | Complete |
 | SEARCH-01 | Phase 20 | Pending |
 | SEARCH-02 | Phase 20 | Pending |
 | SEARCH-03 | Phase 20 | Pending |
