@@ -436,7 +436,7 @@ Plans:
 - [x] **Phase 24: API Routes** - Subtask operations, sync settings, archive endpoints
 - [x] **Phase 25: Frontend Context** - SyncContext for state management, Kanban board components
 - [x] **Phase 26: Item Modal & Subtasks** - SyncItemModal with view/edit modes, subtask drag-and-drop
-- [ ] **Phase 27: Archive Flow** - Archive modal, restore functionality, auto-archive on resolve
+- [x] **Phase 27: Archive Flow** - Archive modal, restore functionality, auto-archive on resolve
 
 ### Phase 27: Archive Flow
 **Goal**: User can archive resolved items and restore them from archive modal
@@ -447,11 +447,11 @@ Plans:
   2. Archive modal lists archived items with date filter
   3. Restore action moves item back to active Kanban board
   4. Setting status to "Done" automatically archives the item
-**Plans**: 2 plans
+**Plans**: 2/2 complete
 
 Plans:
-- [ ] 27-01-PLAN.md — Archive modal and restore flow
-- [ ] 27-02-PLAN.md — Auto-archive on resolve
+- [x] 27-01-PLAN.md — Archive modal and restore flow
+- [x] 27-02-PLAN.md — Auto-archive on resolve
 
 ## Progress
 
@@ -492,4 +492,4 @@ v1.6: 23 -> 24 (depends on 23) -> 25 (depends on 24) -> 26 (depends on 25) -> 27
 | 24. API Routes | v1.6 | 2/2 | Complete | 2026-01-29 |
 | 25. Frontend Context | v1.6 | 2/2 | Complete | 2026-01-29 |
 | 26. Item Modal & Subtasks | v1.6 | 2/2 | Complete | 2026-01-29 |
-| 27. Archive Flow | v1.6 | 0/2 | Planned | - |
+| 27. Archive Flow | v1.6 | 2/2 | Complete | 2026-01-29 |
