@@ -6,14 +6,17 @@ import { useSync } from "@/contexts/SyncContext";
 import { TeamDepartmentTabs } from "@/components/sync/TeamDepartmentTabs";
 import { KanbanBoard } from "@/components/sync/KanbanBoard";
 import { SyncItemModal } from "@/components/sync/SyncItemModal";
+import { ArchiveModal } from "@/components/sync/ArchiveModal";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Plus, Archive } from "lucide-react";
 
 export default function TeamSync() {
   const {
     itemsByCategory,
     currentTeam,
     setCurrentTeam,
+    archivedCount,
     loading,
     createItem,
     updateItem,
@@ -23,6 +26,7 @@ export default function TeamSync() {
   // Modal state
   const [selectedItem, setSelectedItem] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [archiveModalOpen, setArchiveModalOpen] = useState(false);
 
   // Handle item click - open modal in view mode
   const handleItemClick = (item) => {
@@ -75,9 +79,21 @@ export default function TeamSync() {
           <h1 className="text-2xl font-bold text-gray-900">Team Sync</h1>
           <p className="text-gray-500 mt-1">Track team goals, blockers, and dependencies</p>
         </div>
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setArchiveModalOpen(true)}
+          >
+            <Archive className="h-4 w-4 mr-2" />
+            Archive
+            {archivedCount > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {archivedCount}
+              </Badge>
+            )}
+          </Button>
           <TeamDepartmentTabs value={currentTeam} onValueChange={setCurrentTeam} />
-          <Button onClick={handleCreateClick} className="ml-4">
+          <Button onClick={handleCreateClick}>
             <Plus className="h-4 w-4 mr-1" />
             Add
           </Button>
@@ -92,6 +108,11 @@ export default function TeamSync() {
         item={selectedItem}
         onSave={handleSave}
         onDelete={selectedItem ? handleDelete : undefined}
+      />
+
+      <ArchiveModal
+        open={archiveModalOpen}
+        onOpenChange={setArchiveModalOpen}
       />
     </div>
   );
