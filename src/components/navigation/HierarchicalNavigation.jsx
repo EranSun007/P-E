@@ -22,9 +22,12 @@ export function HierarchicalNavigation({ navigation, onItemClick }) {
   const { isProductMode } = useAppMode();
 
   // Group navigation items by folder
-  // Match by name since that's the identifier used in NavigationSettings
+  // NavigationSettings stores itemId as lowercase (e.g., "tasks", "github")
+  // Layout.jsx navigation uses capitalized names (e.g., "Tasks", "GitHub")
+  // Match case-insensitively to bridge the two
   const itemsByFolder = navigation.reduce((acc, navItem) => {
-    const assignment = items.find(i => i.itemId === navItem.name);
+    const navItemIdLower = navItem.name.toLowerCase();
+    const assignment = items.find(i => i.itemId.toLowerCase() === navItemIdLower);
     const folderId = assignment?.folderId || 'root';
     if (!acc[folderId]) acc[folderId] = [];
     acc[folderId].push(navItem);
