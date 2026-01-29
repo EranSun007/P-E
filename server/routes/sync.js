@@ -1,5 +1,7 @@
 import express from 'express';
 import SyncItemService from '../services/SyncItemService.js';
+import SubtaskService from '../services/SubtaskService.js';
+import SyncSettingsService from '../services/SyncSettingsService.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
