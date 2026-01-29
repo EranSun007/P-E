@@ -39,6 +39,7 @@ import bugsRouter from './routes/bugs.js';
 import emailPreferencesRouter from './routes/emailPreferences.js';
 import syncRouter from './routes/sync.js';
 import teamSummariesRouter from './routes/teamSummaries.js';
+import menuConfigRouter from './routes/menuConfig.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -151,6 +152,7 @@ app.use('/api/bugs', bugsRouter);
 app.use('/api/email-preferences', emailPreferencesRouter);
 app.use('/api/sync', syncRouter);
 app.use('/api/team-summaries', teamSummariesRouter);
+app.use('/api/menu-config', menuConfigRouter);
 
 // 404 handler
 app.use((req, res) => {
