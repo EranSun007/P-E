@@ -10,6 +10,50 @@
 - **v1.5 Knowledge Base Integration & Team Status** - Phases 19-22 (shipped 2026-01-29) — [Archive](milestones/v1.5-ROADMAP.md)
 - **v1.6 TeamSync Integration** - Phases 23-27 (shipped 2026-01-29) — [Archive](milestones/v1.6-ROADMAP.md)
 - **v1.7 Menu Clustering** - Phases 28-31 (shipped 2026-01-29) — [Archive](milestones/v1.7-ROADMAP.md)
+- **v1.8 Entity Model Viewer** - Phases 32-33 (in progress)
+
+## v1.8 Entity Model Viewer
+
+**Milestone Goal:** Build a read-only visual schema viewer that displays current database structure as an interactive node graph for understanding entity relationships.
+
+- [ ] **Phase 32: Schema Introspection Backend** - PostgreSQL introspection API
+- [ ] **Phase 33: Visual Canvas** - @xyflow/react graph with entity nodes and relationship edges
+
+### Phase 32: Schema Introspection Backend
+**Goal**: Backend can introspect PostgreSQL schema and return tables, columns, relationships via REST API
+**Depends on**: Phase 31 (v1.7 complete)
+**Requirements**: INTRO-01, INTRO-02, INTRO-03, INTRO-04
+**Success Criteria** (what must be TRUE):
+  1. GET /api/schema/tables returns all tables in the database
+  2. Each table includes columns with types, nullable, defaults
+  3. Foreign key relationships are included with source/target info
+  4. Indexes and constraints are included per table
+  5. System tables (migrations, pg_*) can be filtered out
+**Plans**: 2 plans
+
+Plans:
+- [ ] 32-01-PLAN.md — SchemaService with information_schema queries
+- [ ] 32-02-PLAN.md — REST API routes for schema introspection
+
+### Phase 33: Visual Canvas
+**Goal**: Frontend displays schema as interactive node graph with pan, zoom, and click-to-view
+**Depends on**: Phase 32 (introspection API must exist)
+**Requirements**: NAV-01, NAV-02, CANVAS-01, CANVAS-02, CANVAS-03, CANVAS-04
+**Success Criteria** (what must be TRUE):
+  1. Entity Model page accessible from sidebar navigation
+  2. Page loads and displays schema graph on mount
+  3. Each table displays as a node with field list visible
+  4. Foreign key relationships display as connecting edges between nodes
+  5. User can pan and zoom the canvas
+  6. User can click entity node to view full details (fields, types, constraints)
+**Plans**: 2 plans
+
+Plans:
+- [ ] 33-01-PLAN.md — EntityModel page with @xyflow/react setup and EntityNode component
+- [ ] 33-02-PLAN.md — Relationship edges, click-to-view panel, navigation integration
+
+<details>
+<summary>v1.7 Menu Clustering (Phases 28-31) - SHIPPED 2026-01-29</summary>
 
 ## v1.7 Menu Clustering
 
@@ -83,6 +127,8 @@ Plans:
 Plans:
 - [x] 31-01-PLAN.md — useCollapsedFolders hook and CollapsibleFolder component
 - [x] 31-02-PLAN.md — HierarchicalNavigation and Layout.jsx integration
+
+</details>
 
 <details>
 <summary>v1.0 Jira Integration MVP (Phases 1-5) - SHIPPED 2026-01-21</summary>
@@ -529,6 +575,7 @@ v1.4: 17 -> 18 (depends on 17)
 v1.5: 19 -> 20 (depends on 19), 21 (depends on 19), 22 (depends on 19)
 v1.6: 23 -> 24 (depends on 23) -> 25 (depends on 24) -> 26 (depends on 25) -> 27 (depends on 26)
 v1.7: 28 -> 29 (depends on 28) -> 30 (depends on 29) -> 31 (depends on 28)
+v1.8: 32 -> 33 (depends on 32)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -563,8 +610,10 @@ v1.7: 28 -> 29 (depends on 28) -> 30 (depends on 29) -> 31 (depends on 28)
 | 29. Settings UI Basic | v1.7 | 2/2 | Complete | 2026-01-29 |
 | 30. Settings UI DnD Enhancement | v1.7 | 1/1 | Complete | 2026-01-29 |
 | 31. Navigation Integration | v1.7 | 2/2 | Complete | 2026-01-29 |
+| 32. Schema Introspection Backend | v1.8 | 0/2 | Pending | — |
+| 33. Visual Canvas | v1.8 | 0/2 | Pending | — |
 
 **Summary:**
-- v1.0-v1.6: 56 plans (Phases 1-27) - SHIPPED
-- v1.7: 7 plans (Phases 28-31) - COMPLETE
-- **Total: 63 plans across 31 phases — ALL COMPLETE**
+- v1.0-v1.7: 63 plans (Phases 1-31) - SHIPPED
+- v1.8: 4 plans (Phases 32-33) - IN PROGRESS
+- **Total: 67 plans across 33 phases**

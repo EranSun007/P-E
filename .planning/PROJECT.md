@@ -8,17 +8,16 @@ A unified people and engineering management system combining team management, we
 
 Single dashboard showing health and status across all team tools without switching contexts, with full control over what gets captured and how it connects to your data.
 
-## Current Milestone: v1.8 Entity Model Editor
+## Current Milestone: v1.8 Entity Model Viewer
 
-**Goal:** Build a visual schema management tool that shows current database state, lets you design the target state, highlights gaps, and generates migrations to close them.
+**Goal:** Build a read-only visual schema viewer that displays current database structure as an interactive node graph for understanding entity relationships.
 
 **Target features:**
 - Schema introspection reading current PostgreSQL structure (tables, columns, types, constraints, FKs)
-- Form-based entity editor with fields, types, relationships
-- Interactive node graph visualization showing entities and connections
-- Current vs target diff highlighting schema mismatches
-- Migration script generator to transform current → target state
-- Entity model definitions stored in PostgreSQL
+- Interactive node graph visualization (@xyflow/react)
+- Click entity nodes to view field details
+- Pan and zoom navigation
+- Foreign key relationships as connecting edges
 
 ## Shipped State (v1.6)
 
@@ -101,14 +100,13 @@ Single dashboard showing health and status across all team tools without switchi
 
 ### Active
 
-**v1.8 Entity Model Editor:**
+**v1.8 Entity Model Viewer:**
 - [ ] Schema introspection API to read current PostgreSQL structure
-- [ ] Entity model storage tables (entity_definitions, field_definitions, relationships)
-- [ ] Form-based entity editor UI with live preview
-- [ ] Interactive node graph visualization (React Flow or similar)
-- [ ] Current vs target schema diff highlighting
-- [ ] Migration script generator (current → target SQL)
-- [ ] Migration history tracking and application
+- [ ] Interactive node graph visualization (@xyflow/react)
+- [ ] Entity nodes with field lists visible
+- [ ] Foreign key relationships as connecting edges
+- [ ] Pan and zoom navigation
+- [ ] Click entity to view details
 
 ### Future Candidates (v1.9+)
 

@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-01-29)
 
 **Core value:** Single dashboard showing health and status across all team tools without switching contexts
-**Current focus:** v1.8 Entity Model Editor — visual schema management with diff and migration generation
+**Current focus:** v1.8 Entity Model Viewer — read-only schema visualization as interactive node graph
 
 ## Current Position
 
@@ -90,6 +90,6 @@ Resume file: None
 
 ## Next Steps
 
-1. Complete research phase
-2. Define requirements
-3. Create roadmap (phases continue from 32)
+1. Run `/gsd:plan-phase 32` to plan Schema Introspection Backend
+2. Execute Phase 32
+3. Plan and execute Phase 33 (Visual Canvas)
