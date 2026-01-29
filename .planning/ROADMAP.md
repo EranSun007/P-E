@@ -30,10 +30,10 @@
   3. GET /api/menu-config returns user's stored configuration (or defaults if none)
   4. PUT /api/menu-config saves updated configuration (multi-tenancy enforced)
   5. NavigationContext provides menu config to Layout.jsx and Settings.jsx
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 28-01-PLAN.md — Database schema, MenuConfigService, REST API routes
+- [ ] 28-01-PLAN.md — MenuConfigService and REST API routes
 - [ ] 28-02-PLAN.md — NavigationContext with UserSettings integration
 
 ### Phase 29: Settings UI Basic
