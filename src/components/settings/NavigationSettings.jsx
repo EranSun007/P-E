@@ -35,6 +35,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   FolderPlus,
   Pencil,
   Trash2,
@@ -42,7 +49,38 @@ import {
   AlertTriangle,
   Loader2,
   MoreVertical,
+  RotateCcw,
 } from "lucide-react";
+
+// Menu items for People mode (from Layout.jsx)
+const PEOPLE_MENU_ITEMS = [
+  { id: "tasks", name: "Tasks", icon: "CheckSquare" },
+  { id: "calendar", name: "Calendar", icon: "Calendar" },
+  { id: "duties", name: "Duties", icon: "CalendarDays" },
+  { id: "projects", name: "Projects", icon: "Folders" },
+  { id: "metrics", name: "Metrics", icon: "BarChart2" },
+  { id: "team", name: "Team", icon: "UserPlus" },
+  { id: "stakeholders", name: "Stakeholders", icon: "Users" },
+  { id: "peers", name: "Peers", icon: "Users" },
+  { id: "github", name: "GitHub", icon: "Github" },
+  { id: "jira", name: "Jira", icon: "Bug" },
+  { id: "capture-inbox", name: "Capture Inbox", icon: "Inbox" },
+  { id: "capture-rules", name: "Capture Rules", icon: "FileCode" },
+  { id: "bug-dashboard", name: "Bug Dashboard", icon: "Bug" },
+  { id: "knowledge-search", name: "Knowledge Search", icon: "Search" },
+  { id: "team-sync", name: "Team Sync", icon: "Users" },
+  { id: "team-status", name: "Team Status", icon: "Activity" },
+];
+
+// Menu items for Product mode (from Layout.jsx)
+const PRODUCT_MENU_ITEMS = [
+  { id: "services", name: "My Services", icon: "Server" },
+  { id: "roadmap", name: "My Roadmap", icon: "Map" },
+  { id: "backlog", name: "My Backlog", icon: "ListTodo" },
+  { id: "analytics", name: "Usage Analytics", icon: "TrendingUp" },
+  { id: "feedback", name: "Customer Feedback", icon: "MessageSquare" },
+  { id: "releases", name: "Releases", icon: "Rocket" },
+];
 
 /**
  * NavigationSettings component
@@ -54,6 +92,7 @@ export default function NavigationSettings() {
     items,
     config,
     saveConfig,
+    resetToDefaults,
     loading,
     error: contextError,
     currentMode,
@@ -68,9 +107,88 @@ export default function NavigationSettings() {
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState(null);
 
+  // Get menu items based on current mode
+  const menuItems = currentMode === "product" ? PRODUCT_MENU_ITEMS : PEOPLE_MENU_ITEMS;
+
   // Calculate items count per folder
   const getItemsCount = (folderId) => {
     return items.filter((item) => item.folderId === folderId).length;
+  };
+
+  // Get current folder assignment for a menu item
+  const getItemFolder = (itemId) => {
+    const item = items.find((i) => i.itemId === itemId);
+    return item?.folderId || null;
+  };
+
+  // Get root level items (not assigned to any folder)
+  const getRootItems = () => {
+    const assignedToFolder = items.filter((i) => i.folderId).map((i) => i.itemId);
+    return menuItems.filter((m) => !assignedToFolder.includes(m.id));
+  };
+
+  // Get items in a specific folder
+  const getItemsInFolder = (folderId) => {
+    const itemIds = items.filter((i) => i.folderId === folderId).map((i) => i.itemId);
+    return menuItems.filter((m) => itemIds.includes(m.id));
+  };
+
+  // Handle item folder assignment change
+  const handleItemFolderChange = async (itemId, folderId) => {
+    setSaving(true);
+    setLocalError(null);
+
+    try {
+      // Update items array
+      let updatedItems;
+      const existingItem = items.find((i) => i.itemId === itemId);
+
+      if (folderId === "root" || folderId === "") {
+        // Remove item assignment (move to root)
+        updatedItems = items.filter((i) => i.itemId !== itemId);
+      } else if (existingItem) {
+        // Update existing item
+        updatedItems = items.map((i) =>
+          i.itemId === itemId ? { ...i, folderId } : i
+        );
+      } else {
+        // Add new item assignment
+        updatedItems = [...items, { itemId, folderId }];
+      }
+
+      const success = await saveConfig({
+        ...config,
+        items: updatedItems,
+      });
+
+      if (!success) {
+        setLocalError("Failed to update item assignment. Please try again.");
+      }
+    } catch (err) {
+      console.error("Error updating item assignment:", err);
+      setLocalError("An unexpected error occurred. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Handle reset to defaults
+  const handleReset = async () => {
+    if (window.confirm("Reset navigation to defaults? This will remove all folders and item assignments.")) {
+      setSaving(true);
+      setLocalError(null);
+      try {
+        const success = await resetToDefaults();
+        if (!success) {
+          setLocalError("Failed to reset. Please try again.");
+        }
+      } catch (err) {
+        console.error("Error resetting to defaults:", err);
+        setLocalError("An unexpected error occurred. Please try again.");
+      } finally {
+        setSaving(false);
+      }
+    }
   };
 
   // Open create dialog
@@ -301,6 +419,123 @@ export default function NavigationSettings() {
               </TableBody>
             </Table>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Menu Items Card */}
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>Menu Items</CardTitle>
+          <CardDescription>
+            Assign items to folders or leave at root level
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Item Name</TableHead>
+                <TableHead>Folder Assignment</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {menuItems.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell>
+                    <span className="font-medium">{item.name}</span>
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      value={getItemFolder(item.id) || "root"}
+                      onValueChange={(value) => handleItemFolderChange(item.id, value)}
+                      disabled={saving}
+                    >
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Select folder" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="root">Root Level</SelectItem>
+                        {folders
+                          .sort((a, b) => (a.order || 0) - (b.order || 0))
+                          .map((folder) => (
+                            <SelectItem key={folder.id} value={folder.id}>
+                              {folder.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Preview Card */}
+      <Card className="mt-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Preview</CardTitle>
+              <CardDescription>
+                See how your navigation will appear
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleReset}
+              disabled={saving}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset to Defaults
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {/* Root level items first */}
+            {getRootItems().map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center gap-2 py-1.5 px-3 rounded bg-gray-50"
+              >
+                <span className="text-sm">{item.name}</span>
+              </div>
+            ))}
+
+            {/* Folders with their items */}
+            {folders
+              .sort((a, b) => (a.order || 0) - (b.order || 0))
+              .map((folder) => (
+                <div key={folder.id} className="border rounded-lg p-3">
+                  <div className="flex items-center gap-2 font-medium text-sm">
+                    <FolderOpen className="h-4 w-4" />
+                    {folder.name}
+                    <Badge variant="secondary" className="text-xs">
+                      {getItemsInFolder(folder.id).length}
+                    </Badge>
+                  </div>
+                  <div className="ml-6 mt-2 space-y-1">
+                    {getItemsInFolder(folder.id).map((item) => (
+                      <div key={item.id} className="text-sm text-gray-600 py-0.5">
+                        {item.name}
+                      </div>
+                    ))}
+                    {getItemsInFolder(folder.id).length === 0 && (
+                      <div className="text-sm text-gray-400 italic">No items</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+            {/* Empty state */}
+            {getRootItems().length === 0 && folders.length === 0 && (
+              <div className="text-center text-gray-500 py-4">
+                No items to display
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
