@@ -610,7 +610,7 @@ v1.8: 32 -> 33 (depends on 32)
 | 29. Settings UI Basic | v1.7 | 2/2 | Complete | 2026-01-29 |
 | 30. Settings UI DnD Enhancement | v1.7 | 1/1 | Complete | 2026-01-29 |
 | 31. Navigation Integration | v1.7 | 2/2 | Complete | 2026-01-29 |
-| 32. Schema Introspection Backend | v1.8 | 0/2 | Pending | — |
+| 32. Schema Introspection Backend | v1.8 | 2/2 | Complete | 2026-01-29 |
 | 33. Visual Canvas | v1.8 | 0/2 | Pending | — |
 
 **Summary:**
