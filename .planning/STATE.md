@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Researching domain ecosystem
-Last activity: 2026-01-29 — Milestone v1.8 started
+Phase: 32 of 33 (32-schema-introspection-backend)
+Plan: 1 of 1 in phase
+Status: Phase complete
+Last activity: 2026-01-29 — Completed 32-01-PLAN.md
 
-Progress: Defining milestone...
+Progress: [████████████████████████████████████████████████████████████████░░] 64/65 plans (98%)
 
 ## Milestone Summary
 
@@ -30,7 +30,7 @@ Progress: Defining milestone...
 
 **Total: 8 milestones shipped, 31 phases, 63 plans completed**
 
-**Current Milestone:** v1.8 Entity Model Editor (in progress)
+**Current Milestone:** v1.8 Entity Model Viewer (in progress, 1 of 2 phases complete)
 
 ## Performance Metrics
 
@@ -59,10 +59,14 @@ Progress: Defining milestone...
 - CollapsibleFolder component wrapping Radix Collapsible
 - HierarchicalNavigation component grouping items by folder
 
-### Decisions Made (Phases 29-31)
+### Decisions Made (Phases 29-32)
 
 | ID | Decision | Rationale |
 |----|----------|-----------|
+| schema-introspection-approach | information_schema views for portability | SQL-standard over pg_catalog queries |
+| schema-response-format | camelCase keys in API responses | Frontend consistency, friendlier than snake_case |
+| schema-parallel-fetch | Promise.all() for metadata queries | Performance optimization, 60ms vs 250ms+ |
+| constraint-grouping | Multi-column constraints as column arrays | Group by constraint_name, not separate rows |
 | uuid-generation | crypto.randomUUID() for folder IDs | Native browser API, no dependency |
 | folder-order | New folder order = max existing + 1 | New folders appear at end |
 | delete-behavior | Delete folder sets items folderId to null | Items move to root level |
@@ -85,11 +89,11 @@ None — all milestones shipped successfully.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Phase 31 verified and complete
+Stopped at: Phase 32 complete (32-01-PLAN.md)
 Resume file: None
 
 ## Next Steps
 
-1. Run `/gsd:plan-phase 32` to plan Schema Introspection Backend
-2. Execute Phase 32
-3. Plan and execute Phase 33 (Visual Canvas)
+1. Run `/gsd:plan-phase 33` to plan REST API Endpoint
+2. Execute Phase 33
+3. Complete v1.8 milestone and document Entity Model Viewer
