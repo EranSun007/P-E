@@ -387,7 +387,7 @@ Plans:
   4. User can filter results by repository, language, and artifact type
   5. Each result shows similarity score indicating relevance
   6. Repository statistics dashboard shows breakdown of indexed content by type
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [ ] 20-01-PLAN.md — Knowledge Search page with query input, dual-pane results, syntax highlighting
