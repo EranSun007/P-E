@@ -70,6 +70,9 @@ const TeamSync = lazy(() => retryImport(() => import(/* webpackChunkName: "pages
 // TeamStatus (v1.6 - Team Status page)
 const TeamStatus = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-team-status" */ "./TeamStatus"), 3, 1000));
 
+// EntityModel (v1.8 - Entity Model Viewer)
+const EntityModel = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-entity-model" */ "./EntityModel"), 3, 1000));
+
 const PAGES = {
     
     Tasks: Tasks,
@@ -129,6 +132,9 @@ const PAGES = {
 
     // TeamStatus (v1.6)
     TeamStatus: TeamStatus,
+
+    // EntityModel (v1.8)
+    EntityModel: EntityModel,
 }
 
 function _getCurrentPage(url) {
@@ -228,6 +234,7 @@ function PagesContent() {
                         <Route path="/analytics" element={<Analytics />} />
                         <Route path="/feedback" element={<Feedback />} />
                         <Route path="/releases" element={<Releases />} />
+                        <Route path="/entitymodel" element={<EntityModel />} />
 
                         {/* Capture Framework Routes */}
                         <Route path="/captureinbox" element={<CaptureInbox />} />

@@ -28,7 +28,8 @@ import {
   Inbox,
   FileCode,
   Search,
-  Activity
+  Activity,
+  Database
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { User as UserEntity } from "@/api/entities";
@@ -263,6 +264,12 @@ export default function Layout({ children, currentPageName }) {
       icon: Rocket,
       href: createPageUrl("Releases"),
       current: currentPageName === "Releases"
+    },
+    {
+      name: "Entity Model",
+      icon: Database,
+      href: createPageUrl("EntityModel"),
+      current: currentPageName === "EntityModel"
     }
   ];
 
