@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 ## Current Position
 
 Phase: 32 of 33 (32-schema-introspection-backend)
-Plan: 1 of 1 in phase
+Plan: 2 of 2 in phase
 Status: Phase complete
-Last activity: 2026-01-29 — Completed 32-01-PLAN.md
+Last activity: 2026-01-29 — Completed 32-02-PLAN.md
 
-Progress: [████████████████████████████████████████████████████████████████░░] 64/65 plans (98%)
+Progress: [████████████████████████████████████████████████████████████████░░] 65/66 plans (98%)
 
 ## Milestone Summary
 
@@ -30,7 +30,7 @@ Progress: [███████████████████████
 
 **Total: 8 milestones shipped, 31 phases, 63 plans completed**
 
-**Current Milestone:** v1.8 Entity Model Viewer (in progress, 1 of 2 phases complete)
+**Current Milestone:** v1.8 Entity Model Viewer (in progress, 2 of 2 phases complete)
 
 ## Performance Metrics
 
@@ -67,6 +67,8 @@ Progress: [███████████████████████
 | schema-response-format | camelCase keys in API responses | Frontend consistency, friendlier than snake_case |
 | schema-parallel-fetch | Promise.all() for metadata queries | Performance optimization, 60ms vs 250ms+ |
 | constraint-grouping | Multi-column constraints as column arrays | Group by constraint_name, not separate rows |
+| schema-routes-no-auth | No authentication for schema routes | Schema metadata is global and read-only |
+| schema-404-on-missing | 404 status for non-existent tables | Clear error over empty 200 response |
 | uuid-generation | crypto.randomUUID() for folder IDs | Native browser API, no dependency |
 | folder-order | New folder order = max existing + 1 | New folders appear at end |
 | delete-behavior | Delete folder sets items folderId to null | Items move to root level |
@@ -89,7 +91,7 @@ None — all milestones shipped successfully.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Phase 32 complete (32-01-PLAN.md)
+Stopped at: Phase 32 complete (32-02-PLAN.md)
 Resume file: None
 
 ## Next Steps
