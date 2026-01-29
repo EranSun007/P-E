@@ -8,10 +8,50 @@ import { Send, Square, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/components/ui/use-toast';
+
+// Known commands mapping
+const KNOWN_COMMANDS = {
+  '/search': true,
+  '/help': true
+};
+
+/**
+ * Parse command from input string
+ * @param {string} input - User input
+ * @returns {null|{error: string}|{command: string, args: string}}
+ */
+function parseCommand(input) {
+  const commandPattern = /^(\/\w+)\s+(.*)$/;
+  const match = input.match(commandPattern);
+
+  if (!match) {
+    // Check if it starts with / but has no args
+    if (input.startsWith('/')) {
+      const cmd = input.split(/\s+/)[0];
+      if (!KNOWN_COMMANDS[cmd]) {
+        return { error: `Unknown command: ${cmd}. Try /help` };
+      }
+      // Known command but no args
+      return { error: `Command ${cmd} requires arguments` };
+    }
+    return null; // Not a command
+  }
+
+  const [, command, args] = match;
+
+  // Check if command is known
+  if (!KNOWN_COMMANDS[command]) {
+    return { error: `Unknown command: ${command}. Try /help` };
+  }
+
+  return { command, args: args.trim() };
+}
 
 export function ChatInput({
   onSend,
   onCancel,
+  onSearchCommand,
   disabled = false,
   isLoading = false,
   isStreaming = false,
@@ -32,10 +72,53 @@ export function ChatInput({
 
   const handleSubmit = (e) => {
     e?.preventDefault();
-    if (value.trim() && !disabled && !isLoading) {
-      onSend(value.trim());
-      setValue('');
+    if (!value.trim() || disabled || isLoading) {
+      return;
     }
+
+    const trimmedValue = value.trim();
+
+    // Try to parse as command
+    const parsed = parseCommand(trimmedValue);
+
+    // Handle error (unknown command)
+    if (parsed && parsed.error) {
+      toast({
+        title: 'Command Error',
+        description: parsed.error,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Handle /help command
+    if (parsed && parsed.command === '/help') {
+      toast({
+        title: 'Available Commands',
+        description: '/search [query] - Search the knowledge base\n/help - Show this help',
+      });
+      setValue('');
+      return;
+    }
+
+    // Handle /search command
+    if (parsed && parsed.command === '/search') {
+      if (onSearchCommand) {
+        onSearchCommand(parsed.args);
+        setValue('');
+      } else {
+        toast({
+          title: 'Search Not Available',
+          description: 'Search command is not available in this context',
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
+
+    // Normal message (not a command)
+    onSend(trimmedValue);
+    setValue('');
   };
 
   const handleKeyDown = (e) => {
