@@ -106,12 +106,32 @@ export function SyncProvider({ children }) {
     }
   }, [refresh]);
 
-  // Update a sync item (optimistic update)
+  // Update a sync item (optimistic update with auto-archive detection)
   const updateItem = useCallback(async (id, updates) => {
+    // Find current item to check for status transition
+    const currentItem = items.find(item => item.id === id);
+
+    // Check if this is a status transition to "done" (auto-archive trigger)
+    const shouldAutoArchive =
+      updates.sync_status === 'done' &&
+      currentItem?.sync_status !== 'done';
+
+    // If auto-archiving, add archived flag to updates
+    if (shouldAutoArchive) {
+      updates = { ...updates, archived: true };
+    }
+
     // Optimistic update
-    setItems(prev =>
-      prev.map(item => item.id === id ? { ...item, ...updates } : item)
-    );
+    if (shouldAutoArchive) {
+      // Remove from active items (archiving)
+      setItems(prev => prev.filter(item => item.id !== id));
+      setArchivedCount(prev => prev + 1);
+    } else {
+      // Regular update (keep in list)
+      setItems(prev =>
+        prev.map(item => item.id === id ? { ...item, ...updates } : item)
+      );
+    }
 
     try {
       const updatedItem = await SyncItem.update(id, updates);
@@ -122,7 +142,7 @@ export function SyncProvider({ children }) {
       await refresh();
       throw error;
     }
-  }, [refresh]);
+  }, [items, refresh]);
 
   // Delete a sync item (optimistic update)
   const deleteItem = useCallback(async (id) => {
