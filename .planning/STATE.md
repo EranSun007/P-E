@@ -104,6 +104,9 @@ Key patterns established:
 - Auto-archive triggers on transition TO done, not when already done (27-02)
 - Single API call combines user updates with archived:true flag (27-02)
 - Optimistic removal from active items on auto-archive (27-02)
+- Archive modal lazy-loads items only when opened via loadArchivedItems (27-01)
+- Native date inputs for archive filter (no additional date picker library) (27-01)
+- Clear archive filters on modal close for fresh state each open (27-01)
 
 ### Pending Todos
 
@@ -121,7 +124,7 @@ None - v1.6 milestone complete.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed 22-03-PLAN.md execution (PostgreSQL Team Summaries Gap Closure)
+Stopped at: Completed 27-01-PLAN.md execution (Archive Modal UI)
 Resume file: None
 
 ## Next Steps
