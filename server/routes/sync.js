@@ -68,6 +68,34 @@ router.get('/archived/count', async (req, res) => {
 });
 
 /**
+ * GET /api/sync/settings
+ * Get user sync settings (returns defaults if none exist)
+ */
+router.get('/settings', async (req, res) => {
+  try {
+    const settings = await SyncSettingsService.get(req.user.id);
+    res.json(settings);
+  } catch (error) {
+    console.error('GET /api/sync/settings error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * PUT /api/sync/settings
+ * Update user sync settings (upsert)
+ */
+router.put('/settings', async (req, res) => {
+  try {
+    const settings = await SyncSettingsService.update(req.user.id, req.body);
+    res.json(settings);
+  } catch (error) {
+    console.error('PUT /api/sync/settings error:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/sync
  * Create a new sync item
  */
