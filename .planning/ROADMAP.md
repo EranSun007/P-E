@@ -355,7 +355,7 @@ Plans:
 **Milestone Goal:** Integrate with MCP knowledge base server for semantic code/documentation search, enhance AI chat with knowledge context, and add team status dashboard for daily summaries.
 
 - [x] **Phase 19: MCP Client Backend** - MCP protocol client, session management, REST API
-- [ ] **Phase 20: Knowledge Search UI** - Search page with dual-pane results, filters, repository stats
+- [x] **Phase 20: Knowledge Search UI** - Search page with dual-pane results, filters, repository stats
 - [ ] **Phase 21: AI Chat Integration** - Knowledge-aware chat with inline search results
 - [ ] **Phase 22: Team Status Page** - Daily summaries dashboard with health indicators
 
@@ -390,8 +390,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 20-01-PLAN.md — Knowledge Search page with query input, dual-pane results, syntax highlighting
-- [ ] 20-02-PLAN.md — Filters, similarity scores, and repository statistics dashboard
+- [x] 20-01-PLAN.md — Knowledge Search page with query input, dual-pane results, syntax highlighting
+- [x] 20-02-PLAN.md — Filters, similarity scores, and repository statistics dashboard
 
 ### Phase 21: AI Chat Integration
 **Goal**: AI chat automatically enriches responses with knowledge base context
@@ -457,6 +457,6 @@ v1.5: 19 -> 20 (depends on 19), 21 (depends on 19), 22 (depends on 19)
 | 17. Core Bug Fixes | v1.4 | 2/2 | Complete | 2026-01-28 |
 | 18. Table Enhancements & UI Polish | v1.4 | 2/2 | Complete | 2026-01-28 |
 | 19. MCP Client Backend | v1.5 | 2/2 | Complete | 2026-01-29 |
-| 20. Knowledge Search UI | v1.5 | 0/2 | Not started | - |
+| 20. Knowledge Search UI | v1.5 | 2/2 | Complete | 2026-01-29 |
 | 21. AI Chat Integration | v1.5 | 0/2 | Not started | - |
 | 22. Team Status Page | v1.5 | 0/2 | Not started | - |

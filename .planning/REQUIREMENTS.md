@@ -20,12 +20,12 @@ Requirements for Knowledge Base Integration & Team Status milestone. Each maps t
 
 ### Knowledge Search UI
 
-- [ ] **SEARCH-01**: Search page with query input and results display
-- [ ] **SEARCH-02**: Dual-pane view showing code results and documentation side by side
-- [ ] **SEARCH-03**: Syntax highlighting for code results
-- [ ] **SEARCH-04**: Filter by repository, language, and artifact type
-- [ ] **SEARCH-05**: Similarity score display on results
-- [ ] **SEARCH-06**: Repository statistics dashboard showing indexed content breakdown
+- [x] **SEARCH-01**: Search page with query input and results display
+- [x] **SEARCH-02**: Dual-pane view showing code results and documentation side by side
+- [x] **SEARCH-03**: Syntax highlighting for code results
+- [x] **SEARCH-04**: Filter by repository, language, and artifact type
+- [x] **SEARCH-05**: Similarity score display on results
+- [x] **SEARCH-06**: Repository statistics dashboard showing indexed content breakdown
 
 ### AI Chat Integration
 
@@ -91,12 +91,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MCP-06 | Phase 19 | Complete |
 | MCP-07 | Phase 19 | Complete |
 | MCP-08 | Phase 19 | Complete |
-| SEARCH-01 | Phase 20 | Pending |
-| SEARCH-02 | Phase 20 | Pending |
-| SEARCH-03 | Phase 20 | Pending |
-| SEARCH-04 | Phase 20 | Pending |
-| SEARCH-05 | Phase 20 | Pending |
-| SEARCH-06 | Phase 20 | Pending |
+| SEARCH-01 | Phase 20 | Complete |
+| SEARCH-02 | Phase 20 | Complete |
+| SEARCH-03 | Phase 20 | Complete |
+| SEARCH-04 | Phase 20 | Complete |
+| SEARCH-05 | Phase 20 | Complete |
+| SEARCH-06 | Phase 20 | Complete |
 | CHAT-01 | Phase 21 | Pending |
 | CHAT-02 | Phase 21 | Pending |
 | CHAT-03 | Phase 21 | Pending |
