@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 
 ## Current Position
 
-Phase: 29 of 31 (Settings UI Basic) — COMPLETE
-Plan: 2 of 2 complete
-Status: Ready for Phase 30
-Last activity: 2026-01-29 — Phase 29 verified and complete
+Phase: 30 of 31 (Settings UI DnD Enhancement) — IN PROGRESS
+Plan: 1 of 1 complete
+Status: Phase 30 complete, ready for Phase 31
+Last activity: 2026-01-29 — Completed 30-01-PLAN.md
 
-Progress: [==============================] 95% (60/63 plans)
+Progress: [==============================] 97% (61/63 plans)
 
 ## Milestone Summary
 
@@ -28,9 +28,9 @@ Progress: [==============================] 95% (60/63 plans)
 - v1.6 TeamSync Integration (Phases 23-27, 11 plans) — 2026-01-29
 
 **Current Milestone:**
-- v1.7 Menu Clustering (Phases 28-31, 7 plans) — IN PROGRESS (5/7 plans)
+- v1.7 Menu Clustering (Phases 28-31, 7 plans) — IN PROGRESS (6/7 plans)
 
-**Total: 7 milestones shipped, 28 phases, 60 plans completed**
+**Total: 7 milestones shipped, 30 phases, 61 plans completed**
 
 ## Performance Metrics
 
@@ -52,8 +52,11 @@ Progress: [==============================] 95% (60/63 plans)
 - Settings tab component pattern with Card layout (NavigationSettings)
 - Select dropdown for item-to-folder assignment
 - Preview visualization pattern for navigation configuration
+- DnD state transformation pattern (buildItemContainers, findItemContainer)
+- DroppableContainer component with hover highlights
+- DragOverlay for visual feedback during drag operations
 
-### Decisions Made (Phase 29)
+### Decisions Made (Phases 29-30)
 
 | ID | Decision | Rationale |
 |----|----------|-----------|
@@ -62,11 +65,10 @@ Progress: [==============================] 95% (60/63 plans)
 | delete-behavior | Delete folder sets items folderId to null | Items move to root level |
 | menu-items-inline | PEOPLE_MENU_ITEMS/PRODUCT_MENU_ITEMS defined in component | Match Layout.jsx navigation arrays |
 | root-representation | "root" value in Select for root level | Clear UX, null removal on save |
-
-### Research Flags for v1.7
-
-- Phase 30 (DnD Enhancement): Cross-container drag with multiple SortableContexts needs careful review
-- All other phases use standard patterns already in codebase
+| dnd-architecture | Single DndContext for folders, separate for items | Isolated concerns, cleaner state management |
+| dnd-save-timing | saveConfig in onDragEnd, not onDragOver | Persist after drag completes, not during |
+| dnd-transform | itemContainers state with buildItemContainers() | Transform context to DnD format in real-time |
+| dnd-rollback | setItemContainers(buildItemContainers()) on error | Rollback to context state on save failure |
 
 ### Blockers/Concerns
 
@@ -75,11 +77,11 @@ None — all milestones shipped successfully.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed 29-02-PLAN.md
+Stopped at: Completed 30-01-PLAN.md
 Resume file: None
 
 ## Next Steps
 
-1. Plan Phase 30 (Settings UI DnD Enhancement) — add drag-and-drop for folder/item reordering
-2. Execute Phase 30 plans
-3. Continue to Phase 31 (Navigation Integration) — collapsible folders in sidebar
+1. Plan Phase 31 (Navigation Integration) — collapsible folders in sidebar
+2. Execute Phase 31 plans
+3. Verify v1.7 Menu Clustering milestone complete
