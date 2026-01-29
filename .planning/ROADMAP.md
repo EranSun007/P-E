@@ -357,7 +357,7 @@ Plans:
 - [x] **Phase 19: MCP Client Backend** - MCP protocol client, session management, REST API
 - [x] **Phase 20: Knowledge Search UI** - Search page with dual-pane results, filters, repository stats
 - [x] **Phase 21: AI Chat Integration** - Knowledge-aware chat with inline search results
-- [ ] **Phase 22: Team Status Page** - Daily summaries dashboard with health indicators
+- [ ] **Phase 22: Team Status Page** - Daily summaries dashboard with health indicators (gap closure in progress)
 
 ### Phase 19: MCP Client Backend
 **Goal**: Backend can communicate with MCP server to query knowledge base and store insights
@@ -420,11 +420,12 @@ Plans:
   5. Interactive timeline allows browsing daily summary history
   6. Health indicators (red/yellow/green) show status per team member or workstream
   7. User can filter summaries by date range
-**Plans**: 2 plans
+**Plans**: 3 plans (2 complete, 1 gap closure)
 
 Plans:
-- [ ] 22-01-PLAN.md — Backend insights API, TeamStatusContext, page scaffold with routing
-- [ ] 22-02-PLAN.md — Dashboard components (MetricsBanner, MemberCard, TimelineNav, health indicators)
+- [x] 22-01-PLAN.md — Backend insights API, TeamStatusContext, page scaffold with routing
+- [x] 22-02-PLAN.md — Dashboard components (MetricsBanner, MemberCard, TimelineNav, health indicators)
+- [ ] 22-03-PLAN.md — Gap closure: PostgreSQL team_summaries table to fix data structure mismatch
 
 ## Progress
 
@@ -459,4 +460,4 @@ v1.5: 19 -> 20 (depends on 19), 21 (depends on 19), 22 (depends on 19)
 | 19. MCP Client Backend | v1.5 | 2/2 | Complete | 2026-01-29 |
 | 20. Knowledge Search UI | v1.5 | 2/2 | Complete | 2026-01-29 |
 | 21. AI Chat Integration | v1.5 | 2/2 | Complete | 2026-01-29 |
-| 22. Team Status Page | v1.5 | 0/2 | Not started | - |
+| 22. Team Status Page | v1.5 | 2/3 | Gap closure | - |
