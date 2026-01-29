@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 
 ## Current Position
 
-Phase: 30 of 31 (Settings UI DnD Enhancement) — IN PROGRESS
+Phase: 30 of 31 (Settings UI DnD Enhancement) — COMPLETE
 Plan: 1 of 1 complete
-Status: Phase 30 complete, ready for Phase 31
-Last activity: 2026-01-29 — Completed 30-01-PLAN.md
+Status: Ready for Phase 31
+Last activity: 2026-01-29 — Phase 30 verified and complete
 
 Progress: [==============================] 97% (61/63 plans)
 

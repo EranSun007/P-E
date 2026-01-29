@@ -17,7 +17,7 @@
 
 - [x] **Phase 28: Data Layer & Backend API** - Menu config storage, NavigationContext, REST API
 - [x] **Phase 29: Settings UI Basic** - Folder CRUD and item assignment via dropdowns
-- [ ] **Phase 30: Settings UI DnD Enhancement** - Drag-and-drop for folder/item reordering
+- [x] **Phase 30: Settings UI DnD Enhancement** - Drag-and-drop for folder/item reordering
 - [ ] **Phase 31: Navigation Integration** - Collapsible folders in sidebar with persistence
 
 ### Phase 28: Data Layer & Backend API
@@ -64,7 +64,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 30-01-PLAN.md — @dnd-kit integration for folder reordering and cross-container item dragging
+- [x] 30-01-PLAN.md — @dnd-kit integration for folder reordering and cross-container item dragging
 
 ### Phase 31: Navigation Integration
 **Goal**: Sidebar displays collapsible folder groups with persistent expand/collapse state
@@ -561,7 +561,7 @@ v1.7: 28 -> 29 (depends on 28) -> 30 (depends on 29) -> 31 (depends on 28)
 | 27. Archive Flow | v1.6 | 3/3 | Complete | 2026-01-29 |
 | 28. Data Layer & Backend API | v1.7 | 2/2 | Complete | 2026-01-29 |
 | 29. Settings UI Basic | v1.7 | 2/2 | Complete | 2026-01-29 |
-| 30. Settings UI DnD Enhancement | v1.7 | 0/1 | Not started | - |
+| 30. Settings UI DnD Enhancement | v1.7 | 1/1 | Complete | 2026-01-29 |
 | 31. Navigation Integration | v1.7 | 0/2 | Not started | - |
 
 **Summary:**
