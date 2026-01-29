@@ -35,6 +35,7 @@ import { AppContext } from '@/contexts/AppContext';
 import { useSync, CATEGORIES, TEAM_DEPARTMENTS, SYNC_STATUSES } from '@/contexts/SyncContext';
 import { getCurrentCycle, listSprints, formatSprintLabel } from '@/utils/releaseCycles';
 import { Pencil, Trash2 } from 'lucide-react';
+import { SubtaskSection } from './SubtaskSection';
 
 // Generate sprint options for dropdown (current + 2 more cycles)
 function getSprintOptions() {
@@ -267,6 +268,12 @@ export function SyncItemModal({
         )}
       </div>
 
+      {/* Subtask Section - shown for existing items in view mode */}
+      <SubtaskSection
+        itemId={item?.id}
+        isNewItem={!item}
+      />
+
       <DialogFooter className="gap-2">
         {onDelete && (
           <Button
@@ -446,6 +453,12 @@ export function SyncItemModal({
           />
         </div>
       </form>
+
+      {/* Subtask Section - shown for existing items in edit mode */}
+      <SubtaskSection
+        itemId={item?.id}
+        isNewItem={!item}
+      />
 
       <DialogFooter>
         <Button
