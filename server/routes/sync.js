@@ -169,4 +169,97 @@ router.put('/:id/restore', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/sync/:itemId/subtasks
+ * List all subtasks for a sync item
+ */
+router.get('/:itemId/subtasks', async (req, res) => {
+  try {
+    const subtasks = await SubtaskService.list(req.user.id, req.params.itemId);
+    res.json(subtasks);
+  } catch (error) {
+    console.error(`GET /api/sync/${req.params.itemId}/subtasks error:`, error);
+    const statusCode = error.message.includes('not found') ? 404 : 500;
+    res.status(statusCode).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/sync/:itemId/subtasks
+ * Create a new subtask
+ */
+router.post('/:itemId/subtasks', async (req, res) => {
+  try {
+    const subtask = await SubtaskService.create(req.user.id, req.params.itemId, req.body);
+    res.status(201).json(subtask);
+  } catch (error) {
+    console.error(`POST /api/sync/${req.params.itemId}/subtasks error:`, error);
+    const statusCode = error.message.includes('not found') ? 404 : 400;
+    res.status(statusCode).json({ error: error.message });
+  }
+});
+
+/**
+ * PUT /api/sync/:itemId/subtasks/reorder
+ * Reorder subtasks atomically
+ */
+router.put('/:itemId/subtasks/reorder', async (req, res) => {
+  try {
+    const { orderedSubtaskIds } = req.body;
+
+    if (!Array.isArray(orderedSubtaskIds)) {
+      return res.status(400).json({
+        error: 'Bad Request',
+        message: 'orderedSubtaskIds must be an array'
+      });
+    }
+
+    const subtasks = await SubtaskService.reorder(
+      req.user.id,
+      req.params.itemId,
+      orderedSubtaskIds
+    );
+    res.json(subtasks);
+  } catch (error) {
+    console.error(`PUT /api/sync/${req.params.itemId}/subtasks/reorder error:`, error);
+    const statusCode = error.message.includes('not found') ? 404 : 400;
+    res.status(statusCode).json({ error: error.message });
+  }
+});
+
+/**
+ * PUT /api/sync/:itemId/subtasks/:subtaskId
+ * Update a subtask
+ */
+router.put('/:itemId/subtasks/:subtaskId', async (req, res) => {
+  try {
+    const subtask = await SubtaskService.update(
+      req.user.id,
+      req.params.itemId,
+      req.params.subtaskId,
+      req.body
+    );
+    res.json(subtask);
+  } catch (error) {
+    console.error(`PUT /api/sync/${req.params.itemId}/subtasks/${req.params.subtaskId} error:`, error);
+    const statusCode = error.message.includes('not found') ? 404 : 400;
+    res.status(statusCode).json({ error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/sync/:itemId/subtasks/:subtaskId
+ * Delete a subtask
+ */
+router.delete('/:itemId/subtasks/:subtaskId', async (req, res) => {
+  try {
+    await SubtaskService.delete(req.user.id, req.params.itemId, req.params.subtaskId);
+    res.status(204).send();
+  } catch (error) {
+    console.error(`DELETE /api/sync/${req.params.itemId}/subtasks/${req.params.subtaskId} error:`, error);
+    const statusCode = error.message.includes('not found') ? 404 : 400;
+    res.status(statusCode).json({ error: error.message });
+  }
+});
+
 export default router;
