@@ -656,4 +656,51 @@ export const apiClient = {
       return true;
     },
   },
+
+  // Knowledge Base API (v1.5 - MCP integration)
+  knowledge: {
+    // Semantic code search
+    async searchCode(options) {
+      return fetchWithAuth(`${API_BASE_URL}/knowledge/search/code`, {
+        method: 'POST',
+        body: JSON.stringify({
+          query: options.query,
+          limit: options.limit || 20,
+          threshold: options.threshold,
+          repoName: options.repoName,
+          language: options.language,
+          artifactType: options.artifactType,
+          ownership: options.ownership,
+        }),
+      });
+    },
+
+    // Documentation search
+    async searchDocs(options) {
+      return fetchWithAuth(`${API_BASE_URL}/knowledge/search/docs`, {
+        method: 'POST',
+        body: JSON.stringify({
+          query: options.query,
+          limit: options.limit || 20,
+          threshold: options.threshold,
+          domain: options.domain,
+          category: options.category,
+        }),
+      });
+    },
+
+    // Get repository statistics
+    async getStats(options = {}) {
+      const params = new URLSearchParams();
+      if (options.repoName) params.append('repoName', options.repoName);
+      if (options.statsType) params.append('statsType', options.statsType);
+      const queryString = params.toString();
+      return fetchWithAuth(`${API_BASE_URL}/knowledge/stats${queryString ? '?' + queryString : ''}`);
+    },
+
+    // Health check
+    async getHealth() {
+      return fetchWithAuth(`${API_BASE_URL}/knowledge/health`);
+    },
+  },
 };
