@@ -1,5 +1,6 @@
 import express from 'express';
 import MCPService from '../services/MCPService.js';
+import TeamSummaryService from '../services/TeamSummaryService.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -100,12 +101,17 @@ router.post('/insights', async (req, res) => {
 });
 
 /**
- * GET /insights - Retrieve stored insights
- * Query: { startDate, endDate, teamDepartment, category, limit }
+ * GET /insights - Retrieve team summaries from PostgreSQL
+ * Query: { startDate, endDate, teamDepartment, limit }
+ *
+ * NOTE: This endpoint was changed from MCP semantic search to PostgreSQL team_summaries
+ * to provide structured data matching UI component expectations (MetricsBanner, MemberCard).
+ * The frontend (TeamStatusContext.jsx) calls this via apiClient.knowledge.searchInsights()
+ * and expects structured summary objects with completedCount, blockerCount, items[], etc.
  */
 router.get('/insights', async (req, res) => {
   try {
-    const { startDate, endDate, teamDepartment, category, limit } = req.query;
+    const { startDate, endDate, teamDepartment, limit } = req.query;
 
     // Validate dates if provided
     if (startDate && isNaN(Date.parse(startDate))) {
@@ -115,15 +121,16 @@ router.get('/insights', async (req, res) => {
       return res.status(400).json({ error: 'Invalid endDate format' });
     }
 
-    const results = await MCPService.getInsights({
+    // Read from PostgreSQL team_summaries table (REPLACES MCPService.getInsights)
+    const summaryService = new TeamSummaryService();
+    const summaries = await summaryService.list(req.user.id, {
+      teamDepartment,
       startDate,
       endDate,
-      teamDepartment,
-      category,
       limit: limit ? parseInt(limit) : undefined
     });
 
-    res.json(results);
+    res.json({ summaries, total: summaries.length });
   } catch (error) {
     console.error('GET /api/knowledge/insights error:', error);
     res.status(500).json({ error: error.message });

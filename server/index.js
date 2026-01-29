@@ -38,6 +38,7 @@ import entityMappingsRouter from './routes/entityMappings.js';
 import bugsRouter from './routes/bugs.js';
 import emailPreferencesRouter from './routes/emailPreferences.js';
 import syncRouter from './routes/sync.js';
+import teamSummariesRouter from './routes/teamSummaries.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -149,6 +150,7 @@ app.use('/api/entity-mappings', entityMappingsRouter);
 app.use('/api/bugs', bugsRouter);
 app.use('/api/email-preferences', emailPreferencesRouter);
 app.use('/api/sync', syncRouter);
+app.use('/api/team-summaries', teamSummariesRouter);
 
 // 404 handler
 app.use((req, res) => {
