@@ -26,7 +26,8 @@ import {
   MessageSquare,
   Rocket,
   Inbox,
-  FileCode
+  FileCode,
+  Search
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { User as UserEntity } from "@/api/entities";
@@ -164,6 +165,12 @@ export default function Layout({ children, currentPageName }) {
       icon: Bug,
       href: createPageUrl("BugDashboard"),
       current: currentPageName === "BugDashboard"
+    },
+    {
+      name: "Knowledge Search",
+      icon: Search,
+      href: createPageUrl("KnowledgeSearch"),
+      current: currentPageName === "KnowledgeSearch"
     }
   ];
 

@@ -61,6 +61,9 @@ const CaptureRules = lazy(() => retryImport(() => import(/* webpackChunkName: "p
 // Bug Dashboard Pages
 const BugDashboard = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-bug-dashboard" */ "./BugDashboard"), 3, 1000));
 
+// Knowledge Search Pages (v1.5 - MCP integration)
+const KnowledgeSearch = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-knowledge-search" */ "./KnowledgeSearch"), 3, 1000));
+
 const PAGES = {
     
     Tasks: Tasks,
@@ -111,6 +114,9 @@ const PAGES = {
 
     // Bug Dashboard
     BugDashboard: BugDashboard,
+
+    // Knowledge Search (v1.5 - MCP integration)
+    KnowledgeSearch: KnowledgeSearch,
 }
 
 function _getCurrentPage(url) {
@@ -192,6 +198,9 @@ function PagesContent() {
 
                         {/* Bug Dashboard */}
                         <Route path="/bugdashboard" element={<BugDashboard />} />
+
+                        {/* Knowledge Search (v1.5 - MCP integration) */}
+                        <Route path="/knowledge-search" element={<KnowledgeSearch />} />
 
                     </Routes>
                 </Suspense>
