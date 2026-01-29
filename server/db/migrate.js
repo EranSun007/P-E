@@ -111,6 +111,11 @@ const MIGRATIONS = [
     version: '021_email_notifications',
     name: 'Email notification queue for failure logging',
     file: '021_email_notifications.sql'
+  },
+  {
+    version: '022_sync_items',
+    name: 'Add sync item schema for TeamSync Integration',
+    file: '022_sync_items.sql'
   }
 ];
 
