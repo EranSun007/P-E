@@ -64,6 +64,9 @@ const BugDashboard = lazy(() => retryImport(() => import(/* webpackChunkName: "p
 // Knowledge Search Pages (v1.5 - MCP integration)
 const KnowledgeSearch = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-knowledge-search" */ "./KnowledgeSearch"), 3, 1000));
 
+// TeamSync (v1.6 - Team Sync integration)
+const TeamSync = lazy(() => retryImport(() => import(/* webpackChunkName: "pages-teamsync" */ "./TeamSync"), 3, 1000));
+
 const PAGES = {
     
     Tasks: Tasks,
@@ -117,6 +120,9 @@ const PAGES = {
 
     // Knowledge Search (v1.5 - MCP integration)
     KnowledgeSearch: KnowledgeSearch,
+
+    // TeamSync (v1.6)
+    TeamSync: TeamSync,
 }
 
 function _getCurrentPage(url) {
@@ -201,6 +207,9 @@ function PagesContent() {
 
                         {/* Knowledge Search (v1.5 - MCP integration) */}
                         <Route path="/knowledge-search" element={<KnowledgeSearch />} />
+
+                        {/* TeamSync (v1.6 - Team Sync integration) */}
+                        <Route path="/teamsync" element={<TeamSync />} />
 
                     </Routes>
                 </Suspense>

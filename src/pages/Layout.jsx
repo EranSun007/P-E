@@ -171,6 +171,12 @@ export default function Layout({ children, currentPageName }) {
       icon: Search,
       href: createPageUrl("KnowledgeSearch"),
       current: currentPageName === "KnowledgeSearch"
+    },
+    {
+      name: "Team Sync",
+      icon: Users,
+      href: createPageUrl("TeamSync"),
+      current: currentPageName === "TeamSync"
     }
   ];
 
