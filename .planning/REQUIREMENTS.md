@@ -16,15 +16,15 @@ Requirements for Entity Model Viewer milestone. Read-only schema visualization.
 
 ### Visual Canvas
 
-- [ ] **CANVAS-01**: Entities display as nodes with field lists visible
-- [ ] **CANVAS-02**: Foreign key relationships display as connecting edges
-- [ ] **CANVAS-03**: User can pan and zoom the canvas
-- [ ] **CANVAS-04**: User can click entity node to view details (fields, types, constraints)
+- [x] **CANVAS-01**: Entities display as nodes with field lists visible
+- [x] **CANVAS-02**: Foreign key relationships display as connecting edges
+- [x] **CANVAS-03**: User can pan and zoom the canvas
+- [x] **CANVAS-04**: User can click entity node to view details (fields, types, constraints)
 
 ### Navigation
 
-- [ ] **NAV-01**: Entity Model page accessible from sidebar navigation
-- [ ] **NAV-02**: Page loads and displays schema on mount
+- [x] **NAV-01**: Entity Model page accessible from sidebar navigation
+- [x] **NAV-02**: Page loads and displays schema on mount
 
 ## Future Requirements (v1.9+)
 
@@ -63,12 +63,12 @@ Requirements for Entity Model Viewer milestone. Read-only schema visualization.
 | INTRO-02 | Phase 32 | Complete |
 | INTRO-03 | Phase 32 | Complete |
 | INTRO-04 | Phase 32 | Complete |
-| NAV-01 | Phase 33 | Pending |
-| NAV-02 | Phase 33 | Pending |
-| CANVAS-01 | Phase 33 | Pending |
-| CANVAS-02 | Phase 33 | Pending |
-| CANVAS-03 | Phase 33 | Pending |
-| CANVAS-04 | Phase 33 | Pending |
+| NAV-01 | Phase 33 | Complete |
+| NAV-02 | Phase 33 | Complete |
+| CANVAS-01 | Phase 33 | Complete |
+| CANVAS-02 | Phase 33 | Complete |
+| CANVAS-03 | Phase 33 | Complete |
+| CANVAS-04 | Phase 33 | Complete |
 
 **Coverage:**
 - v1.8 requirements: 10 total

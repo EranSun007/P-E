@@ -10,14 +10,14 @@
 - **v1.5 Knowledge Base Integration & Team Status** - Phases 19-22 (shipped 2026-01-29) — [Archive](milestones/v1.5-ROADMAP.md)
 - **v1.6 TeamSync Integration** - Phases 23-27 (shipped 2026-01-29) — [Archive](milestones/v1.6-ROADMAP.md)
 - **v1.7 Menu Clustering** - Phases 28-31 (shipped 2026-01-29) — [Archive](milestones/v1.7-ROADMAP.md)
-- **v1.8 Entity Model Viewer** - Phases 32-33 (in progress)
+- **v1.8 Entity Model Viewer** - Phases 32-33 (shipped 2026-01-29) — [Archive](milestones/v1.8-ROADMAP.md)
 
 ## v1.8 Entity Model Viewer
 
 **Milestone Goal:** Build a read-only visual schema viewer that displays current database structure as an interactive node graph for understanding entity relationships.
 
 - [x] **Phase 32: Schema Introspection Backend** - PostgreSQL introspection API
-- [ ] **Phase 33: Visual Canvas** - @xyflow/react graph with entity nodes and relationship edges
+- [x] **Phase 33: Visual Canvas** - @xyflow/react graph with entity nodes and relationship edges
 
 ### Phase 32: Schema Introspection Backend
 **Goal**: Backend can introspect PostgreSQL schema and return tables, columns, relationships via REST API
@@ -49,8 +49,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 33-01-PLAN.md — EntityModel page with @xyflow/react setup and EntityNode component
-- [ ] 33-02-PLAN.md — Relationship edges, click-to-view panel, navigation integration
+- [x] 33-01-PLAN.md — EntityModel page with @xyflow/react setup and EntityNode component
+- [x] 33-02-PLAN.md — Relationship edges, click-to-view panel, navigation integration
 
 <details>
 <summary>v1.7 Menu Clustering (Phases 28-31) - SHIPPED 2026-01-29</summary>
@@ -611,9 +611,8 @@ v1.8: 32 -> 33 (depends on 32)
 | 30. Settings UI DnD Enhancement | v1.7 | 1/1 | Complete | 2026-01-29 |
 | 31. Navigation Integration | v1.7 | 2/2 | Complete | 2026-01-29 |
 | 32. Schema Introspection Backend | v1.8 | 2/2 | Complete | 2026-01-29 |
-| 33. Visual Canvas | v1.8 | 0/2 | Pending | — |
+| 33. Visual Canvas | v1.8 | 2/2 | Complete | 2026-01-29 |
 
 **Summary:**
-- v1.0-v1.7: 63 plans (Phases 1-31) - SHIPPED
-- v1.8: 4 plans (Phases 32-33) - IN PROGRESS
+- v1.0-v1.8: 67 plans (Phases 1-33) - SHIPPED
 - **Total: 67 plans across 33 phases**
