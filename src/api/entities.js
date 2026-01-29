@@ -143,3 +143,25 @@ export const User = USE_API ? apiClient.auth : {
     return true;
   }
 };
+
+// TeamSync Integration (v1.6)
+export const SyncItem = USE_API ? apiClient.entities.SyncItem : {
+  list: async () => { throw new Error('Sync not available in local mode'); },
+  get: async () => { throw new Error('Sync not available in local mode'); },
+  create: async () => { throw new Error('Sync not available in local mode'); },
+  update: async () => { throw new Error('Sync not available in local mode'); },
+  delete: async () => { throw new Error('Sync not available in local mode'); },
+  getArchived: async () => { throw new Error('Sync not available in local mode'); },
+  getArchivedCount: async () => { throw new Error('Sync not available in local mode'); },
+  restore: async () => { throw new Error('Sync not available in local mode'); },
+  listSubtasks: async () => { throw new Error('Sync not available in local mode'); },
+  createSubtask: async () => { throw new Error('Sync not available in local mode'); },
+  updateSubtask: async () => { throw new Error('Sync not available in local mode'); },
+  deleteSubtask: async () => { throw new Error('Sync not available in local mode'); },
+  reorderSubtasks: async () => { throw new Error('Sync not available in local mode'); },
+};
+
+export const SyncSettings = USE_API ? apiClient.sync.settings : {
+  get: async () => { throw new Error('Sync settings not available in local mode'); },
+  update: async () => { throw new Error('Sync settings not available in local mode'); },
+};
