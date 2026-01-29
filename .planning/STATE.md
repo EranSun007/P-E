@@ -9,20 +9,20 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 
 ## Current Position
 
-Phase: 20 of 22 (Knowledge Search UI)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-01-29 — Completed 20-02-PLAN.md (Advanced Search Filters)
+Phase: 24 of 27 (REST API)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-01-29 — Completed 24-01-PLAN.md (Sync Item REST API)
 
-Progress: [####################..........] 41/47 plans (87% overall)
+Progress: [#####################.........] 42/47 plans (89% overall)
 
 ## Milestone Summary
 
 **v1.6 TeamSync Integration:**
 - Phases: 23-27 (5 phases)
-- Plans: 10 total (2 complete)
+- Plans: 10 total (3 complete)
 - Requirements: 59 mapped
-- Status: Phase 23 complete, Phase 24 ready
+- Status: Phase 23 complete, Phase 24 in progress (24-01 complete)
 
 **v1.5 Knowledge Base (parallel on feature/v1.6):**
 - Phases: 19-22
@@ -33,7 +33,7 @@ Progress: [####################..........] 41/47 plans (87% overall)
 
 **v1.0-v1.4:** 35 plans completed across 18 phases
 **v1.5:** 4 plans completed (Phase 19 complete, Phase 20 complete)
-**v1.6:** 2 plans completed (Phase 23 - Database & Backend Services complete)
+**v1.6:** 3 plans completed (Phase 23 complete, 24-01 complete)
 
 ## Accumulated Context
 
@@ -59,6 +59,9 @@ Key patterns established:
 - Color-coded similarity thresholds: green >=80%, yellow >=60%, gray <60% (20-02)
 - Tab-based navigation for search and statistics views (20-02)
 - Recharts for analytics dashboards (20-02)
+- Route ordering critical: specific routes before generic /:id (24-01)
+- Query param mapping at route layer: camelCase → snake_case (24-01)
+- HTTP status codes: 201 create, 204 delete, 404 not found (24-01)
 
 ### Pending Todos
 
@@ -71,10 +74,12 @@ None - milestone starting fresh.
 2. Continue v1.5 on feature/v1.6 and merge later
 3. Focus on v1.6 now, reconcile branches after
 
+**Schema drift (24-01):** Updated_date column was missing from projects table despite trigger expecting it. Consider auditing other tables for similar schema drift issues.
+
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed 20-02-PLAN.md execution (Phase 20 complete)
+Stopped at: Completed 24-01-PLAN.md execution (Sync Item REST API)
 Resume file: None
 
 ## Next Steps
@@ -85,7 +90,6 @@ Resume file: None
 3. Continue Phase 22: Health Monitoring
 
 **v1.6 TeamSync Integration:**
-1. `/gsd:plan-phase 24` - Plan REST API
-2. Execute 24-01: Sync item routes (CRUD, archive, restore)
-3. Execute 24-02: Subtask and settings routes
-4. Continue through phases 25-27
+1. Execute 24-02: Subtask and settings routes
+2. Continue Phase 25: Frontend Components
+3. Continue through phases 26-27
