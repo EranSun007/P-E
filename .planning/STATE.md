@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 
 ## Current Position
 
-Phase: 28 of 31 (Data Layer & Backend API) - COMPLETE
-Plan: 2 of 2 complete
-Status: Phase complete
-Last activity: 2026-01-29 — Completed 28-02-PLAN.md (Frontend Navigation Context)
+Phase: 29 of 31 (Settings UI Basic)
+Plan: 1 of 2 complete
+Status: In progress
+Last activity: 2026-01-29 — Completed 29-01-PLAN.md (Navigation Tab with Folder CRUD)
 
-Progress: [=============================] 92% (58/63 plans)
+Progress: [=============================] 94% (59/63 plans)
 
 ## Milestone Summary
 
@@ -28,9 +28,9 @@ Progress: [=============================] 92% (58/63 plans)
 - v1.6 TeamSync Integration (Phases 23-27, 11 plans) — 2026-01-29
 
 **Current Milestone:**
-- v1.7 Menu Clustering (Phases 28-31, 7 plans) — IN PROGRESS (2/7 plans)
+- v1.7 Menu Clustering (Phases 28-31, 7 plans) — IN PROGRESS (3/7 plans)
 
-**Total: 7 milestones shipped, 27 phases, 58 plans completed**
+**Total: 7 milestones shipped, 28 phases, 59 plans completed**
 
 ## Performance Metrics
 
@@ -49,16 +49,15 @@ Progress: [=============================] 92% (58/63 plans)
 - @radix-ui/react-collapsible for expand/collapse (already installed)
 - JSON config storage in user_settings (menu_config_{mode})
 - Context with parallel mode config loading (NavigationContext pattern)
+- Settings tab component pattern with Card layout (NavigationSettings)
 
-### Decisions Made (Phase 28)
+### Decisions Made (Phase 29)
 
 | ID | Decision | Rationale |
 |----|----------|-----------|
-| json-storage | Store menu config as JSON string in user_settings | Reuses existing infrastructure |
-| separate-modes | Separate setting keys per mode | Users may have different organizations |
-| empty-defaults | Default configs are empty arrays | Let frontend determine initial ordering |
-| parallel-load | Load both mode configs on auth | Avoids re-fetch when switching modes |
-| provider-placement | NavigationProvider inside AppModeProvider | Requires useAppMode for isProductMode |
+| uuid-generation | crypto.randomUUID() for folder IDs | Native browser API, no dependency |
+| folder-order | New folder order = max existing + 1 | New folders appear at end |
+| delete-behavior | Delete folder sets items folderId to null | Items move to root level |
 
 ### Research Flags for v1.7
 
@@ -72,9 +71,9 @@ None — all milestones shipped successfully.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed 28-02-PLAN.md (Phase 28 complete)
+Stopped at: Completed 29-01-PLAN.md
 Resume file: None
 
 ## Next Steps
 
-Execute Phase 29 (Settings UI) to add menu customization interface in Settings page.
+Execute Phase 29 Plan 02 (Item Assignment) to add drag-and-drop assignment of items to folders.
