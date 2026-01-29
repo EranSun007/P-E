@@ -46,7 +46,7 @@ Plans:
   3. User can delete a folder (items return to root level, not deleted)
   4. User can assign menu items to folders using a dropdown selector
   5. User can remove items from folders (move back to root)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
 - [ ] 29-01-PLAN.md — Navigation Settings tab with folder CRUD
