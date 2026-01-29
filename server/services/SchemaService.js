@@ -142,6 +142,130 @@ class SchemaService {
     const result = await query(sql);
     return result.rows;
   }
+
+  /**
+   * Get complete schema for all tables with nested structure
+   * @returns {Promise<Object>} Complete schema with nested structure
+   */
+  async getCompleteSchema() {
+    // Fetch all data in parallel
+    const [tables, columns, foreignKeys, indexes, constraints] = await Promise.all([
+      this.getTables(),
+      this.getColumns(),
+      this.getForeignKeys(),
+      this.getIndexes(),
+      this.getConstraints()
+    ]);
+
+    // Group columns by table
+    const columnsByTable = this.groupByTable(columns);
+    const indexesByTable = this.groupByTable(indexes, 'tablename', 'schemaname');
+    const constraintsByTable = this.groupByTable(constraints);
+    const foreignKeysByTable = this.groupByTable(foreignKeys, 'source_table', 'source_schema');
+
+    // Build nested structure with camelCase keys
+    const tablesWithMetadata = tables.map(table => ({
+      schema: table.table_schema,
+      name: table.table_name,
+      type: table.table_type,
+      columns: (columnsByTable[`${table.table_schema}.${table.table_name}`] || []).map(this.transformColumn),
+      indexes: (indexesByTable[`${table.table_schema}.${table.table_name}`] || []).map(this.transformIndex),
+      constraints: this.groupConstraints(constraintsByTable[`${table.table_schema}.${table.table_name}`] || []),
+      foreignKeys: (foreignKeysByTable[`${table.table_schema}.${table.table_name}`] || []).map(this.transformForeignKey)
+    }));
+
+    return { tables: tablesWithMetadata };
+  }
+
+  /**
+   * Helper: Group array items by table
+   * @private
+   */
+  groupByTable(items, tableKey = 'table_name', schemaKey = 'table_schema') {
+    return items.reduce((acc, item) => {
+      const key = `${item[schemaKey]}.${item[tableKey]}`;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    }, {});
+  }
+
+  /**
+   * Helper: Transform column from snake_case to camelCase
+   * @private
+   */
+  transformColumn(col) {
+    return {
+      columnName: col.column_name,
+      ordinalPosition: col.ordinal_position,
+      dataType: col.data_type,
+      udtName: col.udt_name,
+      isNullable: col.is_nullable === 'YES',
+      columnDefault: col.column_default,
+      characterMaximumLength: col.character_maximum_length,
+      numericPrecision: col.numeric_precision,
+      numericScale: col.numeric_scale
+    };
+  }
+
+  /**
+   * Helper: Transform index from snake_case to camelCase
+   * @private
+   */
+  transformIndex(idx) {
+    return {
+      schema: idx.schemaname,
+      table: idx.tablename,
+      name: idx.indexname,
+      definition: idx.indexdef
+    };
+  }
+
+  /**
+   * Helper: Transform foreign key from snake_case to camelCase
+   * @private
+   */
+  transformForeignKey(fk) {
+    return {
+      constraintName: fk.constraint_name,
+      sourceSchema: fk.source_schema,
+      sourceTable: fk.source_table,
+      sourceColumn: fk.source_column,
+      targetSchema: fk.target_schema,
+      targetTable: fk.target_table,
+      targetColumn: fk.target_column,
+      updateRule: fk.update_rule,
+      deleteRule: fk.delete_rule
+    };
+  }
+
+  /**
+   * Helper: Group constraints by name and aggregate columns
+   * @private
+   */
+  groupConstraints(constraints) {
+    // Group by constraint_name since multi-column constraints have multiple rows
+    const grouped = constraints.reduce((acc, constraint) => {
+      const key = constraint.constraint_name;
+      if (!acc[key]) {
+        acc[key] = {
+          name: constraint.constraint_name,
+          schema: constraint.table_schema,
+          table: constraint.table_name,
+          type: constraint.constraint_type,
+          columns: [],
+          isDeferrable: constraint.is_deferrable === 'YES',
+          initiallyDeferred: constraint.initially_deferred === 'YES'
+        };
+      }
+      if (constraint.column_name) {
+        acc[key].columns.push(constraint.column_name);
+      }
+      return acc;
+    }, {});
+
+    return Object.values(grouped);
+  }
 }
 
 export default new SchemaService();
