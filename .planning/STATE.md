@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-29)
 ## Current Position
 
 Phase: 29 of 31 (Settings UI Basic)
-Plan: 1 of 2 complete
-Status: In progress
-Last activity: 2026-01-29 — Completed 29-01-PLAN.md (Navigation Tab with Folder CRUD)
+Plan: 2 of 2 complete
+Status: Phase complete
+Last activity: 2026-01-29 — Completed 29-02-PLAN.md (Item Assignment and Folder Preview)
 
-Progress: [=============================] 94% (59/63 plans)
+Progress: [==============================] 95% (60/63 plans)
 
 ## Milestone Summary
 
@@ -28,9 +28,9 @@ Progress: [=============================] 94% (59/63 plans)
 - v1.6 TeamSync Integration (Phases 23-27, 11 plans) — 2026-01-29
 
 **Current Milestone:**
-- v1.7 Menu Clustering (Phases 28-31, 7 plans) — IN PROGRESS (3/7 plans)
+- v1.7 Menu Clustering (Phases 28-31, 7 plans) — IN PROGRESS (4/7 plans)
 
-**Total: 7 milestones shipped, 28 phases, 59 plans completed**
+**Total: 7 milestones shipped, 28 phases, 60 plans completed**
 
 ## Performance Metrics
 
@@ -50,6 +50,8 @@ Progress: [=============================] 94% (59/63 plans)
 - JSON config storage in user_settings (menu_config_{mode})
 - Context with parallel mode config loading (NavigationContext pattern)
 - Settings tab component pattern with Card layout (NavigationSettings)
+- Select dropdown for item-to-folder assignment
+- Preview visualization pattern for navigation configuration
 
 ### Decisions Made (Phase 29)
 
@@ -58,6 +60,8 @@ Progress: [=============================] 94% (59/63 plans)
 | uuid-generation | crypto.randomUUID() for folder IDs | Native browser API, no dependency |
 | folder-order | New folder order = max existing + 1 | New folders appear at end |
 | delete-behavior | Delete folder sets items folderId to null | Items move to root level |
+| menu-items-inline | PEOPLE_MENU_ITEMS/PRODUCT_MENU_ITEMS defined in component | Match Layout.jsx navigation arrays |
+| root-representation | "root" value in Select for root level | Clear UX, null removal on save |
 
 ### Research Flags for v1.7
 
@@ -71,9 +75,9 @@ None — all milestones shipped successfully.
 ## Session Continuity
 
 Last session: 2026-01-29
-Stopped at: Completed 29-01-PLAN.md
+Stopped at: Completed 29-02-PLAN.md
 Resume file: None
 
 ## Next Steps
 
-Execute Phase 29 Plan 02 (Item Assignment) to add drag-and-drop assignment of items to folders.
+Execute Phase 30 Plan 01 (DnD Enhancement) to add drag-and-drop reordering for folders and items.
