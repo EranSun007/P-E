@@ -40,6 +40,7 @@ import emailPreferencesRouter from './routes/emailPreferences.js';
 import syncRouter from './routes/sync.js';
 import teamSummariesRouter from './routes/teamSummaries.js';
 import menuConfigRouter from './routes/menuConfig.js';
+import schemaRouter from './routes/schema.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -153,6 +154,7 @@ app.use('/api/email-preferences', emailPreferencesRouter);
 app.use('/api/sync', syncRouter);
 app.use('/api/team-summaries', teamSummariesRouter);
 app.use('/api/menu-config', menuConfigRouter);
+app.use('/api/schema', schemaRouter);
 
 // 404 handler
 app.use((req, res) => {
