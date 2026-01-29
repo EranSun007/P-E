@@ -1,1019 +1,1146 @@
-# Architecture Patterns: KPI Trend Charts & Threshold Notifications
+# Architecture Patterns: Menu Clustering / Collapsible Folder Navigation
 
-**Domain:** Express/React/PostgreSQL Time Series Visualization & Alert System
-**Researched:** 2026-01-28
+**Domain:** React Sidebar Navigation with Hierarchical Menu Structure
+**Researched:** 2026-01-29
 **Confidence:** HIGH
 
 ## Executive Summary
 
-KPI trend charts and threshold notifications integrate seamlessly with the existing Express/React/PostgreSQL architecture. The project already has all foundational pieces: Recharts for visualization, weekly_kpis table for time-series data, notification system for alerts, and established service patterns. No job scheduler or email infrastructure exists yet, requiring new dependencies (node-cron for scheduling, nodemailer for email).
+Menu clustering integrates seamlessly with the existing P&E Manager architecture. The project already has all foundational pieces: shadcn/ui sidebar components with built-in `SidebarMenuSub` for nested items, `@radix-ui/react-collapsible` for expand/collapse behavior, `@dnd-kit` for drag-and-drop reordering, and `UserSettingsService` with the `user_settings` table for persisting configuration. No new dependencies required.
 
 **Key architectural decisions:**
-1. **Time-series queries:** Extend BugService with historical KPI queries across multiple weekly_kpis rows
-2. **Trend visualization:** Add Recharts LineChart/AreaChart components following existing chart patterns
-3. **Threshold monitoring:** New ThresholdService evaluates KPIs against configurable thresholds on upload
-4. **Notification delivery:** Extend NotificationService with in-app alerts first, email optional via nodemailer
-5. **Scheduling:** Introduce node-cron for periodic threshold checks (lightweight, no Redis needed)
+1. **Data model:** Store menu configuration as JSON in existing `user_settings` table (key: `menu_config_people` / `menu_config_product`)
+2. **UI components:** Transform flat navigation arrays to hierarchical structure using existing shadcn/ui sidebar primitives
+3. **Settings UI:** Add "Navigation" tab to Settings.jsx using existing Tabs pattern with folder CRUD and drag-drop item assignment
+4. **State management:** New `NavigationContext` to centralize menu structure, loaded on app init
+5. **Default fallback:** Maintain flat array as default for users without custom configuration
 
-**Build order:** Historical queries → Trend charts → Threshold evaluation → Notification integration → (Optional) Email delivery
+**Build order:** Data model + context first, then hierarchical rendering, then Settings UI, then drag-drop (optional enhancement).
 
 ## Recommended Architecture
 
 ### System Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Frontend (React)                            │
-├─────────────────────────────────────────────────────────────────┤
-│  BugDashboard.jsx                                               │
-│    ├─ KPITrendChart.jsx (NEW)  ← Recharts LineChart           │
-│    ├─ KPICard.jsx (exists)     ← Add trend indicator           │
-│    └─ NotificationBell.jsx (NEW) ← Badge for unread alerts    │
-│                                                                 │
-│  API Calls:                                                     │
-│    ├─ GET /api/bugs/kpis/history?weeks=8&component=X (NEW)    │
-│    ├─ GET /api/notifications (exists)                          │
-│    └─ PUT /api/notifications/:id (mark read - exists)         │
-└─────────────────────────────────────────────────────────────────┘
-                            ↓ HTTP
-┌─────────────────────────────────────────────────────────────────┐
-│                     Backend (Express)                           │
-├─────────────────────────────────────────────────────────────────┤
-│  Routes:                                                        │
-│    ├─ bugs.js (EXTEND)                                         │
-│    │    └─ GET /kpis/history → BugService.getKPIHistory()     │
-│    ├─ notifications.js (exists)                                │
-│    │    └─ GET /api/notifications → NotificationService.list()│
-│    └─ thresholds.js (NEW - optional)                           │
-│         └─ GET /api/thresholds → ThresholdService.list()      │
-│                                                                 │
-│  Services:                                                      │
-│    ├─ BugService.js (EXTEND)                                  │
-│    │    ├─ getKPIHistory(userId, weeks, component)            │
-│    │    └─ uploadCSV() → triggers threshold check (MODIFIED)  │
-│    ├─ ThresholdService.js (NEW)                               │
-│    │    ├─ evaluateKPIs(kpis, uploadId)                       │
-│    │    ├─ createNotificationIfBreached(userId, kpi, value)   │
-│    │    └─ list/create/update/delete thresholds               │
-│    └─ NotificationService.js (exists - no changes needed)     │
-│                                                                 │
-│  Scheduler (NEW):                                              │
-│    └─ scheduler/kpiMonitor.js                                  │
-│         └─ node-cron: 0 8 * * 1 (weekly Monday 8am)           │
-│              └─ Check thresholds for all users/uploads         │
-│                                                                 │
-│  Email (OPTIONAL):                                             │
-│    └─ services/EmailService.js (NEW - only if email needed)   │
-│         └─ sendThresholdAlert(user, kpi, value)               │
-└─────────────────────────────────────────────────────────────────┘
-                            ↓ SQL
-┌─────────────────────────────────────────────────────────────────┐
-│                   PostgreSQL Database                           │
-├─────────────────────────────────────────────────────────────────┤
-│  weekly_kpis (EXISTS)                                          │
-│    ├─ upload_id (FK)                                           │
-│    ├─ component (VARCHAR)                                      │
-│    ├─ kpi_data (JSONB) ← { bug_inflow_rate, sla_vh_percent }  │
-│    └─ calculated_at (TIMESTAMP)                                │
-│                                                                 │
-│  notifications (EXISTS)                                         │
-│    ├─ id, user_id, message, read                              │
-│    ├─ scheduled_date (TIMESTAMP)                               │
-│    └─ created_date (TIMESTAMP)                                 │
-│                                                                 │
-│  kpi_thresholds (NEW - optional)                               │
-│    ├─ id, user_id, kpi_name                                    │
-│    ├─ warning_threshold (NUMERIC)                              │
-│    ├─ critical_threshold (NUMERIC)                             │
-│    └─ notification_enabled (BOOLEAN)                           │
-│                                                                 │
-│  bug_uploads (EXISTS - join key for historical queries)        │
-│    ├─ id, user_id, week_ending                                │
-│    └─ uploaded_at (TIMESTAMP)                                  │
-└─────────────────────────────────────────────────────────────────┘
++----------------------------------------------------------------+
+|                     Frontend (React)                            |
++----------------------------------------------------------------+
+|  Layout.jsx                                                     |
+|    |-- NavigationContext.Provider                              |
+|         |-- useNavigation() hook                               |
+|              |-- menuConfig (hierarchical)                     |
+|              |-- updateMenuConfig()                            |
+|                                                                |
+|  Sidebar Rendering:                                            |
+|    |-- CollapsibleFolder.jsx (NEW)                             |
+|         |-- SidebarGroup + Collapsible                         |
+|         |-- SidebarMenuSub for nested items                    |
+|                                                                |
+|  Settings.jsx                                                  |
+|    |-- TabsContent value="navigation" (NEW)                    |
+|         |-- FolderList (CRUD folders)                          |
+|         |-- MenuItemAssignment (drag items to folders)         |
+|                                                                |
+|  API Calls:                                                    |
+|    |-- UserSettings.get('menu_config_people')                  |
+|    |-- UserSettings.set('menu_config_people', config)          |
++----------------------------------------------------------------+
+                            | HTTP
++----------------------------------------------------------------+
+|                     Backend (Express)                           |
++----------------------------------------------------------------+
+|  Routes:                                                        |
+|    |-- /api/user-settings (EXISTS)                             |
+|         |-- GET /:key                                          |
+|         |-- PUT /:key                                          |
+|                                                                |
+|  Services:                                                      |
+|    |-- UserSettingsService.js (EXISTS)                         |
+|         |-- get(userId, settingKey)                            |
+|         |-- set(userId, settingKey, value)                     |
++----------------------------------------------------------------+
+                            | SQL
++----------------------------------------------------------------+
+|                   PostgreSQL Database                           |
++----------------------------------------------------------------+
+|  user_settings (EXISTS)                                        |
+|    |-- id (UUID)                                               |
+|    |-- user_id (VARCHAR)                                       |
+|    |-- setting_key (VARCHAR) -- 'menu_config_people'           |
+|    |-- setting_value (TEXT)  -- JSON string                    |
+|    |-- encrypted (BOOLEAN)   -- false for menu config          |
++----------------------------------------------------------------+
 ```
 
 ### Component Boundaries
 
 | Component | Responsibility | Communicates With | State |
 |-----------|----------------|-------------------|-------|
-| **BugDashboard.jsx** | Orchestrate KPI display, trend charts, filters | KPITrendChart, KPICard, apiClient | Current + EXTEND with historical KPIs |
-| **KPITrendChart.jsx** (NEW) | Render multi-week KPI line chart | Recharts LineChart, apiClient | Read-only (receives data from parent) |
-| **ThresholdService.js** (NEW) | Evaluate KPIs against thresholds, create notifications | BugService (get KPIs), NotificationService (create) | Stateless |
-| **BugService.js** | Provide KPI time-series data | weekly_kpis table (multi-row queries) | EXTEND with history queries |
-| **NotificationService.js** | Store/retrieve notifications | notifications table | EXISTS - no changes |
-| **kpiMonitor.js** (NEW) | Scheduled threshold checks | ThresholdService, BugService | Cron job runner |
-| **EmailService.js** (OPTIONAL) | Send email alerts | nodemailer, SMTP server | NEW - only if email required |
+| **NavigationContext** (NEW) | Centralize menu config, provide hooks | UserSettings API, Layout | menuConfig, loading, updateMenuConfig() |
+| **Layout.jsx** (MODIFY) | Consume NavigationContext, render hierarchical nav | NavigationContext | EXTEND with folder rendering |
+| **CollapsibleFolder.jsx** (NEW) | Render collapsible folder with nested items | Collapsible, SidebarMenuSub | isOpen state (local) |
+| **Settings.jsx** (MODIFY) | Add Navigation tab for folder management | NavigationContext, UserSettings | EXTEND with navigation tab |
+| **FolderManager.jsx** (NEW) | CRUD operations for folders | NavigationContext | editing state, newFolderName |
+| **MenuItemAssignment.jsx** (NEW) | Drag items to folders | @dnd-kit, NavigationContext | dragState |
+| **UserSettingsService** (EXISTS) | Persist settings to DB | user_settings table | No changes needed |
 
 ### Data Flow
 
-**Flow 1: Historical KPI Query (Trend Charts)**
+**Flow 1: Load Menu Configuration on App Init**
 ```
-1. User views BugDashboard
-2. Frontend calls GET /api/bugs/kpis/history?weeks=8&component=all
-3. BugService.getKPIHistory():
-   - Queries weekly_kpis table for last 8 weeks (JOIN with bug_uploads on week_ending)
-   - Returns array: [{ week_ending, kpi_data }, ...]
-4. Frontend transforms to Recharts format:
-   [{ week: '2026-01-11', bug_inflow_rate: 6.2, sla_vh_percent: 85 }, ...]
-5. KPITrendChart renders LineChart with multiple lines (one per KPI)
+1. User authenticates, AppProvider mounts
+2. NavigationContext fetches: GET /api/user-settings/menu_config_people
+3. If exists: Parse JSON, set as menuConfig
+4. If not exists: Use DEFAULT_MENU_CONFIG (flat array structure)
+5. Layout.jsx consumes menuConfig via useNavigation() hook
+6. Render hierarchical sidebar based on menuConfig structure
 ```
 
-**Flow 2: Threshold Evaluation (On Upload)**
+**Flow 2: User Creates New Folder**
 ```
-1. User uploads CSV via POST /api/bugs/upload
-2. BugService.uploadCSV():
-   - Parses CSV, calculates KPIs, stores in weekly_kpis (existing logic)
-   - NEW: Calls ThresholdService.evaluateKPIs(kpis, uploadId)
-3. ThresholdService.evaluateKPIs():
-   - Fetches thresholds for user (or uses defaults)
-   - Checks each KPI against warning/critical thresholds
-   - If breached: NotificationService.create({ message: "SLA VH below 60%" })
-4. Frontend polls GET /api/notifications or uses existing notification bell
+1. User opens Settings > Navigation tab
+2. Clicks "Add Folder", enters name (e.g., "Core Tasks")
+3. FolderManager calls NavigationContext.createFolder(name)
+4. NavigationContext:
+   a. Updates local menuConfig state (optimistic)
+   b. Calls UserSettings.set('menu_config_people', JSON.stringify(newConfig))
+5. Backend stores in user_settings table
+6. Sidebar re-renders with new folder
 ```
 
-**Flow 3: Scheduled Monitoring (Weekly Check)**
+**Flow 3: User Moves Item to Folder**
 ```
-1. Cron job triggers Monday 8am: scheduler/kpiMonitor.js
-2. For each user with uploads:
-   - Fetch most recent upload's KPIs
-   - ThresholdService.evaluateKPIs(kpis, uploadId)
-3. If thresholds breached:
-   - Create in-app notification
-   - (Optional) EmailService.sendThresholdAlert()
-4. User sees notification on next login
+1. In Settings > Navigation, user drags "Tasks" item
+2. Drops onto "Core Tasks" folder
+3. MenuItemAssignment calls NavigationContext.moveItemToFolder(itemId, folderId)
+4. NavigationContext:
+   a. Removes item from current location (root or other folder)
+   b. Adds item to target folder's children
+   c. Persists to UserSettings
+5. Sidebar re-renders with item in new folder
+```
+
+**Flow 4: Toggle Folder Collapse State**
+```
+1. User clicks folder header in sidebar
+2. CollapsibleFolder toggles local isOpen state
+3. Optional: Persist collapse states to localStorage for session persistence
+   (Not database - transient UI preference)
 ```
 
 ## Integration Points
 
-### 1. Existing BugService (server/services/BugService.js)
+### 1. Existing UserSettingsService (server/services/UserSettingsService.js)
 
-**Current state:** Provides `getKPIs(userId, uploadId, component)` for single week
+**Current state:** Provides `get(userId, key)`, `set(userId, key, value, encrypt)` for any key-value pair.
 
-**Integration:**
+**Integration:** Use as-is. No modifications needed.
+
 ```javascript
-// ADD NEW METHOD to BugService.js
-/**
- * Get KPI history across multiple weeks for trend analysis
- * @param {string} userId - User ID
- * @param {number} weeks - Number of weeks to retrieve (default 8)
- * @param {string|null} component - Optional component filter
- * @returns {Array} - Array of { week_ending, kpi_data, upload_id }
- */
-async getKPIHistory(userId, weeks = 8, component = null) {
-  const sql = `
-    SELECT
-      bu.week_ending,
-      wk.kpi_data,
-      wk.upload_id,
-      wk.calculated_at
-    FROM weekly_kpis wk
-    JOIN bug_uploads bu ON wk.upload_id = bu.id
-    WHERE bu.user_id = $1
-      AND wk.component IS NOT DISTINCT FROM $2
-    ORDER BY bu.week_ending DESC
-    LIMIT $3
-  `;
+// Example usage for menu config
+await UserSettingsService.set(
+  userId,
+  'menu_config_people',
+  JSON.stringify(menuConfig),
+  false // not encrypted
+);
 
-  const result = await query(sql, [userId, component, weeks]);
-
-  // Return in chronological order (oldest first) for charts
-  return result.rows.reverse();
-}
+const config = await UserSettingsService.get(userId, 'menu_config_people');
+const menuConfig = config ? JSON.parse(config) : DEFAULT_CONFIG;
 ```
 
-**Modification to existing uploadCSV():**
+### 2. Existing apiClient UserSettings (src/api/entities.js)
+
+**Current state:** Exports `UserSettings` with `get()`, `set()`, `delete()` methods.
+
+**Integration:** Use existing methods.
+
 ```javascript
-// In BugService.uploadCSV(), after storing KPIs (line 521)
-// ADD threshold evaluation trigger
-await client.query('COMMIT');
+// In NavigationContext
+import { UserSettings } from '@/api/entities';
 
-// NEW: Evaluate thresholds after successful upload
-const ThresholdService = (await import('./ThresholdService.js')).default;
-await ThresholdService.evaluateKPIs(allKPIs, uploadId, userId);
+const loadMenuConfig = async () => {
+  const configStr = await UserSettings.get('menu_config_people');
+  return configStr ? JSON.parse(configStr) : DEFAULT_MENU_CONFIG;
+};
 
-return { uploadId, bugCount, components, kpis: allKPIs };
+const saveMenuConfig = async (config) => {
+  await UserSettings.set('menu_config_people', JSON.stringify(config));
+};
 ```
 
-### 2. Existing Bug Routes (server/routes/bugs.js)
+### 3. Existing Layout.jsx (src/pages/Layout.jsx)
 
-**Current state:** Provides `/kpis`, `/list`, `/upload` endpoints
+**Current state:**
+- Lines 91-188: `peopleNavigation` flat array (16 items)
+- Lines 191-228: `productNavigation` flat array (6 items)
+- Line 230: `navigation = isProductMode ? productNavigation : peopleNavigation`
+- Lines 301-320: Map over flat array to render `<Link>` items
 
 **Integration:**
+
 ```javascript
-// ADD NEW ROUTE to bugs.js (after existing /kpis route)
-/**
- * GET /api/bugs/kpis/history
- * Get KPI history for trend analysis
- * Query params: weeks (default 8), component (optional)
- */
-router.get('/kpis/history', async (req, res) => {
-  try {
-    const { weeks = 8, component } = req.query;
+// BEFORE: Flat array rendering
+{navigation.map((item) => (
+  <Link key={item.name} to={item.href} ...>
+    <item.icon className="h-5 w-5 mr-3" />
+    {item.name}
+  </Link>
+))}
 
-    const history = await BugService.getKPIHistory(
-      req.user.id,
-      parseInt(weeks, 10),
-      component === 'all' ? null : component
-    );
+// AFTER: Hierarchical rendering with context
+const { menuConfig, isLoading } = useNavigation();
+const navigation = isProductMode
+  ? menuConfig.product
+  : menuConfig.people;
 
-    res.json(history);
-  } catch (error) {
-    console.error('GET /api/bugs/kpis/history error:', error);
-    res.status(500).json({ error: 'Internal Server Error', message: error.message });
+{isLoading ? (
+  <NavigationSkeleton />
+) : (
+  <HierarchicalNavigation items={navigation} />
+)}
+```
+
+### 4. Existing Settings.jsx (src/pages/Settings.jsx)
+
+**Current state:**
+- Lines 272-282: `tabConfigs` array defines all settings tabs
+- Line 370: `<Tabs>` component with `TabsList` and `TabsContent` for each tab
+
+**Integration:**
+
+```javascript
+// ADD to tabConfigs array (line 272)
+const tabConfigs = [
+  { id: "priorities", label: "Priorities", icon: Flag },
+  { id: "taskTypes", label: "Task Types", icon: Layers },
+  // ... existing tabs ...
+  { id: "navigation", label: "Navigation", icon: Menu }, // NEW
+  { id: "data", label: "Data", icon: Database }
+];
+
+// ADD TabsContent (after line 525)
+{tab.id === 'navigation' && (
+  <NavigationSettings />
+)}
+```
+
+### 5. Existing shadcn/ui Components
+
+**Available (no new dependencies):**
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `Collapsible` | `src/components/ui/collapsible.jsx` | Expand/collapse folder content |
+| `SidebarMenuSub` | `src/components/ui/sidebar.jsx` | Nested menu items (line 554-565) |
+| `SidebarMenuSubItem` | `src/components/ui/sidebar.jsx` | Individual nested item (line 567) |
+| `SidebarMenuSubButton` | `src/components/ui/sidebar.jsx` | Clickable nested item (line 570-592) |
+| `Accordion` | `src/components/ui/accordion.jsx` | Alternative to Collapsible (more structure) |
+
+**Existing Collapsible usage pattern:**
+```javascript
+// From OneOnOneComplianceCard.jsx - exact pattern to follow
+<Collapsible open={expanded} onOpenChange={setExpanded}>
+  <CollapsibleTrigger asChild>
+    <Button variant="ghost" className="w-full flex items-center justify-between">
+      <span>{expanded ? 'Hide' : 'Show'} details</span>
+      {expanded ? <ChevronUp /> : <ChevronDown />}
+    </Button>
+  </CollapsibleTrigger>
+  <CollapsibleContent className="space-y-2 pt-2">
+    {items.map(item => (...))}
+  </CollapsibleContent>
+</Collapsible>
+```
+
+### 6. Existing @dnd-kit (src/components/sync/SubtaskList.jsx)
+
+**Current state:** Used for subtask reordering in SubtaskList.jsx
+
+**Integration for menu item drag-drop:**
+
+```javascript
+// Exact pattern from SubtaskList.jsx
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
+
+// In MenuItemAssignment component
+const sensors = useSensors(
+  useSensor(PointerSensor),
+  useSensor(KeyboardSensor, {
+    coordinateGetter: sortableKeyboardCoordinates,
+  })
+);
+
+const handleDragEnd = (event) => {
+  const { active, over } = event;
+  if (active.id !== over?.id) {
+    // Move item to folder or reorder
+    moveItemToFolder(active.id, over.id);
   }
-});
-```
-
-### 3. Existing Notifications (No Changes Needed)
-
-**Current state:** NotificationService and routes already exist for CRUD operations
-
-**Integration:** Use as-is. ThresholdService will call `NotificationService.create()`:
-```javascript
-// Example call from ThresholdService
-await NotificationService.create(userId, {
-  message: `⚠️ SLA VH Compliance dropped to ${slaVhPercent.toFixed(1)}% (threshold: 60%)`,
-  read: false,
-  scheduled_date: null
-});
-```
-
-### 4. Frontend BugDashboard (src/pages/BugDashboard.jsx)
-
-**Current state:** Displays single-week KPIs in cards with status colors
-
-**Integration:**
-```javascript
-// ADD historical KPI state and fetch
-const [historicalKPIs, setHistoricalKPIs] = useState([]);
-
-useEffect(() => {
-  // Existing single-week KPI fetch remains unchanged
-  // ADD parallel historical fetch for trends
-  async function loadHistoricalData() {
-    if (!selectedComponent) return;
-
-    try {
-      const history = await apiClient.bugs.getKPIHistory(
-        8, // last 8 weeks
-        selectedComponent === 'all' ? null : selectedComponent
-      );
-      setHistoricalKPIs(history);
-    } catch (err) {
-      console.error('Failed to load historical KPIs:', err);
-    }
-  }
-
-  loadHistoricalData();
-}, [selectedComponent]);
-
-// PASS historicalKPIs to new KPITrendChart component
-<KPITrendChart data={historicalKPIs} kpiName="bug_inflow_rate" />
-```
-
-### 5. Frontend API Client (src/api/apiClient.js)
-
-**Current state:** Has `bugs.getKPIs()`, `bugs.listUploads()`, `bugs.uploadCSV()`
-
-**Integration:**
-```javascript
-// ADD to bugs client in apiClient.js (around line 400-500)
-bugs: {
-  // ... existing methods ...
-
-  async getKPIHistory(weeks = 8, component = null) {
-    const params = new URLSearchParams({ weeks: weeks.toString() });
-    if (component) params.append('component', component);
-
-    return fetchWithAuth(`${API_BASE_URL}/bugs/kpis/history?${params.toString()}`);
-  }
-}
+};
 ```
 
 ## New Components Needed
 
-### 1. ThresholdService.js (NEW)
+### 1. NavigationContext.jsx (NEW)
 
-**Location:** `server/services/ThresholdService.js`
-**Purpose:** Evaluate KPIs against thresholds and create notifications
+**Location:** `src/contexts/NavigationContext.jsx`
+**Purpose:** Centralize menu configuration state and operations
 
 ```javascript
-import { query } from '../db/connection.js';
-import NotificationService from './NotificationService.js';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { UserSettings } from '@/api/entities';
+import { useAuth } from '@/contexts/AuthContext';
+import { logger } from '@/utils/logger';
 
-// Default thresholds (can be overridden per-user in kpi_thresholds table)
-const DEFAULT_THRESHOLDS = {
-  bug_inflow_rate: { warning: 8, critical: 10 },     // bugs/week
-  median_ttfr_hours: { warning: 48, critical: 72 },  // hours
-  sla_vh_percent: { warning: 60, critical: 50 },     // % (inverted: lower is worse)
-  sla_high_percent: { warning: 60, critical: 50 },
-  backlog_health_score: { warning: 50, critical: 30 } // score (inverted)
+// Default configurations (flat structure as fallback)
+const DEFAULT_PEOPLE_CONFIG = {
+  folders: [],
+  items: [
+    { id: 'tasks', name: 'Tasks', icon: 'CheckSquare', href: '/Tasks', folderId: null },
+    { id: 'calendar', name: 'Calendar', icon: 'Calendar', href: '/Calendar', folderId: null },
+    // ... all 16 items from peopleNavigation
+  ]
 };
 
-class ThresholdService {
-  /**
-   * Evaluate KPIs and create notifications if thresholds breached
-   */
-  async evaluateKPIs(kpis, uploadId, userId) {
-    // Check each KPI with threshold
-    for (const [kpiName, thresholds] of Object.entries(DEFAULT_THRESHOLDS)) {
-      const value = kpis[kpiName];
-      if (value === null || value === undefined) continue;
+const DEFAULT_PRODUCT_CONFIG = {
+  folders: [],
+  items: [
+    { id: 'services', name: 'My Services', icon: 'Server', href: '/Services', folderId: null },
+    // ... all 6 items from productNavigation
+  ]
+};
 
-      const breachLevel = this.checkThreshold(kpiName, value, thresholds);
+const NavigationContext = createContext(null);
 
-      if (breachLevel) {
-        await this.createNotification(userId, kpiName, value, breachLevel);
-      }
+export function NavigationProvider({ children }) {
+  const { isAuthenticated } = useAuth();
+  const [peopleConfig, setPeopleConfig] = useState(DEFAULT_PEOPLE_CONFIG);
+  const [productConfig, setProductConfig] = useState(DEFAULT_PRODUCT_CONFIG);
+  const [loading, setLoading] = useState(true);
+
+  // Load configuration on auth
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadConfigs();
     }
-  }
+  }, [isAuthenticated]);
 
-  /**
-   * Check if KPI breaches threshold
-   * @returns {string|null} - 'warning' or 'critical' or null
-   */
-  checkThreshold(kpiName, value, thresholds) {
-    const isInverted = ['sla_vh_percent', 'sla_high_percent', 'backlog_health_score'].includes(kpiName);
+  const loadConfigs = async () => {
+    setLoading(true);
+    try {
+      const [peopleStr, productStr] = await Promise.all([
+        UserSettings.get('menu_config_people'),
+        UserSettings.get('menu_config_product')
+      ]);
 
-    if (isInverted) {
-      // Lower is worse
-      if (value <= thresholds.critical) return 'critical';
-      if (value <= thresholds.warning) return 'warning';
-    } else {
-      // Higher is worse
-      if (value >= thresholds.critical) return 'critical';
-      if (value >= thresholds.warning) return 'warning';
+      if (peopleStr) setPeopleConfig(JSON.parse(peopleStr));
+      if (productStr) setProductConfig(JSON.parse(productStr));
+    } catch (err) {
+      logger.error('Failed to load menu config', { error: String(err) });
+    } finally {
+      setLoading(false);
     }
+  };
 
-    return null;
-  }
+  const saveConfig = useCallback(async (mode, config) => {
+    const key = mode === 'people' ? 'menu_config_people' : 'menu_config_product';
+    await UserSettings.set(key, JSON.stringify(config));
+  }, []);
 
-  async createNotification(userId, kpiName, value, level) {
-    const emoji = level === 'critical' ? '🚨' : '⚠️';
-    const labels = {
-      bug_inflow_rate: 'Bug Inflow Rate',
-      median_ttfr_hours: 'Time to First Response',
-      sla_vh_percent: 'SLA VH Compliance',
-      sla_high_percent: 'SLA High Compliance',
-      backlog_health_score: 'Backlog Health Score'
+  // Folder operations
+  const createFolder = useCallback(async (mode, name) => {
+    const config = mode === 'people' ? peopleConfig : productConfig;
+    const setConfig = mode === 'people' ? setPeopleConfig : setProductConfig;
+
+    const newFolder = {
+      id: `folder-${Date.now()}`,
+      name,
+      order: config.folders.length
     };
 
-    const message = `${emoji} ${labels[kpiName]} ${level}: ${value.toFixed(1)}`;
+    const newConfig = {
+      ...config,
+      folders: [...config.folders, newFolder]
+    };
 
-    await NotificationService.create(userId, {
-      message,
-      read: false
-    });
-  }
+    setConfig(newConfig);
+    await saveConfig(mode, newConfig);
+    return newFolder;
+  }, [peopleConfig, productConfig, saveConfig]);
+
+  const moveItemToFolder = useCallback(async (mode, itemId, folderId) => {
+    const config = mode === 'people' ? peopleConfig : productConfig;
+    const setConfig = mode === 'people' ? setPeopleConfig : setProductConfig;
+
+    const newConfig = {
+      ...config,
+      items: config.items.map(item =>
+        item.id === itemId ? { ...item, folderId } : item
+      )
+    };
+
+    setConfig(newConfig);
+    await saveConfig(mode, newConfig);
+  }, [peopleConfig, productConfig, saveConfig]);
+
+  const value = {
+    peopleConfig,
+    productConfig,
+    loading,
+    createFolder,
+    moveItemToFolder,
+    // ... other operations
+  };
+
+  return (
+    <NavigationContext.Provider value={value}>
+      {children}
+    </NavigationContext.Provider>
+  );
 }
 
-export default new ThresholdService();
+export function useNavigation() {
+  const context = useContext(NavigationContext);
+  if (!context) {
+    throw new Error('useNavigation must be used within NavigationProvider');
+  }
+  return context;
+}
 ```
 
-### 2. KPITrendChart.jsx (NEW)
+### 2. CollapsibleFolder.jsx (NEW)
 
-**Location:** `src/components/bugs/KPITrendChart.jsx`
-**Purpose:** Render multi-week trend line chart for a single KPI
+**Location:** `src/components/navigation/CollapsibleFolder.jsx`
+**Purpose:** Render a collapsible folder with nested navigation items
 
 ```javascript
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { format } from 'date-fns';
+import { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { ChevronDown, ChevronRight, Folder, FolderOpen } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cn } from '@/lib/utils';
 
-const KPI_LABELS = {
-  bug_inflow_rate: 'Bug Inflow Rate',
-  median_ttfr_hours: 'Time to First Response',
-  sla_vh_percent: 'SLA VH Compliance',
-  sla_high_percent: 'SLA High Compliance',
-  backlog_health_score: 'Backlog Health Score'
+export function CollapsibleFolder({
+  folder,
+  items,
+  isProductMode,
+  onNavigate
+}) {
+  const [isOpen, setIsOpen] = useState(true); // Default open
+  const location = useLocation();
+
+  // Check if any child is active
+  const hasActiveChild = items.some(item =>
+    location.pathname === item.href ||
+    location.pathname.startsWith(item.href + '/')
+  );
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <CollapsibleTrigger className={cn(
+        "w-full flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors",
+        isProductMode
+          ? hasActiveChild
+            ? "bg-purple-900/30 text-purple-300"
+            : "text-gray-400 hover:bg-gray-800 hover:text-gray-200"
+          : hasActiveChild
+            ? "bg-indigo-50/50 text-indigo-700"
+            : "text-gray-600 hover:bg-gray-100"
+      )}>
+        {isOpen ? (
+          <FolderOpen className="h-4 w-4 mr-2" />
+        ) : (
+          <Folder className="h-4 w-4 mr-2" />
+        )}
+        <span className="flex-1 text-left">{folder.name}</span>
+        {isOpen ? (
+          <ChevronDown className="h-4 w-4" />
+        ) : (
+          <ChevronRight className="h-4 w-4" />
+        )}
+      </CollapsibleTrigger>
+
+      <CollapsibleContent>
+        <div className="ml-4 mt-1 space-y-1 border-l border-gray-200 dark:border-gray-700 pl-2">
+          {items.map((item) => {
+            const Icon = item.iconComponent; // Pre-resolved icon
+            const isActive = location.pathname === item.href;
+
+            return (
+              <Link
+                key={item.id}
+                to={item.href}
+                onClick={onNavigate}
+                className={cn(
+                  "flex items-center px-3 py-2 text-sm rounded-md transition-colors",
+                  isProductMode
+                    ? isActive
+                      ? "bg-purple-900/50 text-purple-300"
+                      : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                    : isActive
+                      ? "bg-indigo-50 text-indigo-700"
+                      : "text-gray-700 hover:bg-gray-100"
+                )}
+              >
+                <Icon className="h-4 w-4 mr-2" />
+                {item.name}
+              </Link>
+            );
+          })}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+```
+
+### 3. HierarchicalNavigation.jsx (NEW)
+
+**Location:** `src/components/navigation/HierarchicalNavigation.jsx`
+**Purpose:** Orchestrate rendering of folders and standalone items
+
+```javascript
+import { Link, useLocation } from 'react-router-dom';
+import { CollapsibleFolder } from './CollapsibleFolder';
+import { cn } from '@/lib/utils';
+
+// Icon mapping (move from Layout.jsx)
+import * as Icons from 'lucide-react';
+
+const ICON_MAP = {
+  CheckSquare: Icons.CheckSquare,
+  Calendar: Icons.Calendar,
+  CalendarDays: Icons.CalendarDays,
+  Folders: Icons.Folders,
+  BarChart2: Icons.BarChart2,
+  UserPlus: Icons.UserPlus,
+  Users: Icons.Users,
+  Github: Icons.Github,
+  Bug: Icons.Bug,
+  Server: Icons.Server,
+  Map: Icons.Map,
+  ListTodo: Icons.ListTodo,
+  TrendingUp: Icons.TrendingUp,
+  MessageSquare: Icons.MessageSquare,
+  Rocket: Icons.Rocket,
+  Inbox: Icons.Inbox,
+  FileCode: Icons.FileCode,
+  Search: Icons.Search,
+  Activity: Icons.Activity,
 };
 
-const KPI_UNITS = {
-  bug_inflow_rate: '/week',
-  median_ttfr_hours: 'hours',
-  sla_vh_percent: '%',
-  sla_high_percent: '%',
-  backlog_health_score: 'score'
-};
+export function HierarchicalNavigation({
+  config,
+  isProductMode,
+  onNavigate
+}) {
+  const location = useLocation();
+  const { folders, items } = config;
 
-/**
- * KPITrendChart - Line chart showing KPI trend over time
- * @param {Array} data - Historical KPI data from getKPIHistory()
- * @param {string} kpiName - KPI field name (e.g., 'bug_inflow_rate')
- */
-export function KPITrendChart({ data, kpiName }) {
-  // Transform data for Recharts
-  const chartData = data.map(item => ({
-    week: format(new Date(item.week_ending), 'MM/dd'),
-    value: item.kpi_data[kpiName] || 0
+  // Resolve icon components
+  const itemsWithIcons = items.map(item => ({
+    ...item,
+    iconComponent: ICON_MAP[item.icon] || Icons.Circle
   }));
 
-  if (chartData.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{KPI_LABELS[kpiName]} Trend</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Not enough historical data
-        </CardContent>
-      </Card>
-    );
-  }
+  // Group items by folder
+  const itemsByFolder = {};
+  const standaloneItems = [];
+
+  itemsWithIcons.forEach(item => {
+    if (item.folderId) {
+      if (!itemsByFolder[item.folderId]) {
+        itemsByFolder[item.folderId] = [];
+      }
+      itemsByFolder[item.folderId].push(item);
+    } else {
+      standaloneItems.push(item);
+    }
+  });
+
+  // Sort folders by order
+  const sortedFolders = [...folders].sort((a, b) => a.order - b.order);
+
+  return (
+    <div className="space-y-1">
+      {/* Render folders with their items */}
+      {sortedFolders.map(folder => (
+        <CollapsibleFolder
+          key={folder.id}
+          folder={folder}
+          items={itemsByFolder[folder.id] || []}
+          isProductMode={isProductMode}
+          onNavigate={onNavigate}
+        />
+      ))}
+
+      {/* Render standalone items (not in any folder) */}
+      {standaloneItems.map(item => {
+        const Icon = item.iconComponent;
+        const isActive = location.pathname === item.href;
+
+        return (
+          <Link
+            key={item.id}
+            to={item.href}
+            onClick={onNavigate}
+            className={cn(
+              "flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors",
+              isProductMode
+                ? isActive
+                  ? "bg-purple-900/50 text-purple-300"
+                  : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                : isActive
+                  ? "bg-indigo-50 text-indigo-700"
+                  : "text-gray-700 hover:bg-gray-100"
+            )}
+          >
+            <Icon className="h-5 w-5 mr-3" />
+            {item.name}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+```
+
+### 4. NavigationSettings.jsx (NEW)
+
+**Location:** `src/components/settings/NavigationSettings.jsx`
+**Purpose:** Settings UI for folder management and item assignment
+
+```javascript
+import { useState } from 'react';
+import { useNavigation } from '@/contexts/NavigationContext';
+import { useAppMode } from '@/contexts/AppModeContext';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog';
+import { Plus, Folder, Trash2, Edit2, GripVertical } from 'lucide-react';
+
+export default function NavigationSettings() {
+  const { isProductMode } = useAppMode();
+  const {
+    peopleConfig,
+    productConfig,
+    createFolder,
+    deleteFolder,
+    renameFolder,
+    moveItemToFolder,
+    resetToDefaults
+  } = useNavigation();
+
+  const config = isProductMode ? productConfig : peopleConfig;
+  const mode = isProductMode ? 'product' : 'people';
+
+  const [showAddFolder, setShowAddFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [editingFolder, setEditingFolder] = useState(null);
+
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return;
+    await createFolder(mode, newFolderName.trim());
+    setNewFolderName('');
+    setShowAddFolder(false);
+  };
+
+  // Group items by folder for display
+  const itemsByFolder = {};
+  const unassignedItems = [];
+
+  config.items.forEach(item => {
+    if (item.folderId) {
+      if (!itemsByFolder[item.folderId]) {
+        itemsByFolder[item.folderId] = [];
+      }
+      itemsByFolder[item.folderId].push(item);
+    } else {
+      unassignedItems.push(item);
+    }
+  });
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{KPI_LABELS[kpiName]} Trend (8 weeks)</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Folder className="h-5 w-5" />
+          Navigation Folders
+        </CardTitle>
+        <CardDescription>
+          Organize your {isProductMode ? 'Product' : 'People'} mode navigation into folders
+        </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="week" />
-              <YAxis unit={KPI_UNITS[kpiName]} />
-              <Tooltip
-                formatter={(value) => [value.toFixed(1), KPI_LABELS[kpiName]]}
-              />
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                dot={{ r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+      <CardContent className="space-y-6">
+        {/* Current mode indicator */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-500">Editing:</span>
+          <Badge variant={isProductMode ? 'default' : 'secondary'}>
+            {isProductMode ? 'Product Mode' : 'People Mode'}
+          </Badge>
+        </div>
+
+        {/* Folders list */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium">Folders</h3>
+            <Button size="sm" onClick={() => setShowAddFolder(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add Folder
+            </Button>
+          </div>
+
+          {config.folders.length === 0 ? (
+            <p className="text-sm text-gray-500 py-4 text-center border border-dashed rounded">
+              No folders created. Add a folder to start organizing your navigation.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {config.folders.map(folder => (
+                <div
+                  key={folder.id}
+                  className="p-3 border rounded-lg bg-gray-50"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Folder className="h-4 w-4 text-gray-500" />
+                      <span className="font-medium">{folder.name}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {(itemsByFolder[folder.id] || []).length} items
+                      </Badge>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditingFolder(folder)}
+                      >
+                        <Edit2 className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteFolder(mode, folder.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Items in this folder */}
+                  {(itemsByFolder[folder.id] || []).length > 0 && (
+                    <div className="mt-2 pl-6 space-y-1">
+                      {(itemsByFolder[folder.id] || []).map(item => (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between text-sm py-1"
+                        >
+                          <span>{item.name}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => moveItemToFolder(mode, item.id, null)}
+                            className="text-xs"
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Unassigned items */}
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium">Unassigned Items</h3>
+          <p className="text-xs text-gray-500">
+            Click an item to assign it to a folder
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            {unassignedItems.map(item => (
+              <Badge
+                key={item.id}
+                variant="outline"
+                className="cursor-pointer hover:bg-gray-100"
+                // TODO: Open folder selection dropdown
+              >
+                {item.name}
+              </Badge>
+            ))}
+          </div>
+        </div>
+
+        {/* Reset to defaults */}
+        <div className="pt-4 border-t">
+          <Button
+            variant="outline"
+            onClick={() => resetToDefaults(mode)}
+            className="text-gray-600"
+          >
+            Reset to Default Navigation
+          </Button>
         </div>
       </CardContent>
+
+      {/* Add folder dialog */}
+      <Dialog open={showAddFolder} onOpenChange={setShowAddFolder}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Folder</DialogTitle>
+            <DialogDescription>
+              Add a new folder to organize your navigation items
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="folderName">Folder Name</Label>
+            <Input
+              id="folderName"
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              placeholder="e.g., Core Tasks, Team, Integrations"
+              className="mt-2"
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddFolder(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateFolder}>
+              Create Folder
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
 ```
 
-### 3. kpiMonitor.js (NEW - Optional)
+## Data Model
 
-**Location:** `server/scheduler/kpiMonitor.js`
-**Purpose:** Scheduled job for periodic threshold checks
+### Menu Configuration Structure
 
-```javascript
-import cron from 'node-cron';
-import { query } from '../db/connection.js';
-import ThresholdService from '../services/ThresholdService.js';
+```typescript
+interface MenuConfig {
+  folders: Folder[];
+  items: MenuItem[];
+}
 
-/**
- * Weekly KPI monitoring job
- * Runs every Monday at 8:00 AM
- */
-export function startKPIMonitor() {
-  // Cron pattern: minute hour day month weekday
-  // 0 8 * * 1 = Every Monday at 8:00 AM
-  cron.schedule('0 8 * * 1', async () => {
-    console.log('[KPI Monitor] Running weekly threshold check...');
+interface Folder {
+  id: string;           // 'folder-{timestamp}'
+  name: string;         // 'Core Tasks'
+  order: number;        // 0, 1, 2... for folder ordering
+  collapsed?: boolean;  // Optional: default collapse state
+}
 
-    try {
-      // Get all users with recent uploads
-      const result = await query(`
-        SELECT DISTINCT bu.user_id, wk.upload_id, wk.kpi_data
-        FROM bug_uploads bu
-        JOIN weekly_kpis wk ON bu.id = wk.upload_id
-        WHERE wk.component IS NULL  -- All components aggregate
-          AND bu.week_ending >= CURRENT_DATE - INTERVAL '7 days'
-      `);
-
-      for (const row of result.rows) {
-        await ThresholdService.evaluateKPIs(
-          row.kpi_data,
-          row.upload_id,
-          row.user_id
-        );
-      }
-
-      console.log(`[KPI Monitor] Checked ${result.rows.length} uploads`);
-    } catch (error) {
-      console.error('[KPI Monitor] Error:', error);
-    }
-  });
-
-  console.log('[KPI Monitor] Started (runs Mondays 8am)');
+interface MenuItem {
+  id: string;           // 'tasks', 'calendar', etc.
+  name: string;         // 'Tasks'
+  icon: string;         // 'CheckSquare' (icon name for mapping)
+  href: string;         // '/Tasks'
+  folderId: string | null;  // null = root level, 'folder-123' = in folder
+  order?: number;       // Optional: ordering within folder
 }
 ```
 
-**Integration:** Add to `server/index.js`:
-```javascript
-// After all routes mounted, before app.listen()
-import { startKPIMonitor } from './scheduler/kpiMonitor.js';
+### Example Configuration (Stored in user_settings)
 
-if (process.env.NODE_ENV === 'production') {
-  startKPIMonitor();
+```json
+{
+  "folders": [
+    { "id": "folder-1706500000000", "name": "Core Tasks", "order": 0 },
+    { "id": "folder-1706500000001", "name": "Team", "order": 1 },
+    { "id": "folder-1706500000002", "name": "Integrations", "order": 2 }
+  ],
+  "items": [
+    { "id": "tasks", "name": "Tasks", "icon": "CheckSquare", "href": "/Tasks", "folderId": "folder-1706500000000" },
+    { "id": "calendar", "name": "Calendar", "icon": "Calendar", "href": "/Calendar", "folderId": "folder-1706500000000" },
+    { "id": "duties", "name": "Duties", "icon": "CalendarDays", "href": "/Duties", "folderId": "folder-1706500000000" },
+    { "id": "team", "name": "Team", "icon": "UserPlus", "href": "/Team", "folderId": "folder-1706500000001" },
+    { "id": "stakeholders", "name": "Stakeholders", "icon": "Users", "href": "/Stakeholders", "folderId": "folder-1706500000001" },
+    { "id": "github", "name": "GitHub", "icon": "Github", "href": "/GitHub", "folderId": "folder-1706500000002" },
+    { "id": "jira", "name": "Jira", "icon": "Bug", "href": "/Jira", "folderId": "folder-1706500000002" },
+    { "id": "projects", "name": "Projects", "icon": "Folders", "href": "/Projects", "folderId": null },
+    { "id": "metrics", "name": "Metrics", "icon": "BarChart2", "href": "/Metrics", "folderId": null }
+  ]
 }
 ```
 
-### 4. EmailService.js (OPTIONAL - Only if email required)
+### Storage Location
 
-**Location:** `server/services/EmailService.js`
-**Purpose:** Send email alerts for threshold breaches
-
-**Required:** `npm install nodemailer` (not currently installed)
-
-```javascript
-import nodemailer from 'nodemailer';
-
-class EmailService {
-  constructor() {
-    this.transporter = nodemailer.createTransporter({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
-    });
-  }
-
-  async sendThresholdAlert(userEmail, kpiName, value, level) {
-    const subject = `[${level.toUpperCase()}] Bug Dashboard Alert: ${kpiName}`;
-    const html = `
-      <h2>KPI Threshold Alert</h2>
-      <p><strong>${kpiName}</strong> has breached the ${level} threshold.</p>
-      <p>Current value: <strong>${value.toFixed(1)}</strong></p>
-      <p><a href="${process.env.FRONTEND_URL}/bug-dashboard">View Dashboard</a></p>
-    `;
-
-    await this.transporter.sendMail({
-      from: process.env.SMTP_FROM || 'noreply@example.com',
-      to: userEmail,
-      subject,
-      html
-    });
-  }
-}
-
-export default new EmailService();
+```
+user_settings table:
+  user_id: 'dev-user-001'
+  setting_key: 'menu_config_people'
+  setting_value: '{"folders":[...],"items":[...]}'
+  encrypted: false
 ```
 
 ## Modified Components
 
-### BugService.js Modifications
+### Layout.jsx Modifications
 
-**File:** `server/services/BugService.js`
-
-**Changes:**
-1. Add `getKPIHistory()` method (see Integration Points section)
-2. Modify `uploadCSV()` to call ThresholdService after commit:
-
-```javascript
-// Line 523, after await client.query('COMMIT');
-// ADD:
-import ThresholdService from './ThresholdService.js';
-
-// Evaluate thresholds (fire-and-forget, don't block response)
-ThresholdService.evaluateKPIs(allKPIs, uploadId, userId)
-  .catch(err => console.error('Threshold evaluation failed:', err));
-
-return { uploadId, bugCount, components, kpis: allKPIs };
-```
-
-### BugDashboard.jsx Modifications
-
-**File:** `src/pages/BugDashboard.jsx`
+**File:** `src/pages/Layout.jsx`
 
 **Changes:**
-1. Add historical KPIs state and fetch
-2. Add KPITrendChart component to layout
-3. Add trend indicator to existing KPICard
+1. Import and wrap with NavigationProvider
+2. Replace flat array rendering with HierarchicalNavigation
+3. Keep mode switching logic unchanged
 
 ```javascript
-// After existing state declarations (line 54)
-const [historicalKPIs, setHistoricalKPIs] = useState([]);
+// IMPORTS (add)
+import { NavigationProvider, useNavigation } from '@/contexts/NavigationContext';
+import { HierarchicalNavigation } from '@/components/navigation/HierarchicalNavigation';
 
-// Add new useEffect for historical data
-useEffect(() => {
-  if (selectedSprint !== 'all' || !selectedUploadId) return;
+// REPLACE flat array usage (lines 301-320) with:
+const { peopleConfig, productConfig, loading: navLoading } = useNavigation();
 
-  async function loadHistoricalKPIs() {
-    try {
-      const history = await apiClient.bugs.getKPIHistory(
-        8,
-        selectedComponent === 'all' ? null : selectedComponent
-      );
-      setHistoricalKPIs(history);
-    } catch (err) {
-      console.error('Failed to load historical KPIs:', err);
-    }
-  }
-
-  loadHistoricalKPIs();
-}, [selectedUploadId, selectedComponent]);
-
-// In render, after KPIGrid (line 364):
-{/* Trend Charts */}
-{historicalKPIs.length > 1 && (
-  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <KPITrendChart data={historicalKPIs} kpiName="bug_inflow_rate" />
-    <KPITrendChart data={historicalKPIs} kpiName="sla_vh_percent" />
-  </div>
-)}
+// In render, replace navigation.map() block:
+<nav className="flex-1 p-4 overflow-y-auto">
+  {navLoading ? (
+    <NavigationSkeleton />
+  ) : (
+    <HierarchicalNavigation
+      config={isProductMode ? productConfig : peopleConfig}
+      isProductMode={isProductMode}
+      onNavigate={() => setSidebarOpen(false)}
+    />
+  )}
+</nav>
 ```
 
-### apiClient.js Modifications
+### Settings.jsx Modifications
 
-**File:** `src/api/apiClient.js`
+**File:** `src/pages/Settings.jsx`
 
-**Changes:** Add `getKPIHistory()` method to bugs client (see Integration Points section)
+**Changes:**
+1. Add "navigation" to tabConfigs
+2. Import and render NavigationSettings component
 
-## Data Flow Changes
+```javascript
+// IMPORTS (add)
+import NavigationSettings from '@/components/settings/NavigationSettings';
+import { Menu } from 'lucide-react';
 
-### Current State (Single Week)
+// tabConfigs (line 272, add before 'data')
+{ id: "navigation", label: "Navigation", icon: Menu },
+
+// TabsContent (add case around line 525)
+{tab.id === 'navigation' && <NavigationSettings />}
 ```
-Upload CSV → BugService.uploadCSV() → Calculate KPIs → Store in weekly_kpis
-Frontend → GET /api/bugs/kpis?uploadId=X → Single KPI object → KPICard
-```
 
-### New State (Trends + Alerts)
-```
-Upload CSV → BugService.uploadCSV()
-  → Calculate KPIs
-  → Store in weekly_kpis
-  → ThresholdService.evaluateKPIs()
-     → Check thresholds
-     → NotificationService.create() if breached
+### App.jsx or Main.jsx Modifications
 
-Frontend → GET /api/bugs/kpis/history?weeks=8
-  → Array of KPIs (8 weeks)
-  → KPITrendChart (LineChart)
+**File:** Entry point that renders providers
 
-Frontend → GET /api/notifications
-  → Unread notification count
-  → NotificationBell badge
+**Changes:** Add NavigationProvider to provider stack
+
+```javascript
+// Ensure NavigationProvider is inside AuthProvider (needs auth state)
+<AuthProvider>
+  <NavigationProvider>
+    <AppProvider>
+      {/* ... */}
+    </AppProvider>
+  </NavigationProvider>
+</AuthProvider>
 ```
 
 ## Suggested Build Order
 
-**Phase 1: Historical Queries & Trend Charts**
-1. Add `BugService.getKPIHistory()` method
-2. Add `GET /api/bugs/kpis/history` route
-3. Add `apiClient.bugs.getKPIHistory()` frontend method
-4. Create `KPITrendChart.jsx` component
-5. Integrate trend charts into BugDashboard
+**Phase 1: Data Model + Context**
+1. Create NavigationContext.jsx with default configs
+2. Add NavigationProvider to app provider stack
+3. Verify UserSettings.get/set works for menu config keys
+4. Test: Config loads/saves correctly
 
-**Dependencies:** None (extends existing patterns)
-**Risk:** Low - read-only queries, no schema changes
+**Dependencies:** None
+**Risk:** Low - uses existing UserSettingsService
 
-**Phase 2: Threshold Evaluation**
-1. Create `ThresholdService.js` with default thresholds
-2. Modify `BugService.uploadCSV()` to call ThresholdService
-3. Test threshold detection with sample uploads
+**Phase 2: Hierarchical Rendering**
+1. Create CollapsibleFolder.jsx component
+2. Create HierarchicalNavigation.jsx component
+3. Modify Layout.jsx to use HierarchicalNavigation
+4. Verify folder collapse/expand works
+5. Verify active item highlighting works within folders
 
-**Dependencies:** Phase 1 complete
-**Risk:** Medium - side effect on upload, needs error handling
+**Dependencies:** Phase 1
+**Risk:** Medium - modifies core Layout, needs careful testing
 
-**Phase 3: Notification Integration**
-1. Modify BugDashboard to fetch notifications
-2. Add notification bell with unread badge
-3. Link threshold alerts to KPI cards (click notification → scroll to KPI)
+**Phase 3: Settings UI (Basic)**
+1. Create NavigationSettings.jsx component
+2. Add "Navigation" tab to Settings.jsx
+3. Implement folder CRUD (create, rename, delete)
+4. Implement item assignment (click to assign/unassign)
+5. Implement reset to defaults
 
-**Dependencies:** Phase 2 complete, NotificationService exists
-**Risk:** Low - UI changes only
+**Dependencies:** Phase 2
+**Risk:** Low - isolated to settings page
 
-**Phase 4 (Optional): Scheduled Monitoring**
-1. Install `node-cron` package
-2. Create `scheduler/kpiMonitor.js`
-3. Integrate into `server/index.js`
-4. Add environment variable `ENABLE_KPI_MONITORING=true`
+**Phase 4: Settings UI (Enhanced - Optional)**
+1. Add @dnd-kit drag-drop for item assignment
+2. Add folder reordering via drag-drop
+3. Add item reordering within folders
+4. Persist collapse states to localStorage
 
-**Dependencies:** Phase 2 complete
-**Risk:** Medium - new process management, needs monitoring
-
-**Phase 5 (Optional): Email Notifications**
-1. Install `nodemailer` package
-2. Create `EmailService.js`
-3. Add SMTP environment variables
-4. Modify ThresholdService to call EmailService
-5. Add user preference for email alerts
-
-**Dependencies:** Phase 2 complete
-**Risk:** High - external SMTP dependency, deliverability issues
+**Dependencies:** Phase 3
+**Risk:** Medium - @dnd-kit complexity, but pattern exists in SubtaskList
 
 ## Architecture Patterns
 
-### Pattern 1: Time-Series Query with JOIN
+### Pattern 1: Context + UserSettings for Persistent UI Config
 
-**What:** Query multiple weeks of KPIs efficiently
-**When:** Historical trend display, week-over-week comparison
-**Example:**
-```sql
-SELECT
-  bu.week_ending,
-  wk.kpi_data,
-  wk.calculated_at
-FROM weekly_kpis wk
-JOIN bug_uploads bu ON wk.upload_id = bu.id
-WHERE bu.user_id = $1
-  AND wk.component IS NOT DISTINCT FROM $2
-ORDER BY bu.week_ending DESC
-LIMIT 8;
-```
-
+**What:** Store UI configuration in database via UserSettings, provide via React Context
+**When:** User-customizable UI state that should persist across sessions
 **Why this works:**
-- `week_ending` provides X-axis for charts
-- `kpi_data` JSONB contains all KPI values
-- `IS NOT DISTINCT FROM` handles NULL component correctly (all components aggregate)
-- `LIMIT` prevents unbounded queries
+- UserSettingsService already handles key-value storage
+- Context provides app-wide access without prop drilling
+- JSON serialization allows complex nested structures
 
-### Pattern 2: Fire-and-Forget Threshold Check
+### Pattern 2: Collapsible + SidebarMenuSub for Nested Navigation
 
-**What:** Evaluate thresholds asynchronously after upload
-**When:** Upload success, don't block response
-**Example:**
-```javascript
-await client.query('COMMIT');
-
-// Don't await - fire-and-forget
-ThresholdService.evaluateKPIs(kpis, uploadId, userId)
-  .catch(err => console.error('Threshold eval failed:', err));
-
-return { uploadId, bugCount, components, kpis };
-```
-
+**What:** Combine Radix Collapsible with shadcn sidebar primitives
+**When:** Hierarchical menu with expand/collapse
 **Why this works:**
-- Upload response not delayed by notification creation
-- Errors in threshold logic don't break upload
-- User gets immediate feedback, notifications appear shortly after
+- Collapsible handles animation and state
+- SidebarMenuSub provides proper indentation and styling
+- Already installed, no new dependencies
 
-### Pattern 3: Default Thresholds with Override Option
+### Pattern 3: Icon Name to Component Mapping
 
-**What:** Hardcode sensible defaults, allow per-user customization later
-**When:** MVP threshold system
-**Example:**
-```javascript
-const DEFAULT_THRESHOLDS = {
-  bug_inflow_rate: { warning: 8, critical: 10 }
-};
-
-async getThresholds(userId, kpiName) {
-  // Future: query kpi_thresholds table for user overrides
-  // For now: return defaults
-  return DEFAULT_THRESHOLDS[kpiName];
-}
-```
-
+**What:** Store icon names as strings, map to Lucide components at render
+**When:** Serialized config needs to reference React components
 **Why this works:**
-- Immediate value without configuration UI
-- Extensible to per-user thresholds later
-- Single source of truth in code
+- JSON can't store React components
+- Mapping table is explicit and type-safe
+- Easy to extend with new icons
 
-### Pattern 4: Notification as Event Log
+### Pattern 4: Optimistic Updates + Background Persist
 
-**What:** Store all threshold breaches as notifications, mark read when acknowledged
-**When:** Threshold breach detected
-**Example:**
-```javascript
-await NotificationService.create(userId, {
-  message: '🚨 SLA VH Compliance critical: 45% (threshold: 50%)',
-  read: false,
-  scheduled_date: null
-});
-```
-
+**What:** Update local state immediately, save to backend asynchronously
+**When:** UI responsiveness matters more than guaranteed persistence
 **Why this works:**
-- Persistent audit trail of alerts
-- User can review past breaches
-- Existing notification system handles read/unread state
-- No new tables needed
-
-### Pattern 5: Recharts LineChart for Trends
-
-**What:** Use existing Recharts patterns for multi-week trends
-**When:** Displaying KPI over time
-**Example:**
-```jsx
-<ResponsiveContainer width="100%" height="100%">
-  <LineChart data={chartData}>
-    <CartesianGrid strokeDasharray="3 3" />
-    <XAxis dataKey="week" />
-    <YAxis />
-    <Tooltip />
-    <Line type="monotone" dataKey="value" stroke="#3b82f6" />
-  </LineChart>
-</ResponsiveContainer>
-```
-
-**Why this works:**
-- Consistent with existing Metrics.jsx patterns
-- ResponsiveContainer handles sizing
-- LineChart built-in to Recharts (no new dependencies)
+- No loading spinner on every change
+- Background save is fire-and-forget
+- Reload restores from last saved state
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Real-Time Threshold Monitoring
+### Anti-Pattern 1: Storing Full Component References
 
-**What:** Running threshold checks on every KPI query
-**Why bad:** Performance overhead, redundant checks
-**Instead:** Check thresholds only on upload and scheduled jobs
+**What:** Trying to serialize React components into JSON
+**Why bad:** JSON.stringify fails on functions/components
+**Instead:** Store icon name strings, map to components at render time
 
-### Anti-Pattern 2: Storing Trend Data Separately
+### Anti-Pattern 2: Prop Drilling Navigation Config
 
-**What:** Creating a new `kpi_trends` table
-**Why bad:** Duplicates data already in `weekly_kpis`
-**Instead:** Query `weekly_kpis` with JOIN for historical data
+**What:** Passing menuConfig through Layout -> Sidebar -> NavItem
+**Why bad:** Verbose, hard to update, components coupled
+**Instead:** Use NavigationContext, consume with useNavigation() hook
 
-### Anti-Pattern 3: Synchronous Email Sending
+### Anti-Pattern 3: Mutating Default Config
 
-**What:** Await email send in upload flow
-**Why bad:** Blocks response on SMTP latency/failures
-**Instead:** Fire-and-forget or background job queue
+**What:** Directly modifying DEFAULT_PEOPLE_CONFIG object
+**Why bad:** Shared reference, affects all users/sessions
+**Instead:** Deep copy defaults when creating user config
 
-### Anti-Pattern 4: Client-Side Threshold Logic
+### Anti-Pattern 4: Blocking UI on Save
 
-**What:** Calculating threshold breaches in React
-**Why bad:** No notifications for users not viewing dashboard
-**Instead:** Server-side evaluation creates persistent notifications
+**What:** await saveConfig() before allowing next interaction
+**Why bad:** Perceived slowness, bad UX
+**Instead:** Optimistic update, background persist, handle errors gracefully
 
-### Anti-Pattern 5: Hardcoded Chart Count
+### Anti-Pattern 5: Complex Nested State Updates
 
-**What:** Always showing 8 weeks of trend
-**Why bad:** Fails when <8 weeks of data exist
-**Instead:** Handle `chartData.length === 0` and show "Not enough data"
+**What:** Deep spread operators for nested updates: `{...config, folders: {...config.folders, ...}}`
+**Why bad:** Error-prone, hard to reason about
+**Instead:** Use immer or functional update patterns with clear helper functions
 
 ## Scalability Considerations
 
-| Concern | At 10 uploads | At 100 uploads | At 1000 uploads |
-|---------|--------------|----------------|-----------------|
-| **Historical query** | <10ms | <50ms | Needs index on (user_id, week_ending) |
-| **Threshold checks** | Synchronous OK | Synchronous OK | Move to background job queue |
-| **Notification storage** | No issue | No issue | Add pagination to notification list |
-| **Chart rendering** | Instant | Instant | Limit to 12 weeks max |
-| **Email delivery** | Nodemailer OK | Nodemailer OK | Consider SendGrid/SES |
+| Concern | At 10 items | At 50 items | At 100+ items |
+|---------|-------------|-------------|---------------|
+| **Config load** | <10ms | <20ms | Add pagination to Settings UI |
+| **Render** | Instant | Instant | Virtualize folder contents |
+| **Settings UI** | Simple list | Add search/filter | Paginate unassigned items |
+| **Save** | <100ms | <100ms | No issue (single JSON blob) |
 
 ## Technology Decisions
 
-### Decision 1: node-cron vs Bull/Agenda
+### Decision 1: User Settings vs Dedicated Table
 
-**Choice:** node-cron (if scheduling needed)
-
-**Rationale:**
-- **Pros:** Lightweight (no Redis), simple cron syntax, sufficient for weekly checks
-- **Cons:** No persistence (jobs lost on restart), no distributed scheduling
-- **Alternatives considered:**
-  - Bull: Requires Redis, overkill for weekly jobs
-  - Agenda: Requires MongoDB, not in current stack
-- **When to reconsider:** If need >1 concurrent worker or job history
-
-### Decision 2: Recharts LineChart vs AreaChart
-
-**Choice:** LineChart for trends
+**Choice:** user_settings table (existing)
 
 **Rationale:**
-- **Pros:** Cleaner for multi-KPI overlay, already used in Metrics.jsx
-- **Cons:** Less visual emphasis than AreaChart
-- **Alternatives considered:**
-  - AreaChart: Good for single KPI, but cluttered with multiple lines
-  - ComposedChart: Overkill for simple trends
-- **When to reconsider:** If need to show confidence intervals or ranges
+- **Pros:** No migration needed, key-value flexibility, encryption available
+- **Cons:** No query by config content, no relationships
+- **Alternatives:** New `menu_configs` table with proper columns
+- **When to reconsider:** If needing to query configs across users (e.g., admin view)
 
-### Decision 3: In-App Notifications Only vs Email
+### Decision 2: Context vs Zustand for Menu State
 
-**Choice:** In-app notifications first, email optional
+**Choice:** React Context
 
 **Rationale:**
-- **Pros:** No external dependencies, existing notification system works
-- **Cons:** Requires login to see alerts
-- **Alternatives considered:**
-  - Email-only: Misses users with SMTP issues
-  - Push notifications: Requires PWA setup
-- **When to reconsider:** User feedback requests email alerts
+- **Pros:** Already used throughout app (AuthContext, AppContext), no new dependency
+- **Cons:** Requires provider hierarchy, potential re-render issues
+- **Alternatives:** Zustand for simpler updates, Jotai for atomic state
+- **When to reconsider:** If experiencing re-render performance issues
 
-### Decision 4: Default Thresholds vs Configuration UI
+### Decision 3: Collapsible vs Accordion for Folders
 
-**Choice:** Default thresholds hardcoded, configuration deferred
+**Choice:** Collapsible (per-folder independent state)
 
 **Rationale:**
-- **Pros:** Immediate value, no UI development, sensible defaults for domain
-- **Cons:** Not customizable per team
-- **Alternatives considered:**
-  - User-configurable from day 1: 2x development time
-  - Per-component thresholds: Complex UX
-- **When to reconsider:** Multiple users with different threshold needs
-
-## Dependencies
-
-### New Dependencies Required
-
-| Package | Version | Purpose | When Needed |
-|---------|---------|---------|-------------|
-| node-cron | ^3.0.3 | Scheduled jobs | Phase 4 (optional) |
-| nodemailer | ^6.9.8 | Email alerts | Phase 5 (optional) |
-
-### No New Dependencies (Using Existing)
-
-- Recharts 2.15.1 - Already installed, LineChart available
-- date-fns 3.6.0 - Already installed, format() for chart labels
-- Express 4.18.2 - Existing routes extended
-- pg 8.11.3 - Existing query patterns
-
-## Database Schema Changes
-
-### Option A: No Schema Changes (Recommended for MVP)
-
-Use default thresholds in code, store notifications in existing `notifications` table.
-
-**Pros:**
-- No migration needed
-- Immediate deployment
-- Notifications already work
-
-**Cons:**
-- Thresholds not customizable without code changes
-- No threshold history/audit
-
-### Option B: Add kpi_thresholds Table (Future Enhancement)
-
-```sql
-CREATE TABLE IF NOT EXISTS kpi_thresholds (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id VARCHAR(255) NOT NULL,
-  kpi_name VARCHAR(100) NOT NULL,
-  warning_threshold NUMERIC,
-  critical_threshold NUMERIC,
-  notification_enabled BOOLEAN DEFAULT true,
-  email_enabled BOOLEAN DEFAULT false,
-  created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(user_id, kpi_name)
-);
-
-CREATE INDEX idx_kpi_thresholds_user_id ON kpi_thresholds(user_id);
-```
-
-**When to add:** User requests customizable thresholds
-
-## Testing Strategy
-
-### Unit Tests
-
-**BugService.getKPIHistory():**
-```javascript
-// Mock query response with 3 weeks
-const mockWeeks = [
-  { week_ending: '2026-01-11', kpi_data: { bug_inflow_rate: 6.5 } },
-  { week_ending: '2026-01-18', kpi_data: { bug_inflow_rate: 7.2 } },
-  { week_ending: '2026-01-25', kpi_data: { bug_inflow_rate: 8.9 } }
-];
-
-// Assert returned in chronological order (oldest first)
-expect(result[0].week_ending).toBe('2026-01-11');
-```
-
-**ThresholdService.checkThreshold():**
-```javascript
-// Lower-is-worse KPI (bug inflow)
-expect(checkThreshold('bug_inflow_rate', 10.5, { warning: 8, critical: 10 }))
-  .toBe('critical');
-
-// Higher-is-worse KPI (SLA %)
-expect(checkThreshold('sla_vh_percent', 55, { warning: 60, critical: 50 }))
-  .toBe('warning');
-```
-
-### Integration Tests
-
-**Historical Query:**
-```javascript
-// Insert 3 weeks of test data
-// Query getKPIHistory(userId, 2, null)
-// Assert returns 2 most recent weeks
-```
-
-**Threshold on Upload:**
-```javascript
-// Upload CSV with SLA VH = 45% (below critical 50%)
-// Assert notification created with "critical" in message
-```
-
-### Manual Testing
-
-1. Upload CSV with SLA VH < 50% → Check notification created
-2. View dashboard → See 8-week trend chart (if 8 weeks uploaded)
-3. Mark notification as read → Badge count decreases
-4. Filter by component → Trend chart updates
+- **Pros:** Multiple folders can be open simultaneously, simpler state
+- **Cons:** No built-in single-open mode
+- **Alternatives:** Accordion forces single-open behavior
+- **When to reconsider:** If users prefer single-open mode
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/i306072/Documents/GitHub/P-E/server/services/BugService.js` - Existing KPI calculation and storage patterns
-- `/Users/i306072/Documents/GitHub/P-E/server/services/NotificationService.js` - Existing notification CRUD operations
-- `/Users/i306072/Documents/GitHub/P-E/server/db/019_bug_dashboard.sql` - weekly_kpis table schema with JSONB kpi_data
-- `/Users/i306072/Documents/GitHub/P-E/src/pages/BugDashboard.jsx` - Current dashboard structure and filter patterns
-- `/Users/i306072/Documents/GitHub/P-E/.planning/phases/12-dashboard-ui/12-RESEARCH.md` - Recharts patterns already established
+- `/Users/i306072/Documents/GitHub/P-E/src/pages/Layout.jsx` - Current navigation structure (lines 91-228)
+- `/Users/i306072/Documents/GitHub/P-E/src/components/ui/sidebar.jsx` - SidebarMenuSub components (lines 554-592)
+- `/Users/i306072/Documents/GitHub/P-E/src/components/ui/collapsible.jsx` - Radix Collapsible wrapper
+- `/Users/i306072/Documents/GitHub/P-E/src/components/metrics/OneOnOneComplianceCard.jsx` - Collapsible usage pattern (lines 233-298)
+- `/Users/i306072/Documents/GitHub/P-E/server/services/UserSettingsService.js` - Settings persistence pattern
+- `/Users/i306072/Documents/GitHub/P-E/src/components/sync/SubtaskList.jsx` - @dnd-kit usage pattern
 
 ### Secondary (MEDIUM confidence)
-- Recharts documentation - LineChart API verified in package.json v2.15.1
-- node-cron documentation - Cron syntax for scheduling (not yet installed)
-- PostgreSQL time-series query patterns - JOIN performance characteristics
+- `/Users/i306072/Documents/GitHub/P-E/package.json` - Confirms @dnd-kit v6.3.1, @radix-ui/react-collapsible v1.1.3
+- `/Users/i306072/Documents/GitHub/P-E/server/db/016_github_integration.sql` - user_settings table schema
 
 ### Tertiary (LOW confidence)
 - None - all patterns verified against existing codebase

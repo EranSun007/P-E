@@ -1,387 +1,435 @@
-# Technology Stack
+# Technology Stack: Menu Clustering
 
-**Project:** P&E Manager - KPI Trend Charts and Threshold Notifications
-**Researched:** 2026-01-28
+**Project:** P&E Manager - Collapsible Folder Navigation with Settings UI
+**Researched:** 2026-01-29
 **Confidence:** HIGH
 
 ## Executive Summary
 
-This milestone adds two new capabilities to the existing bug dashboard:
-1. **KPI trend visualization** - Week-over-week line charts showing historical KPI trends
-2. **Threshold notifications** - Email alerts when KPIs hit red zone thresholds
+This milestone adds collapsible folder groups to the sidebar navigation, allowing users to organize 16+ menu items into customizable folders. The feature requires:
 
-**Key decision:** Leverage existing stack (Recharts, Radix Toast, PostgreSQL) and add only email capability. NO new charting libraries, NO complex notification systems. Keep it simple.
+1. **Collapsible folder UI** - Expand/collapse navigation groups
+2. **Settings UI** - CRUD for folders, drag-and-drop item assignment
+3. **Backend persistence** - Store folder configuration per user
+
+**Key decision:** NO new dependencies required. The existing stack already has everything needed:
+- `@radix-ui/react-collapsible` (v1.1.3) - Already installed, wraps collapsible behavior
+- `@dnd-kit/core` + `@dnd-kit/sortable` (v6.3.1 / v10.0.0) - Already used for subtask reordering
+- PostgreSQL - Existing database for configuration storage
+- shadcn/ui sidebar components - Already have SidebarGroup, SidebarMenu patterns
 
 ---
 
-## New Stack Additions
+## Stack Assessment
 
-### Email Sending (REQUIRED - NEW)
+### ZERO New Dependencies Required
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| **nodemailer** | 7.0.13 | Email delivery | Industry standard, 1.4M+ dependents, active maintenance (released 2026-01-27), zero-config for development, supports SMTP/OAuth2 |
-| **@react-email/components** | 1.0.6 | Email templates | Type-safe React components for emails, renders to HTML, better DX than raw HTML strings |
+| Capability | Required Library | Status | Installed Version |
+|------------|------------------|--------|-------------------|
+| Collapsible folders | @radix-ui/react-collapsible | **ALREADY INSTALLED** | 1.1.3 |
+| Collapsible wrapper | src/components/ui/collapsible.jsx | **ALREADY EXISTS** | shadcn/ui |
+| Drag-and-drop | @dnd-kit/core + @dnd-kit/sortable | **ALREADY INSTALLED** | 6.3.1 / 10.0.0 |
+| DnD utilities | @dnd-kit/utilities | **ALREADY INSTALLED** | 3.2.2 |
+| Settings tabs UI | @radix-ui/react-tabs | **ALREADY INSTALLED** | 1.1.3 |
+| Sidebar patterns | src/components/ui/sidebar.jsx | **ALREADY EXISTS** | shadcn/ui |
+| Database | PostgreSQL via pg | **ALREADY INSTALLED** | 8.11.3 |
 
-**Installation:**
-```bash
-npm install nodemailer @react-email/components
+**Verification (npm list output):**
+```
+@dnd-kit/core@6.3.1
+@dnd-kit/sortable@10.0.0
+@dnd-kit/utilities@3.2.2
+@radix-ui/react-collapsible@1.1.3
 ```
 
-**Why Nodemailer over alternatives:**
-- **vs SendGrid/Mailgun:** Vendor-agnostic SMTP means no lock-in, works with any email provider
-- **vs Resend (v6.9.1):** Nodemailer has 30x more dependents, proven stability, doesn't require paid API
-- **vs EmailEngine:** Overkill for simple threshold alerts - EmailEngine adds webhook infrastructure we don't need
-
-**SAP BTP integration:** Nodemailer works with SAP BTP's mail service binding via SMTP credentials from VCAP_SERVICES. No SAP-specific client needed.
+**npm registry latest versions (verified 2026-01-29):**
+- @dnd-kit/core: 6.3.1 (current = latest)
+- @dnd-kit/sortable: 10.0.0 (current = latest)
+- @radix-ui/react-collapsible: 1.1.12 (installed 1.1.3 is slightly behind but compatible)
 
 ---
 
-### Task Scheduling (REQUIRED - NEW)
+## Existing Components to Leverage
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| **node-cron** | 4.2.1 | Scheduled threshold checks | Simple cron syntax, in-process (no external daemon), 5M+ weekly downloads, battle-tested |
+### 1. Collapsible Component (Already Exists)
 
-**Installation:**
-```bash
-npm install node-cron
-```
+**Location:** `src/components/ui/collapsible.jsx`
 
-**Why node-cron:**
-- **vs node-schedule:** More concise cron syntax, simpler API
-- **vs Bull/BullMQ:** Overkill - we don't need Redis, queue persistence, or distributed jobs
-- **vs Cloud Foundry Tasks:** CF Tasks are for one-off jobs, not recurring schedules
-
-**Use case:** Check KPIs every hour/day and trigger email if thresholds exceeded.
-
----
-
-## Existing Stack (NO CHANGES NEEDED)
-
-### Charting - Recharts (ALREADY INSTALLED)
-
-| Technology | Version | Purpose | Status |
-|------------|---------|---------|--------|
-| **recharts** | 2.15.4 | Charts (line, bar, pie) | ✅ ALREADY IN USE |
-
-**Why NO new charting library:**
-- Recharts already used for MTTRBarChart and BugCategoryChart
-- Recharts LineChart component supports time-series data out-of-box
-- Has ResponsiveContainer, XAxis, YAxis, Tooltip, Legend - everything needed for trend charts
-- Adding another library (Chart.js, Victory, Nivo) increases bundle size for zero benefit
-
-**Trend chart implementation:**
 ```jsx
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+// Already exported and ready to use:
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 
-// Data from weekly_kpis table
-const data = [
-  { week: '2601a', mttr: 48, totalBugs: 245 },
-  { week: '2601b', mttr: 52, totalBugs: 267 },
-  { week: '2602a', mttr: 45, totalBugs: 223 }
-];
-
-<LineChart data={data}>
-  <Line type="monotone" dataKey="mttr" stroke="#8884d8" />
-  <XAxis dataKey="week" />
-  <YAxis />
-</LineChart>
+<Collapsible open={isOpen} onOpenChange={setIsOpen}>
+  <CollapsibleTrigger>
+    <FolderIcon /> {folderName}
+    <ChevronDown className={isOpen ? 'rotate-180' : ''} />
+  </CollapsibleTrigger>
+  <CollapsibleContent>
+    {/* Navigation items in this folder */}
+  </CollapsibleContent>
+</Collapsible>
 ```
 
----
+**Radix Collapsible features (per official docs):**
+- Controlled/uncontrolled state via `open`/`defaultOpen`
+- `onOpenChange` callback for state management
+- CSS variables for animation: `--radix-collapsible-content-height`, `--radix-collapsible-content-width`
+- ARIA disclosure pattern compliance
+- Keyboard support (Space/Enter toggle)
 
-### In-App Notifications - Radix Toast (ALREADY INSTALLED)
+### 2. DnD-Kit Pattern (Already Exists)
 
-| Technology | Version | Purpose | Status |
-|------------|---------|---------|--------|
-| **@radix-ui/react-toast** | 1.2.14 | Toast notifications | ✅ ALREADY INSTALLED |
-| **sonner** | 2.0.7 | Toast library | ✅ ALREADY INSTALLED (alternative) |
+**Existing usage:** `src/components/sync/SubtaskList.jsx` and `SubtaskItem.jsx`
 
-**Why NO new notification library:**
-- Radix Toast primitives already in `/src/components/ui/toast.jsx`
-- Sonner (alternative) also already installed
-- Both support notification center pattern (persist, dismiss, actions)
-- NO need for react-hot-toast, react-toastify, notistack, or any third-party solution
+The project already implements the exact pattern needed for folder management:
 
-**Notification center implementation:**
 ```jsx
-// Use existing notifications table + Radix Toast
-// notifications table already has: message, read, scheduled_date, created_date
-// Just add UI component to list/dismiss notifications
+// Existing pattern in SubtaskList.jsx:
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// This pattern directly applies to:
+// - Reordering folders
+// - Reordering items within folders
+// - Moving items between folders (with multiple SortableContexts)
 ```
+
+**Key existing patterns to reuse:**
+- `useSensors()` with PointerSensor + KeyboardSensor
+- `arrayMove()` for reordering
+- `useSortable()` hook for draggable items
+- `CSS.Transform.toString(transform)` for drag animations
+
+### 3. Sidebar Group Components (Already Exists)
+
+**Location:** `src/components/ui/sidebar.jsx`
+
+The shadcn/ui sidebar already has group/submenu patterns:
+
+```jsx
+// Already available:
+import {
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton
+} from "@/components/ui/sidebar";
+
+// SidebarMenuSub provides nested navigation with visual indent
+// SidebarGroup provides section grouping with labels
+```
+
+### 4. Settings Page Pattern (Already Exists)
+
+**Location:** `src/pages/Settings.jsx`
+
+The Settings page already implements a tabbed configuration UI:
+- Uses `@radix-ui/react-tabs` for navigation
+- Has existing patterns for CRUD operations (TaskAttribute management)
+- Uses Dialog for create/edit modals
+- Uses Table for listing items
+- Uses DropdownMenu for item actions
 
 ---
 
-### Database - PostgreSQL (ALREADY CONFIGURED)
+## Architecture for Menu Clustering
 
-| Technology | Version | Purpose | Status |
-|------------|---------|---------|--------|
-| **pg** | 8.11.3 | PostgreSQL client | ✅ ALREADY IN USE |
-| **notifications table** | - | In-app notifications | ✅ ALREADY EXISTS |
-| **weekly_kpis table** | - | Pre-calculated KPI history | ✅ ALREADY EXISTS |
+### Frontend Data Flow
 
-**Why NO database changes:**
-- `weekly_kpis` table already stores historical KPI data (upload_id, component, kpi_data JSONB)
-- `notifications` table already exists (message, read, scheduled_date)
-- Just need to:
-  1. Query weekly_kpis for trend data (GROUP BY upload_id ORDER BY calculated_at)
-  2. Insert notification when threshold exceeded
-  3. Send email using nodemailer
+```
+Layout.jsx                     MenuConfigContext              API/Database
+    |                               |                              |
+    |-- reads navigation -->        |                              |
+    |                               |                              |
+    |-- useMenuConfig() -->         |                              |
+    |   (provides folders,          |                              |
+    |    collapsed state)           |                              |
+    |                               |                              |
+Settings.jsx                        |                              |
+    |-- updates folders -->         |                              |
+    |-- drag-drop reorder -->       |                              |
+    |                               |-- saves config -->            |
+    |                               |                              |
+    |                               |<-- loads config --            |
+```
 
-**Threshold storage:** Add new table `kpi_thresholds` to store red/yellow/green zones per KPI:
+### Database Schema Addition
+
 ```sql
-CREATE TABLE kpi_thresholds (
+-- New table for folder configuration
+CREATE TABLE menu_folders (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  kpi_name VARCHAR(100) NOT NULL,  -- 'mttr', 'total_bugs', etc.
-  red_min NUMERIC,     -- Red zone starts here
-  yellow_min NUMERIC,  -- Yellow zone starts here
-  green_max NUMERIC,   -- Green zone ends here
-  email_enabled BOOLEAN DEFAULT true,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  user_id VARCHAR(100) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  icon VARCHAR(50),              -- lucide icon name
+  sort_order INTEGER DEFAULT 0,
+  is_collapsed BOOLEAN DEFAULT false,
+  created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- New table for menu item assignments
+CREATE TABLE menu_item_assignments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id VARCHAR(100) NOT NULL,
+  menu_item_key VARCHAR(100) NOT NULL,  -- e.g., 'Tasks', 'Calendar'
+  folder_id UUID REFERENCES menu_folders(id) ON DELETE SET NULL,
+  sort_order INTEGER DEFAULT 0,
+  is_hidden BOOLEAN DEFAULT false,
+  created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for query performance
+CREATE INDEX idx_menu_folders_user ON menu_folders(user_id);
+CREATE INDEX idx_menu_item_assignments_user ON menu_item_assignments(user_id);
+CREATE INDEX idx_menu_item_assignments_folder ON menu_item_assignments(folder_id);
 ```
+
+### Backend Service Layer
+
+```javascript
+// New service: server/services/MenuConfigService.js
+class MenuConfigService {
+  // Folders
+  async listFolders(userId)
+  async createFolder(userId, { name, icon })
+  async updateFolder(userId, folderId, updates)
+  async deleteFolder(userId, folderId)
+  async reorderFolders(userId, folderIds)
+
+  // Item assignments
+  async getItemAssignments(userId)
+  async assignItemToFolder(userId, menuItemKey, folderId, sortOrder)
+  async removeItemFromFolder(userId, menuItemKey)
+  async reorderItemsInFolder(userId, folderId, menuItemKeys)
+
+  // Collapsed state
+  async setFolderCollapsed(userId, folderId, isCollapsed)
+  async getCollapsedState(userId)
+}
+```
+
+### Frontend Components (New)
+
+| Component | Purpose | Uses |
+|-----------|---------|------|
+| `CollapsibleNavFolder.jsx` | Renders a folder with collapsible items | Collapsible, SidebarMenuSub |
+| `MenuConfigContext.jsx` | Provides folder config to Layout | React Context |
+| `MenuSettingsTab.jsx` | Settings tab for folder management | Tabs, Table, DnD |
+| `FolderItemAssigner.jsx` | Drag-drop interface for item assignment | @dnd-kit |
 
 ---
 
 ## What NOT to Add
 
-### ❌ Chart.js, Victory, Nivo, D3
-**Why:** Recharts already installed and sufficient for line charts. Adding another charting library increases bundle size (Chart.js = 200KB, D3 = 500KB+) with no functional benefit.
+### Libraries to Avoid
 
-### ❌ react-notifications, react-toastify, notistack
-**Why:** Radix Toast and Sonner already installed. These are duplicative and add unnecessary dependencies.
+| Library | Why NOT |
+|---------|---------|
+| **react-beautiful-dnd** | Deprecated, @dnd-kit already installed and superior |
+| **framer-motion** for collapse | Radix Collapsible has built-in CSS variable animation |
+| **react-collapse** | Radix Collapsible already handles this |
+| **react-sortable-hoc** | Legacy, @dnd-kit is the modern replacement |
+| **Additional sidebar libraries** | shadcn/ui sidebar already comprehensive |
 
-### ❌ Bull, BullMQ, Agenda (job queues)
-**Why:** Overkill for hourly threshold checks. Require Redis or MongoDB. node-cron is sufficient for simple schedules.
+### Patterns to Avoid
 
-### ❌ SendGrid, Mailgun, Postmark clients
-**Why:** Vendor lock-in. Nodemailer is SMTP-agnostic, works with any email provider, no recurring API costs.
-
-### ❌ SAP @sap/mail-client
-**Why:** Not necessary. Nodemailer works with SAP BTP mail service via standard SMTP credentials from VCAP_SERVICES.
-
-### ❌ WebSockets (Socket.io, Pusher)
-**Why:** Real-time notifications not required. Hourly threshold checks via cron + in-app notifications on next page load is sufficient.
-
-### ❌ Redis for caching
-**Why:** PostgreSQL query performance adequate. weekly_kpis table is pre-calculated. No latency issues to justify Redis.
+| Anti-Pattern | Why Avoid | Instead |
+|--------------|-----------|---------|
+| localStorage for config | Doesn't sync across devices | Use PostgreSQL |
+| Separate collapsed state per device | Confusing UX | Server-side persistence |
+| Complex nested DnD | Hard to implement correctly | Simple folder-to-folder moves |
+| Real-time sync (WebSocket) | Overkill for config changes | Reload on focus/manual refresh |
 
 ---
 
-## Integration Points
+## DnD-Kit Nested Container Pattern
 
-### Backend Service Layer
+For moving items between folders, use multiple `SortableContext` providers:
 
-**New service:** `server/services/KPIThresholdService.js`
-- `checkThresholds()` - Compare current KPIs to thresholds
-- `sendEmailAlert(userId, kpiName, value, threshold)` - Send email via Nodemailer
-- `createNotification(userId, message)` - Insert into notifications table
+```jsx
+// Pattern for Settings UI - drag items between folders
+<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
+  {/* Unassigned items pool */}
+  <SortableContext items={unassignedItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
+    <div className="border p-4">
+      <h3>Unassigned Items</h3>
+      {unassignedItems.map(item => (
+        <DraggableMenuItem key={item.key} item={item} />
+      ))}
+    </div>
+  </SortableContext>
 
-**Email configuration (server/.env.development):**
-```env
-# Email settings (Nodemailer SMTP)
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_SECURE=false
-EMAIL_USER=alerts@example.com
-EMAIL_PASSWORD=app-specific-password
-EMAIL_FROM=P&E Manager Alerts <alerts@example.com>
+  {/* Each folder has its own sortable context */}
+  {folders.map(folder => (
+    <SortableContext
+      key={folder.id}
+      items={folder.items.map(i => i.key)}
+      strategy={verticalListSortingStrategy}
+    >
+      <div className="border p-4">
+        <h3>{folder.name}</h3>
+        {folder.items.map(item => (
+          <DraggableMenuItem key={item.key} item={item} />
+        ))}
+      </div>
+    </SortableContext>
+  ))}
+</DndContext>
 ```
 
-**Scheduled job (server/index.js):**
-```javascript
-import cron from 'node-cron';
-import KPIThresholdService from './services/KPIThresholdService.js';
+**Key DnD-Kit guidance (per official docs):**
+- Nested SortableContexts are supported within single DndContext
+- Item IDs must be unique across ALL contexts (no collisions)
+- Use `over.id` in `onDragEnd` to detect target container
+- `closestCenter` collision detection works for simple use cases
 
-// Check thresholds every hour
-cron.schedule('0 * * * *', async () => {
-  console.log('Running threshold check...');
-  await KPIThresholdService.checkAllThresholds();
-});
+---
+
+## Integration with Existing Layout
+
+### Current Layout.jsx Structure
+
+```jsx
+// Current: Flat navigation array
+const peopleNavigation = [
+  { name: "Tasks", icon: CheckSquare, href: createPageUrl("Tasks"), ... },
+  { name: "Calendar", icon: Calendar, href: createPageUrl("Calendar"), ... },
+  // ... 16 total items
+];
+
+// Current: Simple map rendering
+{navigation.map((item) => (
+  <Link key={item.name} to={item.href} ...>
+    <item.icon />
+    {item.name}
+  </Link>
+))}
+```
+
+### Target Layout.jsx Structure
+
+```jsx
+// New: Menu config from context
+const { folders, unfoldered, isCollapsed, toggleCollapsed } = useMenuConfig();
+
+// New: Render folders with collapsible content
+{folders.map(folder => (
+  <Collapsible
+    key={folder.id}
+    open={!isCollapsed[folder.id]}
+    onOpenChange={() => toggleCollapsed(folder.id)}
+  >
+    <CollapsibleTrigger className="flex items-center px-4 py-2 w-full">
+      <FolderIcon className="mr-2" />
+      {folder.name}
+      <ChevronDown className={cn("ml-auto", !isCollapsed[folder.id] && "rotate-180")} />
+    </CollapsibleTrigger>
+    <CollapsibleContent>
+      {folder.items.map(item => (
+        <Link key={item.name} to={item.href} className="pl-8">
+          <item.icon />
+          {item.name}
+        </Link>
+      ))}
+    </CollapsibleContent>
+  </Collapsible>
+))}
+
+{/* Unfoldered items render directly */}
+{unfoldered.map(item => (
+  <Link key={item.name} to={item.href}>
+    <item.icon />
+    {item.name}
+  </Link>
+))}
 ```
 
 ---
 
-### Frontend Components
+## API Endpoints (New)
 
-**New components:**
-1. `src/components/bugs/KPITrendChart.jsx` - Line chart showing week-over-week KPI trends using Recharts
-2. `src/components/notifications/NotificationCenter.jsx` - Dropdown showing recent notifications using existing notifications table
-3. `src/components/bugs/ThresholdSettings.jsx` - Form to configure red/yellow/green thresholds per KPI
-
-**No new UI library needed:** All components use existing Radix UI primitives (Dialog, Popover, Form, Toast).
-
----
-
-## Environment Configuration
-
-### Development
-```env
-# .env.development (backend)
-EMAIL_HOST=smtp.mailtrap.io  # Use Mailtrap for dev testing
-EMAIL_PORT=2525
-EMAIL_USER=dev-user
-EMAIL_PASSWORD=dev-password
-EMAIL_FROM=dev@pe-manager.local
-CRON_ENABLED=false  # Disable cron in dev (manual triggers)
 ```
+GET    /api/menu-config           - Get folders + assignments for user
+POST   /api/menu-config/folders   - Create folder
+PUT    /api/menu-config/folders/:id - Update folder
+DELETE /api/menu-config/folders/:id - Delete folder
+POST   /api/menu-config/folders/reorder - Reorder folders
 
-### Production (SAP BTP)
-```env
-# Read from VCAP_SERVICES mail service binding
-# No .env needed - credentials auto-injected
+POST   /api/menu-config/assign    - Assign item to folder
+DELETE /api/menu-config/assign/:key - Remove item from folder
+POST   /api/menu-config/items/reorder - Reorder items within folder
+
+PUT    /api/menu-config/collapsed/:folderId - Toggle collapsed state
 ```
-
-**SAP BTP mail service:** Bind mail service to backend app, Nodemailer reads from `VCAP_SERVICES`:
-```javascript
-const vcapServices = JSON.parse(process.env.VCAP_SERVICES || '{}');
-const mailService = vcapServices['mail']?.[0]?.credentials;
-const emailConfig = {
-  host: mailService?.hostname,
-  port: mailService?.port,
-  auth: {
-    user: mailService?.username,
-    pass: mailService?.password
-  }
-};
-```
-
----
-
-## Migration Path
-
-### Phase 1: Trend Charts (No new dependencies)
-1. Add KPITrendChart component using existing Recharts
-2. Query weekly_kpis table for historical data
-3. Display line chart on dashboard
-
-### Phase 2: Email Notifications (Add nodemailer)
-1. `npm install nodemailer @react-email/components`
-2. Create KPIThresholdService with email sending
-3. Add threshold configuration UI
-4. Test with Mailtrap in development
-
-### Phase 3: Scheduled Checks (Add node-cron)
-1. `npm install node-cron`
-2. Add cron job to server/index.js
-3. Check thresholds hourly
-4. Deploy to SAP BTP with mail service binding
-
-### Phase 4: In-App Notification Center (No new dependencies)
-1. Create NotificationCenter component using Radix Popover
-2. Query existing notifications table
-3. Add bell icon to nav with unread count
-4. Mark as read on click
 
 ---
 
 ## Bundle Size Impact
 
-**Current bundle size:** ~800KB (gzipped: ~250KB)
+**Frontend impact:** 0 bytes
+- All required libraries already installed
+- No new dependencies
 
-**New additions:**
-- nodemailer: Backend only (no frontend impact)
-- @react-email/components: Backend only (no frontend impact)
-- node-cron: Backend only (no frontend impact)
-
-**Frontend impact:** 0 bytes (all new features use existing libraries)
-
----
-
-## Testing Strategy
-
-### Email Testing
-- **Development:** Mailtrap.io (free, catches all emails, no real sending)
-- **Staging:** Real SMTP with test email addresses
-- **Production:** SAP BTP mail service with real recipients
-
-### Notification Testing
-- Unit tests for NotificationService (existing pattern)
-- Integration tests for threshold checks
-- E2E tests for notification center UI
-
-### Chart Testing
-- Unit tests for data transformation (weekly_kpis → chart data)
-- Snapshot tests for KPITrendChart rendering
-- Visual regression tests (optional, use Percy/Chromatic)
+**Backend impact:** Minimal
+- New service file (~5KB)
+- New route file (~3KB)
+- New migration (~2KB SQL)
 
 ---
 
-## Security Considerations
+## Version Verification Summary
 
-### Email
-- **SMTP credentials:** Never commit to git, use environment variables or VCAP_SERVICES
-- **Rate limiting:** Limit emails to 1 per KPI per day (prevent spam)
-- **Recipient validation:** Only send to verified user emails in database
-- **Content sanitization:** Escape user input in email templates (XSS prevention)
+| Package | Installed | Latest | Status |
+|---------|-----------|--------|--------|
+| @dnd-kit/core | 6.3.1 | 6.3.1 | Current |
+| @dnd-kit/sortable | 10.0.0 | 10.0.0 | Current |
+| @dnd-kit/utilities | 3.2.2 | 3.2.2 | Current |
+| @radix-ui/react-collapsible | 1.1.3 | 1.1.12 | Compatible |
 
-### Scheduled Jobs
-- **Error handling:** Catch exceptions in cron jobs (prevent crash loops)
-- **Logging:** Log all threshold checks and email sends (audit trail)
-- **Idempotency:** Don't send duplicate emails (check last_notified_at timestamp)
+**Source:** npm registry queries via `npm view [package] version` (2026-01-29)
 
 ---
 
-## Alternatives Considered
+## Confidence Assessment
 
-### Charting Libraries
-| Library | Pros | Cons | Decision |
-|---------|------|------|----------|
-| Recharts | Already installed, React-native, composable | - | ✅ USE THIS |
-| Chart.js | Popular, feature-rich | 200KB, not React-native | ❌ Skip |
-| Victory | Highly customizable | 300KB, steep learning curve | ❌ Skip |
-| Nivo | Beautiful defaults | 500KB, opinionated | ❌ Skip |
+| Area | Confidence | Rationale |
+|------|------------|-----------|
+| Collapsible UI | HIGH | Radix component already installed, shadcn wrapper exists |
+| Drag-and-drop | HIGH | @dnd-kit already used in project, pattern established |
+| Settings UI | HIGH | Follows existing Settings.jsx patterns exactly |
+| Database schema | HIGH | Standard PostgreSQL patterns, follows existing conventions |
+| Layout integration | MEDIUM | Requires refactor of Layout.jsx, but pattern is clear |
 
-### Email Libraries
-| Library | Pros | Cons | Decision |
-|---------|------|------|----------|
-| Nodemailer | Universal SMTP, 1.4M dependents | Lower-level API | ✅ USE THIS |
-| SendGrid | Easy API, reliable | Vendor lock-in, costs $$ | ❌ Skip |
-| Resend | Modern API, good DX | New (less proven), requires API key | ❌ Skip |
-| EmailEngine | Feature-rich, webhooks | Overkill for alerts | ❌ Skip |
-
-### Task Scheduling
-| Library | Pros | Cons | Decision |
-|---------|------|------|----------|
-| node-cron | Simple, in-process | Single-instance only | ✅ USE THIS |
-| node-schedule | Flexible API | More complex | ❌ Skip |
-| Bull/BullMQ | Distributed, persistent | Requires Redis | ❌ Skip |
-| CF Tasks | Cloud-native | One-off only (not recurring) | ❌ Skip |
-
----
-
-## Sources
-
-### Official Documentation
-- Nodemailer GitHub (verified 2026-01-28): https://github.com/nodemailer/nodemailer
-- Nodemailer v7.0.13 (latest, released 2026-01-27)
-- Recharts documentation: Already in use (v2.15.4)
-- Radix Toast: Already installed (v1.2.14)
-- node-cron npm package: v4.2.1 (verified via npm registry)
-
-### Package Verification
-- Nodemailer: 1.4M+ dependent repositories on GitHub
-- node-cron: 5M+ weekly downloads on npm
-- @react-email/components: v1.0.6 (verified via npm registry)
-- Resend: v6.9.1 (considered but rejected)
-
-### Confidence Assessment
-- **Email solution:** HIGH (Nodemailer is industry standard, actively maintained, recent release)
-- **Charting:** HIGH (Recharts already in use, proven for time-series)
-- **Scheduling:** HIGH (node-cron is simple, widely adopted)
-- **Notifications:** HIGH (Radix Toast already installed and sufficient)
+**Overall:** HIGH - This feature requires zero new dependencies and builds entirely on proven patterns already in the codebase.
 
 ---
 
 ## Summary
 
-**Total new dependencies:** 3 (all backend, zero frontend impact)
-- nodemailer (7.0.13)
-- @react-email/components (1.0.6)
-- node-cron (4.2.1)
+**New dependencies:** 0
 
-**Total bundle size increase:** 0 bytes (frontend)
-**Backend runtime increase:** ~5MB (Nodemailer + dependencies)
+**Existing dependencies leveraged:**
+- @radix-ui/react-collapsible (1.1.3)
+- @dnd-kit/core (6.3.1)
+- @dnd-kit/sortable (10.0.0)
+- @dnd-kit/utilities (3.2.2)
+- pg (PostgreSQL client, 8.11.3)
 
-**Stack philosophy:** Maximize existing investments (Recharts, Radix, PostgreSQL), minimize new dependencies. Only add email capability (Nodemailer) and scheduling (node-cron) which are unavoidable requirements.
+**New code required:**
+- Database migration (2 tables)
+- MenuConfigService.js (backend)
+- menuConfig.js routes (backend)
+- MenuConfigContext.jsx (frontend)
+- CollapsibleNavFolder.jsx (frontend)
+- MenuSettingsTab.jsx (frontend)
+
+**Stack philosophy:** 100% leverage existing investments. The @dnd-kit + Radix + shadcn/ui stack is complete for this feature. Adding any new library would be redundant.
