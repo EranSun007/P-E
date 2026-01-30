@@ -9,6 +9,7 @@ import { getCurrentCycle, getSprintById, listSprints, getPreviousCycleId } from 
 export const TEAM_DEPARTMENTS = [
   { id: 'all', label: 'All Teams' },
   { id: 'metering', label: 'Metering' },
+  { id: 'reporting', label: 'Reporting' },
 ];
 
 const TeamStatusContext = createContext(null);

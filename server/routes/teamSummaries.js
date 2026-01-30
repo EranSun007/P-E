@@ -93,4 +93,34 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+/**
+ * POST /bulk - Bulk import summaries
+ * Body: { summaries: Array<SummaryData> }
+ */
+router.post('/bulk', async (req, res) => {
+  try {
+    const { summaries } = req.body;
+
+    if (!Array.isArray(summaries)) {
+      return res.status(400).json({ error: 'summaries must be an array' });
+    }
+
+    const results = { imported: 0, errors: [] };
+
+    for (const summary of summaries) {
+      try {
+        await service.create(req.user.id, summary);
+        results.imported++;
+      } catch (err) {
+        results.errors.push({ summary: summary.memberName, error: err.message });
+      }
+    }
+
+    res.status(201).json(results);
+  } catch (error) {
+    console.error('POST /api/team-summaries/bulk error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

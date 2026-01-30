@@ -5,19 +5,15 @@
  */
 
 import PropTypes from 'prop-types';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useAppMode } from '@/contexts/AppModeContext';
 import { CollapsibleFolder } from '@/components/navigation/CollapsibleFolder';
 import { NativeCollapsibleFolder } from '@/components/navigation/NativeCollapsibleFolder';
 
-// DEBUG: Toggle this to switch between Radix and Native collapsible for testing
-// Set to true to use native HTML details/summary instead of Radix Collapsible
+// Toggle between Radix and Native collapsible for testing
 const USE_NATIVE_COLLAPSIBLE = false;
-
-// DEBUG: Track render count
-let hierNavRenderCount = 0;
 
 /**
  * HierarchicalNavigation renders navigation items grouped by folder
@@ -28,15 +24,7 @@ let hierNavRenderCount = 0;
 export function HierarchicalNavigation({ navigation, onItemClick }) {
   const { folders, items } = useNavigation();
   const { isProductMode } = useAppMode();
-
-  // DEBUG: Track renders
-  hierNavRenderCount++;
-  console.log('[HierarchicalNavigation] Render #', hierNavRenderCount, {
-    foldersCount: folders?.length,
-    itemsCount: items?.length,
-    navigationCount: navigation?.length,
-    isProductMode
-  });
+  const navigate = useNavigate();
 
   // Group navigation items by folder
   // NavigationSettings stores itemId as lowercase (e.g., "tasks", "github")
@@ -55,16 +43,24 @@ export function HierarchicalNavigation({ navigation, onItemClick }) {
   const sortedFolders = [...folders].sort((a, b) => a.order - b.order);
 
   // Render a single navigation link
+  // Use button with navigate() instead of Link - more reliable than Link's internal handler
+  // which sometimes updates browser URL without triggering React re-render
   const renderNavLink = (item) => (
-    <Link
+    <button
       key={item.name}
-      to={item.href}
+      type="button"
       onClick={(e) => {
-        console.log('[HierarchicalNavigation] Link clicked:', item.name, item.href);
+        const targetPath = new URL(item.href, window.location.origin).pathname;
+        console.log('[HierarchicalNavigation] Nav clicked:', item.name, targetPath);
+
+        // Close mobile sidebar
         onItemClick?.(e);
+
+        // Use navigate() directly - bypasses Link's unreliable behavior
+        navigate(targetPath);
       }}
       className={cn(
-        'flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors duration-200',
+        'w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors duration-200 text-left',
         isProductMode
           ? item.current
             ? 'bg-purple-900/50 text-purple-300'
@@ -76,12 +72,11 @@ export function HierarchicalNavigation({ navigation, onItemClick }) {
     >
       <item.icon className="h-5 w-5 mr-3" />
       {item.name}
-    </Link>
+    </button>
   );
 
-  // Select the collapsible component based on debug flag
+  // Select the collapsible component based on flag
   const FolderComponent = USE_NATIVE_COLLAPSIBLE ? NativeCollapsibleFolder : CollapsibleFolder;
-  console.log('[HierarchicalNavigation] Using', USE_NATIVE_COLLAPSIBLE ? 'NATIVE' : 'RADIX', 'collapsible');
 
   return (
     <>

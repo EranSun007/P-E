@@ -70,12 +70,12 @@ After 2-3 page navigations, menu clicks stop working and the site becomes frozen
 
 ## Testing Results
 
-### Test Environment
+### Test Environment - Local (2026-01-29)
 - Local development server (localhost:5173)
 - Browser: Playwright/Chromium
 - Backend: Running on localhost:3001
 
-### Tests Performed
+### Local Tests Performed
 
 1. **Basic Navigation (5 pages)**
    - Result: ✅ PASSED
@@ -93,44 +93,82 @@ After 2-3 page navigations, menu clicks stop working and the site becomes frozen
    - No collapsible folders visible in current environment
    - API returning "Unauthorized" for menu-config
 
-### Key Observations
+---
+
+### Test Environment - Production (2026-01-29)
+- Production URL: https://pe-manager-frontend.cfapps.eu01-canary.hana.ondemand.com
+- Browser: Playwright/Chromium (headless)
+- Deployed commit: c5be8cbe (with debug instrumentation)
+
+### Production Tests Performed
+
+1. **Intensive Navigation with Folders (30+ clicks)**
+   - Result: ✅ PASSED
+   - All clicks captured AND bubbled correctly
+   - Navigation working without issues
+   - 2 folders configured: "Teams" and "Engineering"
+
+2. **Folder Collapse/Expand Cycles**
+   - Result: ✅ PASSED
+   - CollapsibleFolder Instance 1: 11 renders
+   - CollapsibleFolder Instance 2: 9 renders
+   - Radix Collapsible functioning correctly
+   - No event propagation issues observed
+
+3. **Rapid Navigation Sequence**
+   - Tested: Calendar → Projects → Team → GitHub → Bug Dashboard → Metrics → Team Sync → Duties → Stakeholders → Peers → Jira → Team Status → Tasks
+   - All clicks captured in capture phase
+   - All clicks bubbled to document
+   - Every navigation completed successfully
+
+### Key Observations - Production
 
 1. **Click Events Are Working**
    - Every click was captured in the capture phase
    - Every click bubbled to the document
    - No evidence of event propagation being blocked
+   - Pattern: `[Layout] Click captured:` always followed by `[Layout] Click bubbled to document`
 
-2. **Navigation Context Renders**
+2. **Radix Collapsible Working Correctly**
+   - `onOpenChange` triggered for every folder toggle
+   - `useCollapsedFolders` hook called as expected
+   - Renders incrementing normally (not exponentially)
+   - Smooth expand/collapse animations
+
+3. **Navigation Context Renders**
    - NavigationProvider renders 5 times on initial load (expected due to auth flow)
    - HierarchicalNavigation renders 4 times on initial load
    - No runaway re-render cycles observed
 
-3. **No Folders Configured**
-   - The current test environment has no folders configured
-   - All navigation items render flat (no CollapsibleFolder components)
-   - This means Radix Collapsible is NOT being exercised in testing
+4. **No Memory Leaks Detected**
+   - CollapsibleFolder instances mounting and rendering as expected
+   - No duplicate mounts without unmounts
+   - Render counts stable and predictable
 
 ---
 
 ## Theories & Status
 
 ### Theory 1: Radix UI Collapsible Bug
-**Status: INCONCLUSIVE**
-- Could not test because no folders are configured
-- Native alternative created for future testing
-- Recommendation: Test on environment with configured folders
+**Status: ⚠️ NOT REPRODUCED (but not ruled out)**
+- Production testing with folders: 30+ clicks, no freeze
+- Radix Collapsible rendering and toggling correctly
+- All onOpenChange events firing as expected
+- Possible: Bug requires specific timing/conditions not captured in automated testing
 
 ### Theory 2: React Router + Suspense Interaction
 **Status: LIKELY NOT THE CAUSE**
-- 15+ navigations worked without issues
+- 30+ navigations on production worked without issues
 - ErrorBoundary didn't catch any errors
 - Lazy loading working correctly
+- PageChunkErrorBoundary lifecycle normal
 
 ### Theory 3: Context Provider State Corruption
 **Status: LIKELY NOT THE CAUSE**
-- Render counts stable
+- Render counts stable on production
 - No excessive re-renders observed
 - State appears to be managed correctly
+- NavigationProvider renders reasonable (5 on load)
 
 ---
 
@@ -214,13 +252,33 @@ Also remove the test file:
 
 ## Summary
 
-The click freeze bug could not be reproduced in the current test environment. The diagnostic instrumentation is in place and working correctly. The most likely scenario is that the bug is related to:
+The click freeze bug could not be reproduced in either local or production testing despite extensive attempts:
 
-1. **Specific folder configuration** - When CollapsibleFolder components are actually rendering
-2. **Radix Collapsible state accumulation** - After repeated collapse/expand actions
-3. **Production-specific conditions** - Environment differences
+- **Local testing**: 15+ clicks, no folders (not fully testing Radix)
+- **Production testing**: 30+ clicks with 2 folders configured, extensive folder toggling
 
-To fully diagnose, testing needs to be performed with:
-- Configured folders in navigation
-- Multiple collapse/expand cycles
-- Extended usage session
+### What We Know
+1. Debug instrumentation is working correctly and deployed to production
+2. All click events are captured and bubbled properly in our tests
+3. Radix Collapsible is functioning normally with proper state management
+4. No event propagation blocking detected
+5. No runaway re-renders or memory issues observed
+
+### What We Don't Know
+1. The exact trigger conditions for the bug
+2. Whether it requires specific timing (rapid double-clicks, interruptions)
+3. Whether it requires longer session time (hours of usage)
+4. Whether it's browser-specific or device-specific
+
+### Possible Causes Still Under Investigation
+1. **Race condition** - Specific timing between folder toggle and navigation
+2. **User interaction pattern** - Human clicking behavior differs from automated
+3. **Browser state accumulation** - Bug may only appear after prolonged browser session
+4. **Specific navigation sequence** - May require a particular path combination
+
+### Recommendation
+Keep the debug instrumentation deployed. When the bug occurs for a user:
+1. Have them open DevTools Console
+2. Look for missing `[Layout] Click bubbled to document` after a click
+3. Check render counts for exponential growth
+4. Note the exact sequence of actions that triggered it

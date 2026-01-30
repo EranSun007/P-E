@@ -29,7 +29,10 @@ function handleHttpError(response, endpoint) {
   }
 }
 
-// Helper function to make authenticated requests
+// Default request timeout in milliseconds (30 seconds)
+const DEFAULT_TIMEOUT = 30000;
+
+// Helper function to make authenticated requests with timeout
 async function fetchWithAuth(url, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
@@ -42,10 +45,18 @@ async function fetchWithAuth(url, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  // Set up AbortController for timeout
+  const controller = new AbortController();
+  const timeout = options.timeout || DEFAULT_TIMEOUT;
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, timeout);
+
   try {
     const response = await fetch(url, {
       ...options,
       headers,
+      signal: controller.signal,
     });
 
     handleHttpError(response, url);
@@ -57,8 +68,18 @@ async function fetchWithAuth(url, options = {}) {
 
     return await response.json();
   } catch (error) {
+    // Handle abort/timeout errors
+    if (error.name === 'AbortError') {
+      const timeoutError = new Error(`Request timeout after ${timeout}ms: ${url}`);
+      timeoutError.name = 'TimeoutError';
+      timeoutError.url = url;
+      logger.error('API request timeout', { url, timeout });
+      throw timeoutError;
+    }
     logger.error('API request failed', { url, error: String(error) });
     throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

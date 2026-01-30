@@ -126,6 +126,21 @@ const MIGRATIONS = [
     version: '024_archived_at',
     name: 'Add archived_at timestamp column to projects',
     file: '024_archived_at.sql'
+  },
+  {
+    version: '025_enable_sync_all_projects',
+    name: 'Enable sync for all existing projects to appear in Team Sync',
+    file: '025_enable_sync_all_projects.sql'
+  },
+  {
+    version: '026_default_category_for_projects',
+    name: 'Set default category for projects to appear in Kanban columns',
+    file: '026_default_category_for_projects.sql'
+  },
+  {
+    version: '027_fix_projects_trigger',
+    name: 'Drop broken projects trigger referencing non-existent updated_date',
+    file: '027_fix_projects_trigger.sql'
   }
 ];
 

@@ -1,7 +1,7 @@
 // src/services/realTimeUpdateService.js
 // Real-time update service for calendar view modes
 
-import { localClient } from '../api/localClient.js';
+import { Meeting, TimeOff, Duty, TeamMember, CalendarEvent } from '../api/entities.js';
 
 /**
  * Service for handling real-time updates to calendar data
@@ -46,21 +46,27 @@ class RealTimeUpdateService {
 
   /**
    * Get data for a specific entity type
+   * Uses unified entity exports which automatically select API or local client
    */
   async getEntityData(entityType) {
-    switch (entityType) {
-      case 'meetings':
-        return await localClient.entities.Meeting.list();
-      case 'out_of_office':
-        return await localClient.entities.OutOfOffice.list();
-      case 'duties':
-        return await localClient.entities.Duty.list();
-      case 'team_members':
-        return await localClient.entities.TeamMember.list();
-      case 'calendar_events':
-        return await localClient.entities.CalendarEvent.list();
-      default:
-        return [];
+    try {
+      switch (entityType) {
+        case 'meetings':
+          return await Meeting.list();
+        case 'out_of_office':
+          return await TimeOff.list();
+        case 'duties':
+          return await Duty.list();
+        case 'team_members':
+          return await TeamMember.list();
+        case 'calendar_events':
+          return await CalendarEvent.list();
+        default:
+          return [];
+      }
+    } catch (error) {
+      console.error(`Error fetching ${entityType}:`, error);
+      return [];
     }
   }
 

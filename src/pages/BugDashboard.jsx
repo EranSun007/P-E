@@ -42,7 +42,7 @@ import {
  * - CSV upload for importing JIRA data
  */
 const BugDashboard = () => {
-  console.log('[BugDashboard] Component rendering');
+  console.log('[BugDashboard] Component rendering START');
 
   // Upload dialog state
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -64,23 +64,29 @@ const BugDashboard = () => {
   /**
    * Generate sprint options (6 sprints before and after current)
    */
+  console.log('[BugDashboard] About to run sprintOptions useMemo');
   const sprintOptions = useMemo(() => {
-    console.log('[BugDashboard] Generating sprint options');
+    console.log('[BugDashboard] sprintOptions useMemo EXECUTING');
     try {
+      console.log('[BugDashboard] Calling getCurrentCycle...');
       const currentCycle = getCurrentCycle();
       console.log('[BugDashboard] Current cycle:', currentCycle?.id);
       // Go back 3 cycles (6 sprints) from 2 cycles before current
+      console.log('[BugDashboard] Calling getPreviousCycleId 3x...');
       const startCycleId = getPreviousCycleId(getPreviousCycleId(getPreviousCycleId(currentCycle.id)));
       console.log('[BugDashboard] Start cycle ID:', startCycleId);
       // Get 6 cycles (12 sprints total)
+      console.log('[BugDashboard] Calling listSprints...');
       const sprints = listSprints(startCycleId, 6);
       console.log('[BugDashboard] Generated sprints:', sprints?.length);
+      console.log('[BugDashboard] sprintOptions useMemo COMPLETE');
       return sprints;
     } catch (err) {
       console.error('[BugDashboard] Failed to generate sprint options:', err);
       return [];
     }
   }, []);
+  console.log('[BugDashboard] sprintOptions useMemo done, continuing render');
 
   /**
    * Load uploads list on mount
@@ -216,10 +222,11 @@ const BugDashboard = () => {
   };
 
   console.log('[BugDashboard] State:', { loading, error, uploadsCount: uploads.length, selectedUploadId, selectedSprint });
+  console.log('[BugDashboard] Component rendering END - about to return JSX');
 
   // Initial loading state
   if (loading) {
-    console.log('[BugDashboard] Rendering loading state');
+    console.log('[BugDashboard] Rendering loading state - returning JSX');
     return (
       <div className="space-y-6">
         <PageHeader onUploadClick={() => setUploadDialogOpen(true)} />

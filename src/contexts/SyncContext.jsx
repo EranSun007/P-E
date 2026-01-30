@@ -1,7 +1,7 @@
 // src/contexts/SyncContext.jsx
 // Context for managing TeamSync state and actions
 
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { SyncItem } from '@/api/entities';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -35,6 +35,10 @@ export function SyncProvider({ children }) {
   const [archivedCount, setArchivedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const { isAuthenticated } = useAuth();
+
+  // Track if initial data has been loaded to prevent re-fetch on navigation
+  const dataLoadedRef = useRef(false);
+  const previousTeamRef = useRef(currentTeam);
 
   // Computed grouping of items by category
   const itemsByCategory = useMemo(() => {
@@ -89,10 +93,28 @@ export function SyncProvider({ children }) {
     }
   }, [isAuthenticated, currentTeam]);
 
-  // Initial fetch on mount and when auth or team changes
+  // Initial fetch on mount and when auth changes
+  // Only re-fetch when team actually changes, not on every navigation
   useEffect(() => {
+    // Reset loaded state when user logs out
+    if (!isAuthenticated) {
+      dataLoadedRef.current = false;
+      previousTeamRef.current = 'all';
+      return;
+    }
+
+    // Check if team changed
+    const teamChanged = previousTeamRef.current !== currentTeam;
+    previousTeamRef.current = currentTeam;
+
+    // Skip if already loaded and team hasn't changed
+    if (dataLoadedRef.current && !teamChanged) {
+      return;
+    }
+
+    dataLoadedRef.current = true;
     refresh();
-  }, [refresh]);
+  }, [isAuthenticated, currentTeam, refresh]);
 
   // Create a new sync item
   const createItem = useCallback(async (data) => {

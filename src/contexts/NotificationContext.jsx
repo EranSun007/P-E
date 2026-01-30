@@ -1,7 +1,7 @@
 // src/contexts/NotificationContext.jsx
 // Context for managing notification state and actions
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Notification } from '@/api/entities';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -12,6 +12,9 @@ export function NotificationProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const { isAuthenticated } = useAuth();
+
+  // Track if initial data has been loaded to prevent re-fetch on navigation
+  const dataLoadedRef = useRef(false);
 
   // Fetch notifications and unread count
   const refresh = useCallback(async () => {
@@ -38,9 +41,22 @@ export function NotificationProvider({ children }) {
   }, [isAuthenticated]);
 
   // Initial fetch on mount and auth change
+  // Only fetch once per authentication session to prevent re-fetch on navigation
   useEffect(() => {
+    // Reset loaded state when user logs out
+    if (!isAuthenticated) {
+      dataLoadedRef.current = false;
+      return;
+    }
+
+    // Skip if already loaded
+    if (dataLoadedRef.current) {
+      return;
+    }
+
+    dataLoadedRef.current = true;
     refresh();
-  }, [refresh]);
+  }, [isAuthenticated, refresh]);
 
   // Mark a single notification as read (optimistic update)
   const markAsRead = useCallback(async (notificationId) => {

@@ -41,9 +41,6 @@ import { AIChatPanel, AIAssistantButton } from "@/components/ai";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { HierarchicalNavigation } from "@/components/navigation/HierarchicalNavigation";
 
-// Debug counter for tracking render cycles
-let layoutRenderCount = 0;
-
 export default function Layout({ children, currentPageName }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
@@ -52,41 +49,6 @@ export default function Layout({ children, currentPageName }) {
   const { isPresentationMode, togglePresentationMode } = useDisplayMode();
   const { isProductMode, toggleAppMode } = useAppMode();
   const navigate = useNavigate();
-
-  // DEBUG: Track render count
-  layoutRenderCount++;
-  console.log('[Layout] Render #', layoutRenderCount, { currentPageName, isProductMode });
-
-  // DEBUG: Global click tracking to detect when clicks stop propagating
-  useEffect(() => {
-    const captureHandler = (e) => {
-      const target = e.target;
-      const link = target.closest('a');
-      const button = target.closest('button');
-      console.log('[Layout] Click captured:', {
-        target: target.tagName,
-        className: target.className?.slice?.(0, 50),
-        isLink: !!link,
-        linkHref: link?.href,
-        isButton: !!button,
-        buttonText: button?.textContent?.slice?.(0, 30)
-      });
-    };
-
-    const bubbleHandler = (e) => {
-      console.log('[Layout] Click bubbled to document');
-    };
-
-    // Capture phase - catches clicks before any handler can stop them
-    document.addEventListener('click', captureHandler, true);
-    // Bubble phase - only fires if click wasn't stopped
-    document.addEventListener('click', bubbleHandler, false);
-
-    return () => {
-      document.removeEventListener('click', captureHandler, true);
-      document.removeEventListener('click', bubbleHandler, false);
-    };
-  }, []);
 
   useEffect(() => {
     const fetchUser = async () => {
