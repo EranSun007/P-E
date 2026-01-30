@@ -48,11 +48,14 @@ export function transformSchemaToGraph(tables) {
     const columnIndex = index % 4;
     const rowIndex = Math.floor(index / 4);
 
+    // API returns 'name' not 'tableName'
+    const tableName = table.tableName || table.name;
+
     return {
-      id: table.tableName,
+      id: tableName,
       type: 'entity',
       data: {
-        tableName: table.tableName,
+        tableName: tableName,
         columns: enrichedColumns,
         foreignKeys: table.foreignKeys || [],
         indexes: table.indexes || [],
@@ -68,14 +71,17 @@ export function transformSchemaToGraph(tables) {
   // Create edges from foreign keys
   const edges = [];
   tables.forEach(table => {
+    const tableName = table.tableName || table.name;
     const foreignKeys = table.foreignKeys || [];
     foreignKeys.forEach(fk => {
+      // Handle different FK field naming conventions
+      const fkColumns = fk.columns || [fk.sourceColumn];
       edges.push({
-        id: `${table.tableName}-${fk.constraintName}`,
-        source: table.tableName,
-        target: fk.referencedTable,
+        id: `${tableName}-${fk.constraintName}`,
+        source: tableName,
+        target: fk.targetTable || fk.referencedTable,
         type: 'smoothstep',
-        label: fk.columns.join(', '),
+        label: Array.isArray(fkColumns) ? fkColumns.join(', ') : fkColumns,
         animated: false,
         style: { strokeWidth: 2, stroke: '#64748b' },
         markerEnd: { type: MarkerType.ArrowClosed, color: '#64748b' },

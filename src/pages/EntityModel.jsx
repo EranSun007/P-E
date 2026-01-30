@@ -40,7 +40,8 @@ export default function EntityModel() {
           throw new Error(`Failed to load schema: ${response.statusText}`);
         }
 
-        const tables = await response.json();
+        const data = await response.json();
+        const tables = data.tables || data; // Handle both { tables: [...] } and direct array
         const { nodes: graphNodes, edges: graphEdges } = transformSchemaToGraph(tables);
 
         setNodes(graphNodes);
