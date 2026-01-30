@@ -11,6 +11,10 @@ import '@xyflow/react/dist/style.css';
 import EntityNode from '@/components/schema/EntityNode';
 import EntityDetailsPanel from '@/components/schema/EntityDetailsPanel';
 import { transformSchemaToGraph } from '@/components/schema/schemaTransform';
+import AuthService from '@/services/authService';
+
+// Get API base URL from environment (same as apiClient)
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const nodeTypes = {
   entity: EntityNode
@@ -35,7 +39,14 @@ export default function EntityModel() {
         setLoading(true);
         setError(null);
 
-        const response = await fetch('/api/schema/tables');
+        // Build request with auth header
+        const headers = { 'Content-Type': 'application/json' };
+        const token = AuthService.getToken();
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/schema/tables`, { headers });
         if (!response.ok) {
           throw new Error(`Failed to load schema: ${response.statusText}`);
         }
